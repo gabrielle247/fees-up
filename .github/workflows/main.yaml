@@ -1,0 +1,42 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch: # Allows you to run manually button click
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Get your code
+      - uses: actions/checkout@v4
+
+      # 2. Install Java (Required for Android)
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      # 3. Install Flutter
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+
+      # 4. Download libraries
+      - name: Get Dependencies
+        run: flutter pub get
+
+      # 5. Build the APK
+      - name: Build APK
+        run: flutter build apk --release --no-tree-shake-icons
+
+      # 6. Upload the APK so you can download it
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release
+          path: build/app/outputs/flutter-apk/app-release.apk
