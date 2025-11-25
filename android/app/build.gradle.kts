@@ -15,7 +15,7 @@ plugins {
 
 android {
     // 1. ✅ MATCHING YOUR KOTLIN FILE
-    namespace = "com.gabrielle247.fees_up"
+    namespace = "com.example.fees_up"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
