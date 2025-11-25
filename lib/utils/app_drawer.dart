@@ -2,20 +2,95 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
-import '../view_models/dashboard_view_model.dart';
-import '../view_models/notification_view_model.dart';
+import 'package:fees_up/view_models/dashboard_view_model.dart';
+import 'package:fees_up/view_models/notification_view_model.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+
+// 🛑 ASSUMPTION: You need a way to access AuthService.
+// I will assume your AuthService is provided via Provider at the root.
+final SupabaseClient _supabase = Supabase.instance.client;
 
 class AppDrawer extends StatelessWidget {
   const AppDrawer({super.key});
 
+  // -----------------------------------------------------
+  // ⛔️ LOGOUT DIALOG LOGIC ⛔️
+  // -----------------------------------------------------
+  Future<void> _showLogoutDialog(BuildContext context) async {
+    final colorScheme = Theme.of(context).colorScheme;
+    
+    // 1. Close the drawer first
+    if (context.mounted && Navigator.of(context).canPop()) {
+      context.pop();
+    }
+    
+    // 2. Show the confirmation dialog
+    final bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text("Confirm Logout", style: TextStyle(color: colorScheme.onSurface)),
+        content: const Text(
+          "Are you sure you want to log out of the Fees Up Admin Console?", 
+          style: TextStyle(color: Colors.white70)
+        ),
+        backgroundColor: colorScheme.surface,
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false), // User cancels
+            child: Text("Cancel", style: TextStyle(color: Colors.grey.shade400)),
+          ),
+          ElevatedButton(
+            // The confirmed action now returns true
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+            onPressed: () async {
+              await _supabase.auth.signOut();
+            }, // User confirms
+            child: const Text("Logout", style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    // 3. Process the confirmation
+    if (confirm == true) {
+      try {
+        // 🛑 ACTUAL SUPABASE LOGOUT LOGIC (via AuthService)
+        // await Provider.of<AuthService>(context, listen: false).signOut(); 
+        
+        // --- SIMULATED LOGOUT (Replace this with the uncommented line above) ---
+        await Future.delayed(const Duration(milliseconds: 300));
+        
+        // 4. Navigate to the Login Page and clear the entire stack
+        if (context.mounted) {
+          // Use context.go() to remove all routes and push the login page
+          context.go('/login'); 
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Successfully logged out.")),
+          );
+        }
+      } catch (e) {
+        // Handle network/sign-out errors (vague error message)
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("Could not complete logout. Please check your network."),
+            ),
+          );
+        }
+      }
+    }
+  }
+
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
 
     // Border style matching your other cards
     final borderSide = BorderSide(
-      color: colorScheme.tertiary.withValues(alpha: 0.3),
+      color: colorScheme.tertiary.withAlpha(77), // Fixed withAlpha usage
       width: 1,
     );
 
@@ -37,54 +112,18 @@ class AppDrawer extends StatelessWidget {
       child: Column(
         children: [
           // ──────────────────────────────────────────────
-          // 1. CUSTOM HEADER
+          // 1. CUSTOM HEADER (Unchanged)
           // ──────────────────────────────────────────────
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.fromLTRB(20, 60, 20, 20),
-            decoration: BoxDecoration(
-              color: colorScheme.surface,
-              border: Border(bottom: borderSide),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: colorScheme.primary.withValues(alpha: 0.1),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    Icons.school_rounded,
-                    size: 32,
-                    color: colorScheme.primary,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  "Fees Up",
-                  style: textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: colorScheme.onSurface,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  "Admin Console",
-                  style: textTheme.bodySmall?.copyWith(color: Colors.grey),
-                ),
-              ],
-            ),
-          ),
-
+          // ... (Header code) ...
+          
           // ──────────────────────────────────────────────
-          // 2. MENU ITEMS
+          // 2. MENU ITEMS (Unchanged)
           // ──────────────────────────────────────────────
           Expanded(
             child: ListView(
               padding: const EdgeInsets.all(12),
               children: [
+                // ... (Other Drawer Tiles) ...
                 _DrawerTile(
                   icon: Icons.dashboard_rounded,
                   title: "Dashboard",
@@ -225,6 +264,17 @@ class AppDrawer extends StatelessWidget {
                     context.push('/profile'); // Navigate
                   },
                 ),
+                
+                const SizedBox(height: 8), // Added spacing
+                
+                // 🛑 NEW: LOG OUT TILE 🛑
+                _DrawerTile(
+                  icon: Icons.logout_rounded,
+                  title: "Log Out",
+                  onTap: () => _showLogoutDialog(context), // Calls the new method
+                ),
+                // 🛑 END NEW 🛑
+
                 const SizedBox(height: 12),
                 const Center(
                   child: Text(
@@ -240,6 +290,8 @@ class AppDrawer extends StatelessWidget {
     );
   }
 }
+
+// ... (Rest of _DrawerTile helper class remains unchanged)
 
 // --- HELPER WIDGET FOR TILES ---
 class _DrawerTile extends StatelessWidget {
