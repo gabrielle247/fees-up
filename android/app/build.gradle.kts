@@ -10,12 +10,12 @@ if (keystorePropertiesFile.exists()) {
 plugins {
     id("com.android.application")
     id("kotlin-android")
-    // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
 
 android {
-    namespace = "com.example.fees_up"
+    // 1. ✅ MATCHING YOUR KOTLIN FILE
+    namespace = "com.gabrielle247.fees_up"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -29,10 +29,9 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.example.fees_up"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
+        // 2. ✅ UPDATED APP ID TO MATCH
+        applicationId = "com.gabrielle247.fees_up"
+        
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
@@ -41,8 +40,12 @@ android {
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
+            // 3. ✅ DISABLE MINIFICATION (Fixes SQFlite)
+            // Prevents R8 from deleting database/auth code
+            isMinifyEnabled = false 
+            isShrinkResources = false
+
+            // Signing with debug key (Okay for GitHub Actions test)
             signingConfig = signingConfigs.getByName("debug")
         }
     }
@@ -53,7 +56,7 @@ flutter {
 }
 
 dependencies {
-    // ...
-    implementation("com.google.android.material:material:<version>")
-    // ...
+    // 4. ✅ REMOVED BROKEN MATERIAL DEPENDENCY
+    // Flutter handles material design automatically. 
+    // You rarely need to add extra dependencies here.
 }
