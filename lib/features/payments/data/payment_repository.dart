@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import 'package:fees_up/services/database_service.dart';
 
@@ -68,7 +69,7 @@ class PaymentRepository {
 
       // 5. Handle Overpayment (Optional: Store as credit)
       if (remainingAmount > 0) {
-        print("User overpaid by $remainingAmount. Logic needed for Wallet/Credit.");
+        debugPrint("User overpaid by $remainingAmount. Logic needed for Wallet/Credit.");
       }
     });
   }

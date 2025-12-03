@@ -1,19 +1,33 @@
-// student_model.dart (FIXED)
-
 import 'dart:convert';
 import 'package:equatable/equatable.dart';
 
-/// Represents a single student record in the system.
 class Student extends Equatable {
-  final String id; // UUID
+  // Matches SQL 'id' (TEXT PRIMARY KEY)
+  final String id;
+  
+  // Matches SQL 'full_name'
   final String fullName;
-  final String grade; // e.g., "Form 1", "Grade 7"
+  
+  // Matches SQL 'grade'
+  final String grade; 
+  
+  // Matches SQL 'parent_contact'
   final String parentContact;
+  
+  // Matches SQL 'registration_date'
   final DateTime registrationDate;
+  
+  // Matches SQL 'is_active' (Stored as INTEGER 0/1, mapped to bool)
   final bool isActive;
+  
+  // Matches SQL 'default_monthly_fee'
   final double defaultMonthlyFee;
-  final List<String> subjects; // Stored as JSON string in DB
-  final String? adminUid; // For Row Level Security (RLS)
+  
+  // Matches SQL 'subjects' (Stored as JSON String)
+  final List<String> subjects;
+  
+  // Matches SQL 'admin_uid' (For RLS/Sync)
+  final String? adminUid;
 
   const Student({
     required this.id,
@@ -27,9 +41,22 @@ class Student extends Equatable {
     this.adminUid,
   });
 
-  // --- DATABASE MAPPING (Snake_Case for SQL/Supabase) ---
+  // --- FACTORY (From Database Map) ---
+  factory Student.fromMap(Map<String, dynamic> map) {
+    return Student(
+      id: map['id']?.toString() ?? '',
+      fullName: map['full_name'] ?? map['studentName'] ?? '', // Fallback for migration
+      grade: map['grade'] ?? '',
+      parentContact: map['parent_contact'] ?? map['parentContact'] ?? '',
+      registrationDate: DateTime.tryParse(map['registration_date'] ?? '') ?? DateTime.now(),
+      isActive: (map['is_active'] is int) ? (map['is_active'] == 1) : (map['is_active'] ?? true),
+      defaultMonthlyFee: (map['default_monthly_fee'] as num?)?.toDouble() ?? 0.0,
+      subjects: _parseSubjects(map['subjects']),
+      adminUid: map['admin_uid'],
+    );
+  }
 
-  /// Converts the Student object into a Map for database insertion/update.
+  // --- TO MAP (For Database Insert) ---
   Map<String, dynamic> toMap() {
     return {
       'id': id,
@@ -37,42 +64,22 @@ class Student extends Equatable {
       'grade': grade,
       'parent_contact': parentContact,
       'registration_date': registrationDate.toIso8601String(),
-      'is_active': isActive ? 1 : 0, 
+      'is_active': isActive ? 1 : 0,
       'default_monthly_fee': defaultMonthlyFee,
-      'subjects': jsonEncode(subjects), // List<String> -> JSON String
+      'subjects': jsonEncode(subjects), // Store List as JSON String
       'admin_uid': adminUid,
     };
   }
 
-  /// Creates a Student object from a database Map.
-  factory Student.fromMap(Map<String, dynamic> map) {
-    return Student(
-      id: map['id'] as String? ?? '',
-      fullName: map['full_name'] as String? ?? '',
-      grade: map['grade'] as String? ?? '',
-      parentContact: map['parent_contact'] as String? ?? '',
-      registrationDate: DateTime.tryParse(map['registration_date'] as String? ?? '') ?? DateTime.now(),
-      isActive: (map['is_active'] is int) 
-          ? (map['is_active'] == 1) 
-          : (map['is_active'] as bool? ?? true),
-      defaultMonthlyFee: (map['default_monthly_fee'] as num?)?.toDouble() ?? 0.0,
-      subjects: _parseSubjects(map['subjects']),
-      adminUid: map['admin_uid'] as String?,
-    );
-  }
-
-  /// Helper to safely parse subjects from various database formats (String/List/null).
+  // Helper to safely parse the subjects list/string
   static List<String> _parseSubjects(dynamic value) {
     if (value == null) return [];
-    if (value is List) return List<String>.from(value.whereType<String>());
+    if (value is List) return List<String>.from(value);
     if (value is String) {
       try {
-        final decoded = jsonDecode(value);
-        if (decoded is List) {
-          return List<String>.from(decoded.whereType<String>());
-        }
+        return List<String>.from(jsonDecode(value));
       } catch (_) {
-        
+        return [];
       }
     }
     return [];
@@ -103,12 +110,5 @@ class Student extends Equatable {
   }
 
   @override
-  List<Object?> get props => [
-    id,
-    fullName,
-    grade,
-    parentContact,
-    isActive,
-    adminUid,
-  ];
+  List<Object?> get props => [id, fullName, grade, parentContact, isActive, defaultMonthlyFee, subjects, adminUid];
 }
