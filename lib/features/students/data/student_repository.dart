@@ -7,10 +7,7 @@ class StudentRepository {
   // --- CREATE ---
   // This is the method the RegisterViewModel calls
   Future<void> addStudent(Student student) async {
-    await _dbService.insert(
-      'students', 
-      student.toMap(),
-    );
+    await _dbService.insert('students', student.toMap());
   }
 
   // --- READ ---
@@ -19,35 +16,23 @@ class StudentRepository {
     return results.map((map) => Student.fromMap(map)).toList();
   }
 
-  Future<Student?> getStudentById(String id) async {
-    final results = await _dbService.queryWhere(
-      'students', 
-      'id = ?', 
-      [id]
-    );
-    
-    if (results.isNotEmpty) {
-      return Student.fromMap(results.first);
-    }
-    return null;
-  }
-
   // --- UPDATE ---
   Future<void> updateStudent(Student student) async {
-    await _dbService.update(
-      'students',
-      student.toMap(),
-      'id = ?',
-      [student.id],
-    );
+    await _dbService.update('students', student.toMap(), 'id = ?', [
+      student.id,
+    ]);
   }
 
   // --- DELETE ---
   Future<void> deleteStudent(String id) async {
-    await _dbService.delete(
-      'students',
-      'id = ?',
-      [id],
-    );
+    await _dbService.delete('students', 'id = ?', [id]);
+  }
+
+  Future<Student?> getStudentById(String id) async {
+    final results = await _dbService.queryWhere('students', 'id = ?', [id]);
+    if (results.isNotEmpty) {
+      return Student.fromMap(results.first);
+    }
+    return null;
   }
 }

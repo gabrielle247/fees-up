@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 // ⚠️ ASSUMED RIVERPOD CONTROLLERS (Adjust imports/names as needed)
-import '../../features/view_models/dashboard_controller.dart'; 
+import '../../features/view_models/dashboard_controller.dart';
 
 // Placeholder for your Notification Controller (must be a Riverpod provider)
 // Define your actual Notification State and Controller classes outside the drawer
@@ -14,7 +14,7 @@ import '../../features/view_models/dashboard_controller.dart';
 // }
 
 // class NotificationController {
-// } 
+// }
 // --- END ASSUMED RIVERPOD CONTROLLERS ---
 
 final SupabaseClient _supabase = Supabase.instance.client;
@@ -31,26 +31,32 @@ class AppDrawer extends ConsumerWidget {
   // -----------------------------------------------------
   Future<void> _showLogoutDialog(BuildContext context) async {
     final colorScheme = Theme.of(context).colorScheme;
-    
+
     // 1. Close the drawer first
     if (context.mounted && Navigator.of(context).canPop()) {
       context.pop();
     }
-    
+
     // 2. Show the confirmation dialog
     final bool? confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text("Confirm Logout", style: TextStyle(color: colorScheme.onSurface)),
+        title: Text(
+          "Confirm Logout",
+          style: TextStyle(color: colorScheme.onSurface),
+        ),
         content: const Text(
-          "Are you sure you want to log out of the Fees Up Admin Console?", 
-          style: TextStyle(color: Colors.white70)
+          "Are you sure you want to log out of the Fees Up Admin Console?",
+          style: TextStyle(color: Colors.white70),
         ),
         backgroundColor: colorScheme.surface,
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false), // User cancels
-            child: Text("Cancel", style: TextStyle(color: Colors.grey.shade400)),
+            child: Text(
+              "Cancel",
+              style: TextStyle(color: Colors.grey.shade400),
+            ),
           ),
           ElevatedButton(
             // The confirmed action now returns true
@@ -68,11 +74,11 @@ class AppDrawer extends ConsumerWidget {
     if (confirm == true) {
       try {
         await _supabase.auth.signOut();
-        
+
         // 4. Navigate to the Login Page and clear the entire stack
         if (context.mounted) {
-          context.go('/login'); 
-          
+          context.go('/login');
+
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text("Successfully logged out.")),
           );
@@ -81,7 +87,9 @@ class AppDrawer extends ConsumerWidget {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text("Could not complete logout. Please check your network."),
+              content: Text(
+                "Could not complete logout. Please check your network.",
+              ),
             ),
           );
         }
@@ -89,9 +97,9 @@ class AppDrawer extends ConsumerWidget {
     }
   }
 
-
   @override
-  Widget build(BuildContext context, WidgetRef ref) { // 🔑 WidgetRef for Riverpod access
+  Widget build(BuildContext context, WidgetRef ref) {
+    // 🔑 WidgetRef for Riverpod access
     final colorScheme = Theme.of(context).colorScheme;
 
     // Define border side
@@ -102,16 +110,17 @@ class AppDrawer extends ConsumerWidget {
 
     // Helper to refresh dashboard using Riverpod
     void refreshDashboard() {
-        // Reads the controller notifier to call its refresh method
-        ref.read(dashboardControllerProvider.notifier).refresh(); 
+      // Reads the controller notifier to call its refresh method
+      if (context.mounted) {
+        ref.read(dashboardControllerProvider.notifier).refresh();
+      }
     }
-    
+
     // Watch the notification provider for badge logic
     // This assumes your notification controller exposes a state with hasNotifications/unreadCount
-    // final notifState = ref.watch(notificationControllerProvider); 
+    // final notifState = ref.watch(notificationControllerProvider);
     // final bool hasNotifications = notifState.hasNotifications;
     // final int unreadCount = notifState.unreadCount;
-
 
     return Drawer(
       backgroundColor: colorScheme.surface,
@@ -127,7 +136,7 @@ class AppDrawer extends ConsumerWidget {
           // 1. CUSTOM HEADER
           // ──────────────────────────────────────────────
           Container(
-            height: 120, 
+            height: 120,
             width: double.infinity,
             padding: const EdgeInsets.only(top: 40, left: 16),
             alignment: Alignment.centerLeft,
@@ -140,7 +149,7 @@ class AppDrawer extends ConsumerWidget {
               ),
             ),
           ),
-          
+
           // ──────────────────────────────────────────────
           // 2. MENU ITEMS
           // ──────────────────────────────────────────────
@@ -192,6 +201,7 @@ class AppDrawer extends ConsumerWidget {
                   child: Divider(color: Colors.white10),
                 ),
 
+                //TODO I need to add notitfications
                 // // ✅ NOTIFICATIONS TILE (Uses Riverpod state)
                 // _DrawerTile(
                 //       icon: hasNotifications
@@ -238,7 +248,7 @@ class AppDrawer extends ConsumerWidget {
                   onTap: () async {
                     context.pop();
                     // Assumed valid route
-                    await context.push('/evaluation', extra: 0); 
+                    await context.push('/evaluation', extra: 0);
                     refreshDashboard();
                   },
                 ),
@@ -279,9 +289,9 @@ class AppDrawer extends ConsumerWidget {
                     context.push('/profile');
                   },
                 ),
-                
+
                 const SizedBox(height: 8),
-                
+
                 // 🛑 LOG OUT TILE 🛑
                 _DrawerTile(
                   icon: Icons.logout_rounded,
@@ -340,7 +350,7 @@ class _DrawerTile extends StatelessWidget {
           decoration: isActive
               ? BoxDecoration(
                   // Note: colorScheme.primary.withValues(alpha: 0.15) changed to standard opacity
-                  color: colorScheme.primary.withOpacity(0.15), 
+                  color: colorScheme.primary.withOpacity(0.15),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
                     color: colorScheme.primary.withOpacity(0.3),
@@ -376,7 +386,7 @@ class _DrawerTile extends StatelessWidget {
                         subtitle!,
                         style: TextStyle(
                           // colorScheme.primary.withValues(alpha: 0.6) changed to standard opacity
-                          color: colorScheme.primary.withOpacity(0.6), 
+                          color: colorScheme.primary.withOpacity(0.6),
                           fontSize: 10,
                         ),
                       ),
