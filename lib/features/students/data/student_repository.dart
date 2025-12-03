@@ -1,4 +1,4 @@
-import '../../../../services/database_service.dart'; // Adjust if your path is different
+import '../../../core/services/database_service.dart'; // Adjust if your path is different
 import 'student_model.dart';
 
 class StudentRepository {

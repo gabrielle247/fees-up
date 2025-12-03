@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'package:fees_up/services/database_service.dart';
+import 'package:fees_up/core/services/database_service.dart';
 import 'package:fees_up/core/routes/app_router.dart';
 
 Future<void> main() async {

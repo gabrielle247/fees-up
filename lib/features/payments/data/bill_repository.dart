@@ -1,4 +1,4 @@
-import 'package:fees_up/services/database_service.dart';
+import 'package:fees_up/core/services/database_service.dart';
 import 'bill_model.dart';
 
 class BillRepository {

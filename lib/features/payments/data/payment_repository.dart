@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
-import 'package:fees_up/services/database_service.dart';
+import 'package:fees_up/core/services/database_service.dart';
 
 class PaymentRepository {
   final DatabaseService _dbService = DatabaseService();
