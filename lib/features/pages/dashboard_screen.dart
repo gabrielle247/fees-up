@@ -6,10 +6,10 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 // --- CUSTOM WIDGETS ---
-import '../../../../shared/widgets/student_card.dart';
-import '../../../../shared/widgets/evaluation_card.dart';
-import '../../../../shared/widgets/empty_list_widget.dart';
-import '../../../../shared/widgets/app_drawer.dart'; // ✅ Imported AppDrawer
+import 'package:fees_up/shared/widgets/student_card.dart';
+import 'package:fees_up/shared/widgets/evaluation_card.dart';
+import 'package:fees_up/shared/widgets/empty_list_widget.dart';
+import 'package:fees_up/shared/widgets/app_drawer.dart'; // ✅ Imported AppDrawer
 
 
 class DashboardScreen extends ConsumerStatefulWidget {
