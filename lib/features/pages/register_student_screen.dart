@@ -6,7 +6,7 @@ import 'package:intl/intl.dart';
 
 import '../../../../core/constants/zimsec_subjects.dart';
 import '../../../../core/utils/validators.dart';
-import '../../../../shared/widgets/subject_chip_select.dart'; // Ensure this path is correct
+import '../../../../shared/widgets/subject_chip_select.dart';
 
 class RegisterStudentScreen extends ConsumerWidget {
   const RegisterStudentScreen({super.key});
@@ -32,6 +32,13 @@ class _RegisterForm extends ConsumerStatefulWidget {
 
 class _RegisterFormState extends ConsumerState<_RegisterForm> {
   final _formKey = GlobalKey<FormState>();
+
+  // Define the grade options here
+  final List<String> _gradeOptions = [
+    'Form 1', 'Form 2', 'Form 3', 
+    'Form 4', 'Form 5', 'Form 6', 
+    'Informal Student'
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -69,6 +76,19 @@ class _RegisterFormState extends ConsumerState<_RegisterForm> {
             Text("Academic", style: TextStyle(color: colorScheme.primary, fontWeight: FontWeight.bold)),
             const SizedBox(height: 10),
             
+            // --- NEW: Grade Dropdown ---
+            DropdownButtonFormField<String>(
+              initialValue: state.grade,
+              decoration: _inputDecor("Grade / Level", Icons.school),
+              items: _gradeOptions
+                  .map((g) => DropdownMenuItem(value: g, child: Text(g)))
+                  .toList(),
+              onChanged: (val) {
+                if (val != null) controller.updateGrade(val);
+              },
+            ),
+            const SizedBox(height: 16),
+
             // Subject Picker
             SubjectChipSelect(
               allSubjects: ZimsecSubject.allNames,
@@ -86,7 +106,7 @@ class _RegisterFormState extends ConsumerState<_RegisterForm> {
                 // Frequency Dropdown
                 Expanded(
                   child: DropdownButtonFormField<String>(
-                    value: state.frequency,
+                    initialValue: state.frequency,
                     decoration: _inputDecor("Frequency", Icons.update),
                     items: ['Monthly', 'Termly', 'Annually']
                         .map((f) => DropdownMenuItem(value: f, child: Text(f)))
@@ -108,7 +128,6 @@ class _RegisterFormState extends ConsumerState<_RegisterForm> {
                         firstDate: DateTime(2020),
                         lastDate: DateTime(2030),
                         selectableDayPredicate: (date) {
-                          // UI BLOCKER: If Monthly, disable days > 28 visually
                           if (state.frequency == 'Monthly') {
                             return date.day <= 28;
                           }
@@ -163,7 +182,7 @@ class _RegisterFormState extends ConsumerState<_RegisterForm> {
                 if (_formKey.currentState!.validate()) {
                   final success = await controller.register();
                   if (success && context.mounted) {
-                    context.pop(); // Return to dashboard
+                    context.pop(); 
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text("Student Registered Successfully")),
                     );
@@ -176,7 +195,10 @@ class _RegisterFormState extends ConsumerState<_RegisterForm> {
                 foregroundColor: colorScheme.onPrimary,
               ),
               child: state.isLoading 
-                  ? const CircularProgressIndicator(color: Colors.white) 
+                  ? const SizedBox(
+                      height: 20, width: 20,
+                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
+                    ) 
                   : const Text("Complete Registration"),
             ),
           ],

@@ -11,6 +11,7 @@ class RegisterStudentState {
   // Form Fields
   final String fullName;
   final String parentContact;
+  final String grade; // <--- ADDED FIELD
   final double monthlyFee;
   final double initialPayment;
   final List<String> subjects;
@@ -22,6 +23,7 @@ class RegisterStudentState {
     this.error,
     this.fullName = '',
     this.parentContact = '',
+    this.grade = 'Form 1', // <--- DEFAULT VALUE
     this.monthlyFee = 0.0,
     this.initialPayment = 0.0,
     this.subjects = const [],
@@ -34,6 +36,7 @@ class RegisterStudentState {
     String? error,
     String? fullName,
     String? parentContact,
+    String? grade, // <--- ADDED
     double? monthlyFee,
     double? initialPayment,
     List<String>? subjects,
@@ -45,6 +48,7 @@ class RegisterStudentState {
       error: error ?? this.error,
       fullName: fullName ?? this.fullName,
       parentContact: parentContact ?? this.parentContact,
+      grade: grade ?? this.grade, // <--- ADDED
       monthlyFee: monthlyFee ?? this.monthlyFee,
       initialPayment: initialPayment ?? this.initialPayment,
       subjects: subjects ?? this.subjects,
@@ -55,7 +59,6 @@ class RegisterStudentState {
 }
 
 // --- PROVIDER ---
-// This is the variable your screen is looking for!
 final registerStudentControllerProvider = 
     StateNotifierProvider.autoDispose<RegisterStudentController, RegisterStudentState>((ref) {
   return RegisterStudentController();
@@ -72,28 +75,29 @@ class RegisterStudentController extends StateNotifier<RegisterStudentState> {
   // --- FIELD UPDATERS ---
   void updateName(String val) => state = state.copyWith(fullName: val);
   void updateContact(String val) => state = state.copyWith(parentContact: val);
+  
+  // <--- NEW GRADE UPDATER
+  void updateGrade(String val) => state = state.copyWith(grade: val);
+
   void updateFee(String val) => state = state.copyWith(monthlyFee: double.tryParse(val) ?? 0.0);
   void updateInitialPayment(String val) => state = state.copyWith(initialPayment: double.tryParse(val) ?? 0.0);
   void updateSubjects(List<String> val) => state = state.copyWith(subjects: val);
   
   void updateFrequency(String val) {
     state = state.copyWith(frequency: val);
-    // Re-validate date logic when frequency changes
     updateDate(state.registrationDate); 
   }
 
   void updateDate(DateTime date) {
-    // 🧠 LOGIC: For Monthly, restrict to 1-28
+    // Logic: For Monthly, restrict to 1-28
     if (state.frequency == 'Monthly') {
       if (date.day > 28) {
-        // Auto-correct to the 28th of that month
         final corrected = DateTime(date.year, date.month, 28);
         state = state.copyWith(registrationDate: corrected);
       } else {
         state = state.copyWith(registrationDate: date);
       }
     } else {
-      // Annual/Termly can be any day
       state = state.copyWith(registrationDate: date);
     }
   }
@@ -108,7 +112,7 @@ class RegisterStudentController extends StateNotifier<RegisterStudentState> {
       final student = Student(
         id: newId,
         fullName: state.fullName,
-        grade: "Form 1", // TODO: Add Grade Picker if needed
+        grade: state.grade, // <--- USE SELECTED GRADE
         parentContact: state.parentContact,
         registrationDate: state.registrationDate,
         defaultMonthlyFee: state.monthlyFee,
@@ -117,9 +121,6 @@ class RegisterStudentController extends StateNotifier<RegisterStudentState> {
       );
 
       await _studentRepo.addStudent(student);
-
-      // TODO: Here we would trigger the Payment Logic for 'initialPayment'
-      // await _billingService.processInitialPayment(student, state.initialPayment);
 
       state = state.copyWith(isLoading: false);
       return true;
