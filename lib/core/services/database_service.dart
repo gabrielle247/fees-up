@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
@@ -42,9 +43,9 @@ class DatabaseService {
           // Wrapped in try-catch to be safe if it somehow exists.
           try {
             await db.execute("ALTER TABLE students ADD COLUMN grade TEXT");
-            print("MIGRATION SUCCESS: Added 'grade' column to students table.");
+            debugPrint("MIGRATION SUCCESS: Added 'grade' column to students table.");
           } catch (e) {
-            print(
+            debugPrint(
               "MIGRATION INFO: Column 'grade' might already exist. Error: $e",
             );
           }
