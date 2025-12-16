@@ -1,0 +1,12 @@
+# Configure Brick code generation
+targets:
+  $default:
+    builders:
+      brick_offline_first_with_supabase_build|brick_offline_first_with_supabase_builder:
+        enabled: true
+        options:
+          # Specify which models to include
+          # Leave empty or remove to include all models
+          # models:
+          #   - lib/models/student_full.dart
+          #   - lib/models/billing_config.dart

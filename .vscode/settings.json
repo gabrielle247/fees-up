@@ -1,0 +1,27 @@
+{
+    "cmake.sourceDirectory": "/home/nyashagabriel/Development/fees_up/linux",
+    "files.exclude": {
+        "**/.dart_tool": true,
+        ".dart_tool": true,
+        ".dart_tool/**": true,
+        "**/.dart_tool/**/*.md": true
+    },
+    "search.exclude": {
+        "**/.dart_tool": false,
+        ".dart_tool": true,
+        "**/.dart_tool/**": true
+    },
+    "mssql.lintingEnabled": false,
+    "mssql.connections": [],
+    "sql.linting.enabled": false,
+    "[sql]": {
+        "editor.defaultFormatter": null
+    },
+    "[markdown]": {
+        "editor.defaultFormatter": null,
+        "editor.formatOnSave": false
+    },
+    "[*]": {
+        "editor.formatOnSave": false
+    }
+}

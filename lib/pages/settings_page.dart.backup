@@ -1,0 +1,527 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../providers/settings_provider.dart';
+import '../providers/auth_provider.dart';
+import '../providers/profile_provider.dart';
+
+class SettingsPage extends ConsumerWidget {
+  const SettingsPage({super.key});
+
+  // --- Actions ---
+  
+  void _editProfile(BuildContext context) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("TODO: Open Edit Profile Page")),
+    );
+  }
+
+  void _changePassword(BuildContext context) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("TODO: Open Change Password Flow")),
+    );
+  }
+
+  void _openHelpCenter(BuildContext context) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("TODO: Open Help Center / Webview")),
+    );
+  }
+
+  Future<void> _handleSignOut(BuildContext context, WidgetRef ref) async {
+    // Show confirmation dialog
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xff1c2a35),
+        title: const Text("Sign Out?", style: TextStyle(color: Colors.white)),
+        content: const Text(
+          "Are you sure you want to sign out? You will need to login again.",
+          style: TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text("Cancel"),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text("Sign Out", style: TextStyle(color: Colors.redAccent)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      await ref.read(authNotifierProvider.notifier).signOut();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final colorScheme = Theme.of(context).colorScheme;
+    
+    // Watch both providers
+    final settingsAsync = ref.watch(settingsProvider);
+    final profileAsync = ref.watch(userProfileProvider);
+    
+    // Get data or defaults
+    final settings = settingsAsync.valueOrNull ?? AppSettingsState();
+    final profile = profileAsync.valueOrNull;
+    
+    // Watch user profile (offline-first with sync)
+    final profileAsync = ref.watch(userProfileProvider);
+
+    // Handle loading states more efficiently
+    final isLoading = settingsAsync.isLoading || profileAsync.isLoading;
+    final hasError = settingsAsync.hasError || profileAsync.hasError;
+
+    return Scaffold(
+      backgroundColor: colorScheme.surface, // 0xff121b22
+      appBar: AppBar(
+        title: const Text("Settings"),
+        centerTitle: true,
+        backgroundColor: colorScheme.surface,
+        elevation: 0,
+        titleTextStyle: const TextStyle(
+          color: Colors.white, 
+          fontSize: 20, 
+          fontWeight: FontWeight.bold
+        ),
+        iconTheme: const IconThemeData(color: Colors.white),
+      ),
+      body: isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : hasError
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.error_outline, size: 48, color: Colors.redAccent),
+                      const SizedBox(height: 16),
+                      const Text(
+                        "Unable to load settings",
+                        style: TextStyle(color: Colors.red, fontSize: 16),
+                      ),
+                      const SizedBox(height: 16),
+                      ElevatedButton.icon(
+                        onPressed: () {
+                          ref.invalidate(settingsProvider);
+                          ref.invalidate(userProfileProvider);
+                        },
+                        icon: const Icon(Icons.refresh),
+                        label: const Text("Retry"),
+                      ),
+                    ],
+                  ),
+                )
+              : _buildSettingsContent(
+                  context,
+                  ref,
+                  settingsAsync.value!,
+                  profileAsync.value,
+                ),
+    );
+  }
+
+  Widget _buildSettingsContent(
+    BuildContext context,
+    WidgetRef ref,
+    AppSettingsState settings,
+    UserProfile? profile,
+  ) {
+    final email = profile?.email ?? 'No email';
+    final name = profile?.fullName ?? 'User';
+    final schoolName = profile?.schoolName;
+    final avatarUrl = profile?.avatarUrl;
+
+    return SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                children: [
+                  const Icon(Icons.error_outline, size: 48, color: Colors.redAccent),
+                  const SizedBox(height: 16),
+                  Text(
+                    "Unable to load settings",
+                    style: const TextStyle(color: Colors.red, fontSize: 16),
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      ref.invalidate(settingsProvider);
+                      ref.invalidate(userProfileProvider);
+                    },
+                    icon: const Icon(Icons.refresh),
+                    label: const Text("Retry"),
+                  ),
+                ],
+              ),
+            )
+          : _buildSettingsContent(
+              context,
+              ref,
+              settingsAsync.value!,
+              profileAsync.value,
+            ),
+    );
+  }
+
+  Widget _buildSettingsContent(
+    BuildContext context,
+    WidgetRef ref,
+    AppSettingsState settings,
+    UserProfile? profile,
+  ) {
+    final email = profile?.email ?? 'No email';
+    final name = profile?.fullName ?? 'User';
+    final schoolName = profile?.schoolName;
+    final avatarUrl = profile?.avatarUrl;
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        children: [
+          // --- PROFILE HEADER ---
+          Column(
+            children: [
+                        Stack(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(color: Colors.white.withAlpha(20), width: 2),
+                              ),
+                              child: CircleAvatar(
+                                radius: 45,
+                                backgroundImage: avatarUrl != null ? NetworkImage(avatarUrl) : null,
+                                backgroundColor: const Color(0xff1c2a35),
+                                child: avatarUrl == null
+                                    ? Text(
+                                        name.isNotEmpty ? name[0].toUpperCase() : 'U',
+                                        style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
+                                      )
+                                    : null,
+                              ),
+                            ),
+                            Positioned(
+                              bottom: 0,
+                              right: 0,
+                              child: Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: const BoxDecoration(
+                                  color: Color(0xff3498db),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.edit, size: 16, color: Colors.white),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          name,
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          email,
+                          style: TextStyle(fontSize: 14, color: Colors.white.withAlpha(150)),
+                        ),
+                        if (schoolName != null) ...[
+                          const SizedBox(height: 4),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: const Color(0xff3498db).withAlpha(30),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: const Color(0xff3498db).withAlpha(100)),
+                            ),
+                            child: Text(
+                              schoolName,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Color(0xff3498db),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 16),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            ElevatedButton(
+                              onPressed: () => _editProfile(context),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xff3498db).withAlpha(30),
+                                foregroundColor: const Color(0xff3498db),
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+                              ),
+                              child: const Text("Edit Profile", style: TextStyle(fontWeight: FontWeight.bold)),
+                            ),
+                            const SizedBox(width: 8),
+                            IconButton(
+                              onPressed: () async {
+                                await ref.read(profileRefreshProvider.notifier).refresh();
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text("Profile synced successfully")),
+                                  );
+                                }
+                              },
+                              icon: const Icon(Icons.sync, color: Color(0xff3498db)),
+                              tooltip: "Sync profile from server",
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+
+                const SizedBox(height: 32),
+
+                // --- ACCOUNT SECTION ---
+                _SectionTitle(title: "ACCOUNT"),
+                _SettingsGroup(
+                  children: [
+                    _SettingsTile(
+                      icon: Icons.lock_outline,
+                      iconColor: const Color(0xff64b5f6), // Light Blue
+                      title: "Change Password",
+                      trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+                      onTap: () => _changePassword(context),
+                    ),
+                    _Divider(),
+                    _SettingsTile(
+                      icon: Icons.security_outlined,
+                      iconColor: const Color(0xffba68c8), // Purple
+                      title: "Two-Factor Authentication",
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text("Enabled", style: TextStyle(color: const Color(0xff66bb6a), fontSize: 12, fontWeight: FontWeight.bold)),
+                          const SizedBox(width: 8),
+                          const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+                        ],
+                      ),
+                      onTap: () {},
+                    ),
+                    _Divider(),
+                    _SettingsTile(
+                      icon: Icons.fingerprint,
+                      iconColor: const Color(0xffffb74d), // Orange
+                      title: "Biometric Login",
+                      trailing: Switch(
+                        value: settings.biometricEnabled,
+                        onChanged: (val) => ref.read(settingsProvider.notifier).toggleBiometric(val),
+                        activeThumbColor: const Color(0xff3498db),
+                        activeTrackColor: const Color(0xff3498db).withAlpha(100),
+                        inactiveTrackColor: Colors.grey.withAlpha(50),
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 24),
+
+                // --- PREFERENCES SECTION ---
+                _SectionTitle(title: "PREFERENCES"),
+                _SettingsGroup(
+                  children: [
+                    _SettingsTile(
+                      icon: Icons.notifications_none_outlined,
+                      iconColor: const Color(0xff4db6ac), // Teal
+                      title: "Notifications",
+                      trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+                      onTap: () {},
+                    ),
+                    _Divider(),
+                    _SettingsTile(
+                      icon: Icons.language,
+                      iconColor: const Color(0xff7986cb), // Indigo
+                      title: "Language",
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(settings.language, style: TextStyle(color: Colors.white.withAlpha(150), fontSize: 12)),
+                          const SizedBox(width: 8),
+                          const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+                        ],
+                      ),
+                      onTap: () {},
+                    ),
+                    _Divider(),
+                    _SettingsTile(
+                      icon: Icons.dark_mode_outlined,
+                      iconColor: const Color(0xff90a4ae), // Grey Blue
+                      title: "Dark Mode",
+                      // Locked to true for this app design, but switchable in logic
+                      trailing: Switch(
+                        value: settings.darkMode, 
+                        onChanged: (val) => ref.read(settingsProvider.notifier).toggleDarkMode(val),
+                        activeThumbColor: const Color(0xff3498db),
+                        activeTrackColor: const Color(0xff3498db).withAlpha(100),
+                        inactiveTrackColor: Colors.grey.withAlpha(50),
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 24),
+
+                // --- SUPPORT SECTION ---
+                _SectionTitle(title: "SUPPORT"),
+                _SettingsGroup(
+                  children: [
+                    _SettingsTile(
+                      icon: Icons.help_outline,
+                      iconColor: const Color(0xffe57373), // Red
+                      title: "Help Center",
+                      trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+                      onTap: () => _openHelpCenter(context),
+                    ),
+                    _Divider(),
+                    _SettingsTile(
+                      icon: Icons.chat_bubble_outline,
+                      iconColor: const Color(0xffffd54f), // Yellow
+                      title: "Send Feedback",
+                      trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+                      onTap: () {},
+                    ),
+                    _Divider(),
+                    _SettingsTile(
+                      icon: Icons.info_outline,
+                      iconColor: const Color(0xff4fc3f7), // Light Blue
+                      title: "About App",
+                      trailing: Text("v2.4.0", style: TextStyle(color: Colors.white.withAlpha(100), fontSize: 12)),
+                      onTap: () {},
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 40),
+
+                // --- LOGOUT ---
+                SizedBox(
+                  width: double.infinity,
+                  height: 56,
+                  child: OutlinedButton.icon(
+                    onPressed: () => _handleSignOut(context, ref),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Color(0xffef5350)), // Red border
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      foregroundColor: const Color(0xffef5350),
+                    ),
+                    icon: const Icon(Icons.logout),
+                    label: const Text("Sign Out", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  ),
+                ),
+
+                const SizedBox(height: 20),
+                Text(
+                  "Secure Student Data System © 2025",
+                  style: TextStyle(color: Colors.white.withAlpha(50), fontSize: 12),
+                ),
+                const SizedBox(height: 100), // Bottom padding for nav bar
+              ],
+            ),
+          );
+  }
+}
+
+// -----------------------------------------------------------------------------
+// HELPER WIDGETS
+// -----------------------------------------------------------------------------
+
+class _SectionTitle extends StatelessWidget {
+  final String title;
+  const _SectionTitle({required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.only(bottom: 8, left: 4),
+      child: Text(
+        title,
+        style: TextStyle(
+          color: Colors.white.withAlpha(100),
+          fontSize: 12,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 1.0,
+        ),
+      ),
+    );
+  }
+}
+
+class _SettingsGroup extends StatelessWidget {
+  final List<Widget> children;
+  const _SettingsGroup({required this.children});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xff1c2a35), // Card Surface
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withAlpha(10)),
+      ),
+      child: Column(children: children),
+    );
+  }
+}
+
+class _SettingsTile extends StatelessWidget {
+  final IconData icon;
+  final Color iconColor;
+  final String title;
+  final Widget trailing;
+  final VoidCallback? onTap;
+
+  const _SettingsTile({
+    required this.icon,
+    required this.iconColor,
+    required this.title,
+    required this.trailing,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      onTap: onTap,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      leading: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: iconColor.withAlpha(30),
+          shape: BoxShape.circle,
+        ),
+        child: Icon(icon, color: iconColor, size: 20),
+      ),
+      title: Text(
+        title,
+        style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w500),
+      ),
+      trailing: trailing,
+    );
+  }
+}
+
+class _Divider extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Divider(
+      height: 1,
+      thickness: 1,
+      color: Colors.white.withAlpha(10),
+      indent: 60, // Align with text, skipping icon
+    );
+  }
+}
