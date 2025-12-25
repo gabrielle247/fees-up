@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:powersync/powersync.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -56,7 +57,7 @@ class SupabaseConnector extends PowerSyncBackendConnector {
     } catch (e) {
       // Error handling: if it's a permanent error, we might need to complete() it 
       // to unblock the queue, but for connectivity issues, we leave it.
-      print('Sync Upload Error: $e'); 
+      debugPrint('Sync Upload Error: $e'); 
     }
   }
 }

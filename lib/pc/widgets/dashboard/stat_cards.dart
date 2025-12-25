@@ -8,7 +8,7 @@ class StatCard extends StatelessWidget {
   final Color iconColor;
   final Color? iconBgColor;
   final Widget? footer;
-  final bool isAlert; // For the "Outstanding Bills" red border style
+  final bool isAlert;
 
   const StatCard({
     super.key,
@@ -30,7 +30,6 @@ class StatCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: AppColors.surfaceGrey,
           borderRadius: BorderRadius.circular(16),
-          // If alert, show the left red border indicator
           border: isAlert 
               ? const Border(left: BorderSide(color: AppColors.errorRed, width: 4))
               : Border.all(color: Colors.white10),
@@ -38,18 +37,22 @@ class StatCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          mainAxisSize: MainAxisSize.min, // Allow it to shrink to fit content
           children: [
-            // Header: Title + Icon
+            // Header
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  title.toUpperCase(),
-                  style: const TextStyle(
-                    color: Colors.white54,
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 0.5,
+                Flexible(
+                  child: Text(
+                    title.toUpperCase(),
+                    overflow: TextOverflow.ellipsis, // Safe overflow
+                    style: const TextStyle(
+                      color: Colors.white54,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
+                    ),
                   ),
                 ),
                 Container(
@@ -63,22 +66,30 @@ class StatCard extends StatelessWidget {
               ],
             ),
             
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
             
             // Value
-            Text(
-              value,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
+            FittedBox( // Ensures huge numbers don't break layout
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                value,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
             
             const SizedBox(height: 12),
             
-            // Footer Content (Progress bar, alert badge, etc)
-            if (footer != null) footer!,
+            // Footer (Protected)
+            if (footer != null) 
+              SizedBox(
+                height: 24, // Fix height to prevent infinite expansion
+                child: footer!,
+              ),
           ],
         ),
       ),
@@ -86,7 +97,6 @@ class StatCard extends StatelessWidget {
   }
 }
 
-// Helper for the "Needs Attention" badge
 class AlertBadge extends StatelessWidget {
   final String text;
   final String subText;
@@ -104,6 +114,7 @@ class AlertBadge extends StatelessWidget {
             borderRadius: BorderRadius.circular(4),
           ),
           child: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
               const Icon(Icons.warning_amber_rounded, size: 14, color: AppColors.errorRed),
               const SizedBox(width: 4),
@@ -115,7 +126,14 @@ class AlertBadge extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 8),
-        Text(subText, style: const TextStyle(color: Colors.white38, fontSize: 11)),
+        // Flexible prevents the "RenderFlex overflowed by 40px" error
+        Flexible(
+          child: Text(
+            subText,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(color: Colors.white38, fontSize: 11),
+          ),
+        ),
       ],
     );
   }
