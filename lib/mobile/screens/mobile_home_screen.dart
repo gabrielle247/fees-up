@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../data/providers/dashboard_provider.dart';
 import '../widgets/dashboard/mobile_dashboard_widgets.dart';
 import '../../pc/widgets/dashboard/stat_cards.dart'; 
-import '../../pc/widgets/dashboard/revenue_chart.dart'; 
+// Removed unused import: revenue_chart.dart
 
 class MobileHomeScreen extends ConsumerStatefulWidget {
   const MobileHomeScreen({super.key});
@@ -15,20 +16,45 @@ class MobileHomeScreen extends ConsumerStatefulWidget {
 }
 
 class _MobileHomeScreenState extends ConsumerState<MobileHomeScreen> {
-  int _navIndex = 0;
+  
+  // Calculate index based on current route for visual state
+  int _calculateSelectedIndex(BuildContext context) {
+    final String location = GoRouterState.of(context).uri.toString();
+    if (location.startsWith('/transactions')) return 1;
+    if (location.startsWith('/students')) return 2;
+    if (location.startsWith('/profile')) return 3;
+    return 0;
+  }
+
+  void _onItemTapped(int index) {
+    switch (index) {
+      case 0:
+        context.go('/');
+        break;
+      case 1:
+        context.go('/transactions');
+        break;
+      case 2:
+        context.go('/students');
+        break;
+      case 3:
+        context.go('/profile'); // We will add this mock route
+        break;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final dashboardAsync = ref.watch(dashboardDataProvider);
+    final int navIndex = _calculateSelectedIndex(context);
 
     return Scaffold(
       backgroundColor: AppColors.backgroundBlack,
       
-      // BODY (Wrapped in AsyncValue to handle loading/error)
       body: dashboardAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (err, stack) => Center(child: Text("Error: $err", style: const TextStyle(color: Colors.white))),
-        data: (data) => Scaffold( // Inner scaffold to keep App Bar / Bottom Nav structure
+        data: (data) => Scaffold( 
           backgroundColor: AppColors.backgroundBlack,
           
           appBar: AppBar(
@@ -92,8 +118,6 @@ class _MobileHomeScreenState extends ConsumerState<MobileHomeScreen> {
 
                 const SizedBox(height: 24),
 
-                // ... (Quick Actions & Chart kept same as visual placeholders for now) ...
-                
                 // RECENT PAYMENTS LIST (Real Data)
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -104,7 +128,10 @@ class _MobileHomeScreenState extends ConsumerState<MobileHomeScreen> {
                 ),
                 
                 if (data.recentPayments.isEmpty)
-                  const Text("No transactions yet.", style: TextStyle(color: Colors.grey)),
+                  const Padding(
+                    padding: EdgeInsets.only(top: 10),
+                    child: Text("No transactions yet.", style: TextStyle(color: Colors.grey)),
+                  ),
 
                 ...data.recentPayments.map((payment) => MobileTransactionTile(
                   name: payment['payer_name'] ?? 'Unknown',
@@ -120,13 +147,13 @@ class _MobileHomeScreenState extends ConsumerState<MobileHomeScreen> {
             ),
           ),
           
-          // BOTTOM NAV (Keep existing)
+          // BOTTOM NAV
           bottomNavigationBar: Container(
             decoration: const BoxDecoration(border: Border(top: BorderSide(color: Colors.white10))),
             child: BottomNavigationBar(
               backgroundColor: AppColors.surfaceGrey,
-              currentIndex: _navIndex,
-              onTap: (index) => setState(() => _navIndex = index),
+              currentIndex: navIndex,
+              onTap: _onItemTapped, // Triggers navigation
               selectedItemColor: AppColors.primaryBlue,
               unselectedItemColor: Colors.white38,
               type: BottomNavigationBarType.fixed,

@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart'; // Add intl to pubspec.yaml if missing
+import 'package:intl/intl.dart';
 import '../../core/constants/app_colors.dart';
 import '../../data/providers/dashboard_provider.dart';
 import '../widgets/dashboard/sidebar.dart';
 import '../widgets/dashboard/stat_cards.dart';
 import '../widgets/dashboard/revenue_chart.dart';
+import '../widgets/dashboard/quick_actions_grid.dart'; // IMPORTED
 
 class PCHomeScreen extends ConsumerWidget {
   const PCHomeScreen({super.key});
@@ -25,7 +26,6 @@ class PCHomeScreen extends ConsumerWidget {
               error: (err, stack) => Center(child: Text("Error: $err", style: const TextStyle(color: Colors.white))),
               data: (data) => Column(
                 children: [
-                  // Pass real user name to TopBar
                   _buildTopBar(data.userName, data.schoolName),
 
                   Expanded(
@@ -34,7 +34,7 @@ class PCHomeScreen extends ConsumerWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // OVERVIEW HEADER
+                          // HEADER
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
@@ -45,16 +45,16 @@ class PCHomeScreen extends ConsumerWidget {
                                   Text("Status for ${data.schoolName}", style: const TextStyle(color: Colors.white54)),
                                 ],
                               ),
-                              // ... (Buttons kept same as before) ...
                             ],
                           ),
 
                           const SizedBox(height: 24),
 
-                          // KPI ROW (CONNECTED)
+                          // KPI CARDS ROW (Equal Widths)
                           SizedBox(
-                            height: 180,
+                            height: 160, 
                             child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.stretch, 
                               children: [
                                 StatCard(
                                   title: "Outstanding Bills",
@@ -63,11 +63,11 @@ class PCHomeScreen extends ConsumerWidget {
                                   iconColor: AppColors.errorRed,
                                   iconBgColor: const Color(0x22CF6679),
                                   isAlert: data.outstandingBalance > 0,
-                                  footer: AlertBadge(text: "Updated", subText: "Just now"),
+                                  footer: const AlertBadge(text: "Updated", subText: "Just now"),
                                 ),
                                 const StatCard(
                                   title: "Fundraising Goal",
-                                  value: "65%", // Placeholder for now
+                                  value: "65%",
                                   icon: Icons.volunteer_activism,
                                   iconColor: Color(0xFFA855F7),
                                   iconBgColor: Color(0x22A855F7),
@@ -86,21 +86,26 @@ class PCHomeScreen extends ConsumerWidget {
 
                           const SizedBox(height: 24),
 
-                          // CHART & ACTIONS
-                          SizedBox(
-                            height: 320,
+                          // CHART & ACTIONS ROW
+                          const SizedBox(
+                            height: 340,
                             child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
-                                const Expanded(flex: 2, child: RevenueChart()),
-                                const SizedBox(width: 24),
-                                Expanded(flex: 1, child: _buildQuickActionsGrid()),
+                                // REVENUE CHART (66% Width)
+                                Expanded(flex: 2, child: RevenueChart()),
+                                
+                                SizedBox(width: 24),
+                                
+                                // QUICK ACTIONS (33% Width) - Now using external widget
+                                Expanded(flex: 1, child: QuickActionsGrid()),
                               ],
                             ),
                           ),
 
                           const SizedBox(height: 24),
 
-                          // RECENT PAYMENTS (CONNECTED)
+                          // RECENT PAYMENTS
                           Container(
                             padding: const EdgeInsets.all(24),
                             decoration: BoxDecoration(
@@ -130,7 +135,7 @@ class PCHomeScreen extends ConsumerWidget {
                                               : 'Unknown Date',
                                           payment['category'] ?? 'Fee',
                                           NumberFormat.simpleCurrency().format(payment['amount']),
-                                          true, // Assuming paid if it's in payments table
+                                          true,
                                         ),
                                         const Divider(color: Colors.white10),
                                       ],
@@ -152,8 +157,6 @@ class PCHomeScreen extends ConsumerWidget {
     );
   }
 
-  // --- HELPER UPDATES ---
-
   Widget _buildTopBar(String userName, String schoolName) {
     return Container(
       height: 70,
@@ -163,7 +166,6 @@ class PCHomeScreen extends ConsumerWidget {
         children: [
           const Text("Financial Dashboard", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
           const Spacer(),
-          // ... (Search Bar Icons) ...
           Column(
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.end,
@@ -181,20 +183,6 @@ class PCHomeScreen extends ConsumerWidget {
       ),
     );
   }
-
-  // ... (Keep _buildQuickActionsGrid and _buildPaymentRow same as previous, they are purely visual helpers)
-  Widget _buildQuickActionsGrid() {
-    return Container(
-        // ... (Same as before)
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: const Color(0xFF15181E),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.white10),
-        ),
-        child: const Center(child: Text("Quick Actions", style: TextStyle(color: Colors.white))) // Placeholder for brevity in chat
-    );
-  }
   
   Widget _buildPaymentRow(String name, String date, String desc, String amount, bool isPaid) {
     return Padding(
@@ -206,6 +194,18 @@ class PCHomeScreen extends ConsumerWidget {
           Expanded(flex: 2, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(name, style: const TextStyle(color: Colors.white)), Text(date, style: const TextStyle(color: Colors.white38, fontSize: 12))])),
           Expanded(flex: 3, child: Text(desc, style: const TextStyle(color: Colors.white70))),
           Expanded(flex: 1, child: Text(amount, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
+          // Status Badge
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: isPaid ? AppColors.successGreen.withOpacity(0.2) : Colors.orange.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Text(
+              isPaid ? "Paid" : "Pending",
+              style: TextStyle(color: isPaid ? AppColors.successGreen : Colors.orange, fontSize: 11, fontWeight: FontWeight.bold),
+            ),
+          ),
         ],
       ),
     );

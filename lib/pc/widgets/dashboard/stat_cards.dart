@@ -26,7 +26,8 @@ class StatCard extends StatelessWidget {
     return Expanded(
       child: Container(
         margin: const EdgeInsets.only(right: 16),
-        padding: const EdgeInsets.all(20),
+        // FIX: Reduced padding from 20 to 16 to save vertical space (4px saved top + 4px bottom = 8px total)
+        padding: const EdgeInsets.all(16), 
         decoration: BoxDecoration(
           color: AppColors.surfaceGrey,
           borderRadius: BorderRadius.circular(16),
@@ -37,7 +38,6 @@ class StatCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          mainAxisSize: MainAxisSize.min, // Allow it to shrink to fit content
           children: [
             // Header
             Row(
@@ -46,7 +46,7 @@ class StatCard extends StatelessWidget {
                 Flexible(
                   child: Text(
                     title.toUpperCase(),
-                    overflow: TextOverflow.ellipsis, // Safe overflow
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       color: Colors.white54,
                       fontSize: 11,
@@ -66,28 +66,28 @@ class StatCard extends StatelessWidget {
               ],
             ),
             
-            const SizedBox(height: 12),
+            const SizedBox(height: 8), // Reduced gap slightly
             
             // Value
-            FittedBox( // Ensures huge numbers don't break layout
+            FittedBox(
               fit: BoxFit.scaleDown,
               alignment: Alignment.centerLeft,
               child: Text(
                 value,
                 style: const TextStyle(
                   color: Colors.white,
-                  fontSize: 28,
+                  fontSize: 28, // Kept large font
                   fontWeight: FontWeight.bold,
                 ),
               ),
             ),
             
-            const SizedBox(height: 12),
+            const SizedBox(height: 8), // Reduced gap slightly
             
-            // Footer (Protected)
+            // Footer
             if (footer != null) 
               SizedBox(
-                height: 24, // Fix height to prevent infinite expansion
+                height: 24, 
                 child: footer!,
               ),
           ],
@@ -106,6 +106,7 @@ class AlertBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -126,7 +127,6 @@ class AlertBadge extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 8),
-        // Flexible prevents the "RenderFlex overflowed by 40px" error
         Flexible(
           child: Text(
             subText,

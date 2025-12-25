@@ -10,8 +10,16 @@ class DashboardSidebar extends StatefulWidget {
 }
 
 class _DashboardSidebarState extends State<DashboardSidebar> {
-  // Track active index for visual state
-  int _selectedIndex = 0; 
+  // We use the current path to determine the active index
+  int _calculateSelectedIndex(BuildContext context) {
+    final String location = GoRouterState.of(context).uri.toString();
+    if (location.startsWith('/transactions')) return 1;
+    if (location.startsWith('/invoices')) return 2;
+    if (location.startsWith('/students')) return 3;
+    if (location.startsWith('/reports')) return 4;
+    if (location.startsWith('/announcements')) return 5;
+    return 0; // Default to Overview
+  }
 
   final List<Map<String, dynamic>> _menuItems = [
     {'icon': Icons.grid_view_rounded, 'label': 'Overview', 'route': '/'},
@@ -24,9 +32,11 @@ class _DashboardSidebarState extends State<DashboardSidebar> {
 
   @override
   Widget build(BuildContext context) {
+    final int selectedIndex = _calculateSelectedIndex(context);
+
     return Container(
       width: 260,
-      color: const Color(0xFF0F1115), // Slightly darker than main background
+      color: const Color(0xFF0F1115), 
       child: Column(
         children: [
           // 1. BRAND HEADER
@@ -70,15 +80,14 @@ class _DashboardSidebarState extends State<DashboardSidebar> {
               itemCount: _menuItems.length,
               itemBuilder: (context, index) {
                 final item = _menuItems[index];
-                final isSelected = _selectedIndex == index;
-
+                
                 return _SidebarItem(
                   icon: item['icon'],
                   label: item['label'],
-                  isSelected: isSelected,
+                  isSelected: selectedIndex == index,
                   onTap: () {
-                    setState(() => _selectedIndex = index);
-                    // context.go(item['route']); // Uncomment when routes exist
+                    // Navigate to the route defined in the list
+                    context.go(item['route']);
                   },
                 );
               },
@@ -95,7 +104,7 @@ class _DashboardSidebarState extends State<DashboardSidebar> {
                   icon: Icons.settings_outlined,
                   label: "Settings",
                   isSelected: false,
-                  onTap: () {},
+                  onTap: () => context.go('/settings'),
                 ),
                 const SizedBox(height: 8),
                 _SidebarItem(
@@ -104,7 +113,7 @@ class _DashboardSidebarState extends State<DashboardSidebar> {
                   isSelected: false,
                   isDestructive: true,
                   onTap: () {
-                    // Handle Logout Logic
+                    // Implement Logout
                   },
                 ),
               ],
@@ -116,7 +125,6 @@ class _DashboardSidebarState extends State<DashboardSidebar> {
   }
 }
 
-// ANIMATED ITEM WIDGET
 class _SidebarItem extends StatefulWidget {
   final IconData icon;
   final String label;
@@ -141,7 +149,6 @@ class _SidebarItemState extends State<_SidebarItem> {
 
   @override
   Widget build(BuildContext context) {
-    // Determine Colors based on state
     final Color bgColor = widget.isSelected 
         ? AppColors.primaryBlue 
         : (_isHovered ? Colors.white.withOpacity(0.05) : Colors.transparent);
