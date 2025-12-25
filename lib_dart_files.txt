@@ -1,0 +1,1138 @@
+// lib/main.dart
+import 'dart:async';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+// Config & Theme
+import 'package:fees_up/utils/app_constants.dart';
+import 'package:fees_up/utils/app_theme.dart';
+
+// Services
+import 'package:fees_up/services/database_service.dart';
+import 'package:fees_up/services/app_router.dart';
+
+void main() {
+  runZonedGuarded(() async {
+    WidgetsFlutterBinding.ensureInitialized();
+
+    // 1. Desktop Support
+    if (!kIsWeb && (defaultTargetPlatform == TargetPlatform.linux || defaultTargetPlatform == TargetPlatform.windows)) {
+      sqfliteFfiInit();
+      databaseFactory = databaseFactoryFfi;
+    }
+
+    // 2. Initialize Supabase
+    if (AppConstants.hasSupabaseConfig) {
+      await Supabase.initialize(
+        url: AppConstants.supabaseUrl,
+        anonKey: AppConstants.supabaseAnonKey,
+      );
+      debugPrint('✅ Supabase initialized');
+    } else {
+      debugPrint('⚠️ Supabase credentials missing (check --dart-define)');
+    }
+
+    // 3. Initialize The Congress (Database Service - PowerSync)
+    try {
+      await DatabaseService().initialize();
+    } catch (e) {
+      debugPrint('❌ Database initialization failed: $e');
+    }
+
+    runApp(const ProviderScope(child: FeesUpApp()));
+  }, (error, stack) {
+    debugPrint('❌ Unhandled Error: $error');
+    debugPrint(stack.toString());
+  });
+}
+
+class FeesUpApp extends ConsumerWidget {
+  const FeesUpApp({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final router = ref.watch(appRouterProvider);
+
+    return MaterialApp.router(
+      title: AppConstants.defaultAppName,
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: ThemeMode.dark, // Default to Dark (Greyway.Co style)
+      routerConfig: router,
+    );
+  }
+}// lib/utils/app_constants.dart
+import 'package:flutter/material.dart';
+
+class AppConstants {
+  // --- Core Identity ---
+  static const String defaultAppName = 'Fees Up';
+  static const String appTagline = 'Enterprise School Management System';
+  static const String companyName = 'Greyway.Co';
+  static const String appVersion = '1.0.0+1';
+
+  // --- Support ---
+  static const String supportEmail = 'gabwixgamesite2024@gmail.com';
+
+  // --- Environment Config (Production Ready) ---
+  // Reads values passed via --dart-define during build
+  static const String supabaseUrl = String.fromEnvironment(
+    'SUPABASE_URL', 
+    defaultValue: 'https://your-project.supabase.co'
+  );
+  
+  static const String supabaseAnonKey = String.fromEnvironment(
+    'SUPABASE_ANON_KEY', 
+    defaultValue: ''
+  );
+  
+  static const String powerSyncUrl = String.fromEnvironment(
+    'POWERSYNC_ENDPOINT_URL', 
+    defaultValue: ''
+  );
+
+  // --- Helpers ---
+  static bool get hasSupabaseConfig => supabaseUrl.isNotEmpty && supabaseAnonKey.isNotEmpty && supabaseUrl != 'https://your-project.supabase.co';
+  static bool get hasPowerSyncConfig => powerSyncUrl.isNotEmpty;
+
+  // --- Dynamic Branding Logic ---
+  static SchoolBranding getBrandingForUser(String? email) {
+    if (email == null) return _defaultBranding;
+    
+    final normalizedEmail = email.trim().toLowerCase();
+
+    // 1. Kwalendend Academy (Specific Client)
+    if (normalizedEmail == 'danielmutimbwa@gmail.com') {
+      return const SchoolBranding(
+        appName: 'Kwalendend Academy App',
+        schoolName: 'Kwalendend Academy',
+        // Ensure you add this asset or use a network placeholder
+        logoPath: 'assets/schools/kwalendend_logo.png', 
+        primaryColor: Color(0xFF1565C0), // Custom Blue
+      );
+    }
+    
+    // 2. Greyway.Co / Admin (You)
+    if (normalizedEmail == 'gabwixgamesite2024@gmail.com') {
+      return const SchoolBranding(
+        appName: 'Fees Up Admin',
+        schoolName: 'Greyway.Co HQ',
+        logoPath: 'assets/branding/greyway_logo.png',
+        primaryColor: Color(0xFF2962FF), // Greyway Brand Blue
+      );
+    }
+
+    // Default Fallback
+    return _defaultBranding;
+  }
+
+  static const SchoolBranding _defaultBranding = SchoolBranding(
+    appName: defaultAppName,
+    schoolName: 'Demo School',
+    logoPath: 'assets/logo.png',
+    primaryColor: Color(0xFF2196F3),
+  );
+}
+
+// Helper class for dynamic theming
+class SchoolBranding {
+  final String appName;
+  final String schoolName;
+  final String logoPath;
+  final Color primaryColor;
+
+  const SchoolBranding({
+    required this.appName,
+    required this.schoolName,
+    required this.logoPath,
+    required this.primaryColor,
+  });
+}// lib/utils/app_theme.dart
+import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+
+class AppTheme {
+  // Greyway.Co Brand Colors
+  static const Color primaryBlue = Color(0xFF2962FF); // Strong Blue
+  static const Color darkBackground = Color(0xff121b22);
+  static const Color surfaceColor = Color(0xff1c2a35);
+  static const Color accentColor = Color(0xFF448AFF);
+
+  // Font Family
+  static const String fontFamily = 'Poppins';
+
+  static ThemeData get darkTheme {
+    return ThemeData(
+      useMaterial3: true,
+      brightness: Brightness.dark,
+      scaffoldBackgroundColor: darkBackground,
+      primaryColor: primaryBlue,
+      fontFamily: fontFamily,
+      
+      // Color Scheme
+      colorScheme: const ColorScheme.dark(
+        primary: primaryBlue,
+        secondary: accentColor,
+        surface: surfaceColor,
+        onSurface: Colors.white,
+        onPrimary: Colors.white,
+        background: darkBackground,
+      ),
+
+      // Text Theme
+      textTheme: GoogleFonts.poppinsTextTheme(ThemeData.dark().textTheme).apply(
+        bodyColor: Colors.white,
+        displayColor: Colors.white,
+      ),
+
+      // AppBar Theme
+      appBarTheme: const AppBarTheme(
+        backgroundColor: darkBackground,
+        elevation: 0,
+        centerTitle: true,
+        titleTextStyle: TextStyle(
+          fontSize: 20,
+          fontWeight: FontWeight.bold,
+          color: Colors.white,
+          fontFamily: fontFamily,
+        ),
+        iconTheme: IconThemeData(color: Colors.white),
+      ),
+
+      // Input Decoration (Search Bars etc)
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: surfaceColor,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: primaryBlue, width: 2),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Colors.red, width: 1),
+        ),
+      ),
+      
+      // Card Theme
+      cardTheme: CardThemeData(
+        color: surfaceColor,
+        elevation: 4,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      ),
+
+      // Button Themes
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: primaryBlue,
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+          textStyle: const TextStyle(fontWeight: FontWeight.w600, fontFamily: fontFamily),
+        ),
+      ),
+      
+      floatingActionButtonTheme: FloatingActionButtonThemeData(
+        backgroundColor: primaryBlue,
+        foregroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      ),
+    );
+  }
+
+  static ThemeData get lightTheme {
+    return ThemeData(
+      useMaterial3: true,
+      brightness: Brightness.light,
+      scaffoldBackgroundColor: Colors.grey[50],
+      primaryColor: primaryBlue,
+      fontFamily: fontFamily,
+
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: primaryBlue,
+        brightness: Brightness.light,
+        primary: primaryBlue,
+      ),
+
+      textTheme: GoogleFonts.poppinsTextTheme(ThemeData.light().textTheme),
+
+      appBarTheme: const AppBarTheme(
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black87,
+        elevation: 0,
+        centerTitle: true,
+        titleTextStyle: TextStyle(
+          color: Colors.black87,
+          fontSize: 20,
+          fontWeight: FontWeight.bold,
+          fontFamily: fontFamily,
+        ),
+      ),
+
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: Colors.grey[100],
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: primaryBlue, width: 2),
+        ),
+      ),
+
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: primaryBlue,
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      ),
+    );
+  }
+}// lib/services/providers.dart
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'database_service.dart';
+
+// Access to the Congress
+final databaseServiceProvider = Provider<DatabaseService>((ref) {
+  return DatabaseService();
+});
+
+// Stream of Students (Auto-updates UI when DB changes)
+final studentsProvider = StreamProvider<List<Map<String, dynamic>>>((ref) {
+  final db = ref.watch(databaseServiceProvider);
+  return db.watchStudents();
+});// lib/services/database_service.dart
+import 'dart:async';
+import 'package:flutter/foundation.dart';
+import 'package:powersync/powersync.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart';
+import 'package:uuid/uuid.dart';
+
+// Configuration & Schema
+import '../utils/app_constants.dart';
+import '../power/schema.dart'; // Outsourced schema
+
+class DatabaseService {
+  static final DatabaseService _instance = DatabaseService._internal();
+  factory DatabaseService() => _instance;
+  DatabaseService._internal();
+
+  late final PowerSyncDatabase _db;
+  bool _isInitialized = false;
+
+  PowerSyncDatabase get db => _db;
+
+  Future<void> initialize() async {
+    if (_isInitialized) return;
+
+    debugPrint("🏛️ Congress: Initializing Database System...");
+
+    try {
+      final dir = await getApplicationSupportDirectory();
+      final path = join(dir.path, 'fees_up.db');
+
+      // 1. Initialize PowerSync with outsourced schema
+      _db = PowerSyncDatabase(schema: schema, path: path);
+      await _db.initialize();
+
+      // 2. Connect Supabase
+      if (AppConstants.hasSupabaseConfig && AppConstants.hasPowerSyncConfig) {
+        final connector = _SupabaseConnector(_db);
+        _db.connect(connector: connector);
+      } else {
+        debugPrint("⚠️ Running in offline-only mode");
+      }
+
+      _isInitialized = true;
+      debugPrint("🏛️ Congress Initialized: System Online");
+    } catch (e, stack) {
+      debugPrint("🚨 Congress Error: Initialization failed.");
+      debugPrint(e.toString());
+      debugPrint(stack.toString());
+    }
+  }
+
+  // --- Core Methods (Delegated Actions) ---
+
+  Stream<List<Map<String, dynamic>>> watchStudents() {
+    return _db.watch('SELECT * FROM students ORDER BY full_name ASC');
+  }
+
+  Future<void> registerStudent(String fullName, String grade) async {
+    final newId = const Uuid().v4();
+    const schoolId = 'default-school-id'; 
+
+    await _db.execute(
+      'INSERT INTO students (id, full_name, grade, school_id, owed_total, paid_total, is_active) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [newId, fullName, grade, schoolId, 500.0, 0.0, 1]
+    );
+    debugPrint("✅ Student registered: $fullName");
+  }
+
+  Future<List<Map<String, dynamic>>> searchStudents(String query) async {
+    if (query.trim().isEmpty) return [];
+    return await _db.getAll(
+      'SELECT * FROM students WHERE full_name LIKE ? ORDER BY full_name ASC',
+      ['%$query%']
+    );
+  }
+}
+
+class _SupabaseConnector extends PowerSyncBackendConnector {
+  final PowerSyncDatabase db;
+
+  _SupabaseConnector(this.db);
+
+  @override
+  Future<PowerSyncCredentials?> fetchCredentials() async {
+    final session = Supabase.instance.client.auth.currentSession;
+    if (session == null) return null;
+
+    return PowerSyncCredentials(
+      endpoint: AppConstants.powerSyncUrl,
+      token: session.accessToken,
+    );
+  }
+
+  @override
+  Future<void> uploadData(PowerSyncDatabase database) async {
+    final transaction = await database.getNextCrudTransaction();
+    if (transaction == null) return;
+
+    final supabase = Supabase.instance.client;
+
+    try {
+      for (var op in transaction.crud) {
+        final table = op.table;
+        final id = op.id;
+
+        if (op.op == UpdateType.put) {
+          await supabase.from(table).upsert(op.opData!).match({'id': id});
+        } else if (op.op == UpdateType.patch) {
+          await supabase.from(table).update(op.opData!).match({'id': id});
+        } else if (op.op == UpdateType.delete) {
+          await supabase.from(table).delete().match({'id': id});
+        }
+      }
+      await transaction.complete();
+    } catch (e) {
+      debugPrint("Upload failed: $e");
+    }
+  }
+}// lib/services/app_router.dart
+import 'package:go_router/go_router.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+// Screens
+import 'package:fees_up/screens/home_shell.dart';
+import 'package:fees_up/screens/dashboard_screen.dart';
+import 'package:fees_up/screens/classes_screen.dart';
+import 'package:fees_up/screens/finance_screen.dart';
+import 'package:fees_up/screens/settings_screen.dart';
+import 'package:fees_up/screens/auth_screen.dart'; // Placeholder for auth
+
+final appRouterProvider = Provider<GoRouter>((ref) {
+  return GoRouter(
+    initialLocation: '/dashboard',
+    routes: [
+      // Authentication
+      GoRoute(
+        path: '/auth',
+        builder: (context, state) => const AuthScreen(),
+      ),
+      
+      // The Shell wraps the main 4 tabs
+      ShellRoute(
+        builder: (context, state, child) => HomeShell(child: child),
+        routes: [
+          GoRoute(
+            path: '/dashboard',
+            builder: (context, state) => const DashboardScreen(),
+          ),
+          GoRoute(
+            path: '/classes',
+            builder: (context, state) => const ClassesScreen(),
+          ),
+          GoRoute(
+            path: '/finance',
+            builder: (context, state) => const FinanceScreen(),
+          ),
+          GoRoute(
+            path: '/settings',
+            builder: (context, state) => const SettingsScreen(),
+          ),
+        ],
+      ),
+    ],
+    // Basic redirect logic (expand as needed)
+    redirect: (context, state) {
+       // final session = Supabase.instance.client.auth.currentSession;
+       // if (session == null && !state.matchedLocation.startsWith('/auth')) {
+       //   return '/auth';
+       // }
+       return null; 
+    },
+  );
+});// lib/widgets/biometric_card.dart
+// lib/screens/settings_screen.dart
+import 'package:flutter/material.dart';
+import 'package:velocity_x/velocity_x.dart';
+
+class SettingsScreen extends StatelessWidget {
+  const SettingsScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: 'Settings'.text.make()),
+      body: 'Settings Placeholder'.text.xl.make().centered(),
+    );
+  }
+}// lib/screens/local_auth_screen.dart
+// lib/screens/dashboard_screen.dart
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:velocity_x/velocity_x.dart';
+import 'package:gap/gap.dart';
+import '../services/providers.dart';
+
+class DashboardScreen extends ConsumerStatefulWidget {
+  const DashboardScreen({super.key});
+
+  @override
+  ConsumerState<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends ConsumerState<DashboardScreen> {
+  List<Map<String, dynamic>>? _searchResults;
+  bool _isSearching = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final studentsAsync = ref.watch(studentsProvider);
+
+    return Scaffold(
+      appBar: AppBar(title: 'Dashboard'.text.make()),
+      body: VStack([
+        TextField(
+          decoration: const InputDecoration(
+            hintText: 'Search students...',
+            prefixIcon: Icon(Icons.search),
+          ),
+          onSubmitted: (value) async {
+            if (value.isEmpty) {
+              setState(() {
+                _isSearching = false;
+                _searchResults = null;
+              });
+              return;
+            }
+
+            setState(() => _isSearching = true);
+            final results = await ref.read(databaseServiceProvider).searchStudents(value);
+            setState(() => _searchResults = results);
+          },
+        ).p16(),
+
+        HStack([
+          _buildStatCard(context, 'Total Students', '124', Colors.blue),
+          const Gap(16),
+          _buildStatCard(context, 'Fees Collected', '\$45k', Colors.green),
+        ]).p16(),
+
+        'Recent Registrations'.text.xl.bold.make().pOnly(left: 16),
+
+        Expanded(
+          child: _isSearching 
+            ? _buildStudentList(_searchResults ?? [])
+            : studentsAsync.when(
+                data: (students) => _buildStudentList(students),
+                loading: () => const CircularProgressIndicator().centered(),
+                error: (err, stack) => 'Error loading students'.text.red500.make().centered(),
+              ),
+        ),
+      ]),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          ref.read(databaseServiceProvider).registerStudent("New Student", "Form 1");
+        },
+        label: "Register Student".text.make(),
+        icon: const Icon(Icons.add),
+        backgroundColor: Theme.of(context).primaryColor,
+      ),
+    );
+  }
+
+  Widget _buildStudentList(List<Map<String, dynamic>> students) {
+    if (students.isEmpty) {
+      return 'No students found'.text.gray400.make().centered();
+    }
+    return ListView.builder(
+      itemCount: students.length,
+      itemBuilder: (context, index) {
+        final student = students[index];
+        final name = student['full_name'] as String? ?? 'Unknown';
+        final grade = student['grade'] as String? ?? 'No Grade';
+        final owed = student['owed_total'] ?? 0;
+
+        // Fix: Ensure we don't access [0] on an empty string
+        final firstChar = name.isNotEmpty ? name[0] : '?';
+
+        return ListTile(
+          leading: CircleAvatar(child: Text(firstChar)),
+          title: Text(name),
+          subtitle: Text(grade),
+          trailing: "\$$owed".text.red500.bold.make(),
+        );
+      },
+    );
+  }
+
+  Widget _buildStatCard(BuildContext context, String title, String value, Color color) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Theme.of(context).cardTheme.color,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: color.withAlpha(80)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            title.text.gray400.make(),
+            const Gap(8),
+            value.text.xl3.bold.color(color).make(),
+          ],
+        ),
+      ),
+    );
+  }
+}// lib/screens/home_shell.dart
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+
+class HomeShell extends StatelessWidget {
+  final Widget child;
+  const HomeShell({super.key, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: child,
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _calculateSelectedIndex(context),
+        onDestinationSelected: (int index) => _onItemTapped(index, context),
+        destinations: const [
+          NavigationDestination(
+              icon: Icon(Icons.dashboard), label: 'Dashboard'),
+          NavigationDestination(icon: Icon(Icons.class_), label: 'Classes'),
+          NavigationDestination(
+              icon: Icon(Icons.attach_money), label: 'Finance'),
+          NavigationDestination(icon: Icon(Icons.settings), label: 'Settings'),
+        ],
+      ),
+    );
+  }
+
+  int _calculateSelectedIndex(BuildContext context) {
+    final String location = GoRouterState.of(context).uri.path;
+    if (location.startsWith('/dashboard')) return 0;
+    if (location.startsWith('/classes')) return 1;
+    if (location.startsWith('/finance')) return 2;
+    if (location.startsWith('/settings')) return 3;
+    return 0;
+  }
+
+  void _onItemTapped(int index, BuildContext context) {
+    switch (index) {
+      case 0:
+        context.go('/dashboard');
+        break;
+      case 1:
+        context.go('/classes');
+        break;
+      case 2:
+        context.go('/finance');
+        break;
+      case 3:
+        context.go('/settings');
+        break;
+    }
+  }
+}
+// lib/screens/finance_screen.dart
+import 'package:flutter/material.dart';
+import 'package:velocity_x/velocity_x.dart';
+
+class FinanceScreen extends StatelessWidget {
+  const FinanceScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: 'Finance'.text.make()),
+      body: 'Finance & Fees Placeholder'.text.xl.make().centered(),
+    );
+  }
+}// lib/screens/classes_screen.dart
+import 'package:flutter/material.dart';
+import 'package:velocity_x/velocity_x.dart';
+
+class ClassesScreen extends StatelessWidget {
+  const ClassesScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: 'Classes'.text.make()),
+      body: 'Classes Management Placeholder'.text.xl.make().centered(),
+    );
+  }
+}// lib/screens/auth_screen.dart
+import 'package:flutter/material.dart';
+
+class AuthScreen extends StatelessWidget {
+  const AuthScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Login')),
+      body: const Center(child: Text('Auth Screen Placeholder')),
+    );
+  }
+}// lib/power/powersync.dart
+// Central export file for the PowerSync module.
+export 'db.dart';
+export 'schema.dart';// lib/power/schema.dart
+import 'package:powersync/powersync.dart';
+
+// --- THE LAWS (Schema Definition) ---
+const Schema schema = Schema([
+  // 1. Attendance
+  Table('attendance', [
+    Column.text('school_id'),
+    Column.text('student_id'),
+    Column.text('class_id'),
+    Column.text('date'),
+    Column.text('status'),
+    Column.text('remarks'),
+    Column.text('recorded_by'),
+    Column.text('created_at'),
+  ]),
+  // 2. Attendance Sessions
+  Table('attendance_sessions', [
+    Column.text('school_id'),
+    Column.text('class_id'),
+    Column.text('teacher_id'),
+    Column.text('student_admin_id'),
+    Column.text('access_token_id'),
+    Column.text('session_date'),
+    Column.integer('is_confirmed_by_teacher'),
+    Column.text('confirmed_at'),
+    Column.text('created_at'),
+  ]),
+  // 3. Banking Register
+  Table('banking_register', [
+    Column.text('campaign_id'),
+    Column.text('student_id'),
+    Column.real('amount'),
+    Column.text('direction'),
+    Column.text('recorded_by'),
+    Column.text('approved_by'),
+    Column.text('reference'),
+    Column.text('created_at'),
+    Column.text('school_id'),
+  ]),
+  // 4. Bill Items
+  Table('bill_items', [
+    Column.text('bill_id'),
+    Column.text('school_id'),
+    Column.text('description'),
+    Column.real('amount'),
+    Column.integer('quantity'),
+    Column.text('created_at'),
+  ]),
+  // 5. Billing Configs
+  Table('billing_configs', [
+    Column.text('school_id'),
+    Column.text('currency_code'),
+    Column.real('late_fee_percentage'),
+    Column.text('invoice_footer_note'),
+    Column.integer('allow_partial_payments'),
+    Column.text('updated_at'),
+    Column.real('default_fee'),
+  ]),
+  // 6. Bills
+  Table('bills', [
+    Column.text('school_id'),
+    Column.text('student_id'),
+    Column.text('title'),
+    Column.real('total_amount'),
+    Column.integer('is_paid'),
+    Column.text('created_at'),
+    Column.text('admin_uid'),
+    Column.text('bill_type'),
+    Column.text('billing_cycle_end'),
+    Column.text('billing_cycle_start'),
+    Column.real('paid_amount'),
+    Column.text('term_id'),
+    Column.text('month_year'),
+    Column.text('due_date'),
+    Column.text('cycle_interval'),
+    Column.integer('is_closed'),
+    Column.text('updated_at'),
+    Column.text('bill_id'),
+    Column.real('credited_amount'),
+    Column.text('school_year_id'),
+    Column.integer('month_index'),
+  ]),
+  // 7. Campaign Donations
+  Table('campaign_donations', [
+    Column.text('campaign_id'),
+    Column.text('donor_name'),
+    Column.real('amount'),
+    Column.text('payment_method'),
+    Column.text('date_received'),
+    Column.text('created_at'),
+    Column.text('notes'),
+    Column.text('student_id'),
+    Column.text('collected_by'),
+    Column.text('approved_by'),
+    Column.real('expected_cash'),
+    Column.real('actual_cash'),
+    Column.real('variance'),
+    Column.text('updated_at'),
+    Column.text('school_id'),
+  ]),
+  // 8. Campaign Expenses
+  Table('campaign_expenses', [
+    Column.text('campaign_id'),
+    Column.text('category'),
+    Column.real('amount'),
+    Column.text('incurred_by'),
+    Column.text('approved_by'),
+    Column.text('notes'),
+    Column.text('created_at'),
+    Column.text('school_id'),
+  ]),
+  // 9. Campaign Funds
+  Table('campaign_funds', [
+    Column.text('campaign_id'),
+    Column.text('fund_name'),
+    Column.integer('restricted'),
+    Column.real('balance'),
+    Column.text('updated_at'),
+    Column.text('school_id'),
+  ]),
+  // 10. Campaigns
+  Table('campaigns', [
+    Column.text('school_id'),
+    Column.text('class_id'),
+    Column.text('created_by_id'),
+    Column.text('teacher_id'),
+    Column.text('name'),
+    Column.text('description'),
+    Column.text('campaign_type'),
+    Column.text('status'),
+    Column.text('created_at'),
+    Column.real('goal_amount'),
+  ]),
+  // 11. Classes
+  Table('classes', [
+    Column.text('school_id'),
+    Column.text('name'),
+    Column.text('teacher_id'),
+    Column.text('room_number'),
+    Column.text('created_at'),
+    Column.text('admin_uid'),
+    Column.text('subject_code'),
+  ]),
+  // 12. Credits
+  Table('credits', [
+    Column.text('credit_id'),
+    Column.text('school_id'),
+    Column.text('student_id'),
+    Column.text('bill_id'),
+    Column.real('amount'),
+    Column.text('reason'),
+    Column.text('admin_uid'),
+    Column.text('created_at'),
+  ]),
+  // 13. Enrollments
+  Table('enrollments', [
+    Column.text('school_id'),
+    Column.text('student_id'),
+    Column.text('class_id'),
+    Column.text('enrolled_at'),
+    Column.text('created_at'),
+  ]),
+  // 14. Expenses
+  Table('expenses', [
+    Column.text('school_id'),
+    Column.text('title'),
+    Column.real('amount'),
+    Column.text('category'),
+    Column.text('incurred_at'),
+    Column.text('created_at'),
+    Column.text('description'),
+    Column.text('recipient'),
+  ]),
+  // 15. Notifications
+  Table('notifications', [
+    Column.text('user_id'),
+    Column.text('school_id'),
+    Column.text('title'),
+    Column.text('body'),
+    Column.text('type'),
+    Column.integer('is_read'),
+    Column.text('created_at'),
+  ]),
+  // 16. Payment Allocations
+  Table('payment_allocations', [
+    Column.text('payment_id'),
+    Column.text('bill_id'),
+    Column.text('school_id'),
+    Column.real('amount'),
+    Column.text('created_at'),
+  ]),
+  // 17. Payments
+  Table('payments', [
+    Column.text('school_id'),
+    Column.text('student_id'),
+    Column.real('amount'),
+    Column.text('date_paid'),
+    Column.text('created_at'),
+    Column.text('admin_uid'),
+    Column.text('category'),
+    Column.text('payer_name'),
+    Column.text('bill_id'),
+    Column.text('method'),
+  ]),
+  // 18. School Applications
+  Table('school_applications', [
+    Column.text('school_name'),
+    Column.text('school_type'),
+    Column.text('student_count_range'),
+    Column.text('current_system'),
+    Column.integer('requires_offline'),
+    Column.text('applicant_name'),
+    Column.text('applicant_role'),
+    Column.text('contact_email'),
+    Column.text('contact_phone'),
+    Column.integer('authorized_submission'),
+    Column.text('eligibility_tier'),
+    Column.text('submitted_at'),
+  ]),
+  // 19. School Terms
+  Table('school_terms', [
+    Column.text('school_id'),
+    Column.text('name'),
+    Column.text('start_date'),
+    Column.text('end_date'),
+    Column.integer('academic_year'),
+    Column.text('created_at'),
+  ]),
+  // 20. School Year Months
+  Table('school_year_months', [
+    Column.text('school_year_id'),
+    Column.text('name'),
+    Column.integer('month_index'),
+    Column.text('start_date'),
+    Column.text('end_date'),
+    Column.integer('is_billable'),
+    Column.text('created_at'),
+    Column.text('school_id'),
+  ]),
+  // 21. School Years
+  Table('school_years', [
+    Column.text('school_id'),
+    Column.text('year_label'),
+    Column.text('start_date'),
+    Column.text('end_date'),
+    Column.text('description'),
+    Column.integer('active'),
+    Column.text('created_at'),
+  ]),
+  // 22. Schools
+  Table('schools', [
+    Column.text('name'),
+    Column.text('subscription_tier'),
+    Column.integer('max_students'),
+    Column.integer('is_suspended'),
+    Column.text('created_at'),
+  ]),
+  // 23. Student Archives
+  Table('student_archives', [
+    Column.text('school_id'),
+    Column.text('full_name'),
+    Column.text('reason'),
+    Column.text('archived_at'),
+    Column.text('original_data'),
+    Column.text('created_at'),
+  ]),
+  // 24. Students
+  Table('students', [
+    Column.text('student_id'),
+    Column.text('school_id'),
+    Column.text('full_name'),
+    Column.text('grade'),
+    Column.text('parent_contact'),
+    Column.text('registration_date'),
+    Column.text('billing_type'),
+    Column.real('default_fee'),
+    Column.integer('is_active'),
+    Column.text('created_at'),
+    Column.text('admin_uid'),
+    Column.real('owed_total'),
+    Column.real('paid_total'),
+    Column.text('subjects'),
+    Column.text('billing_date'),
+    Column.text('last_synced_at'),
+    Column.text('term_id'),
+    Column.text('date_of_birth'),
+    Column.text('gender'),
+    Column.text('address'),
+    Column.text('emergency_contact_name'),
+    Column.text('medical_notes'),
+    Column.text('enrollment_date'),
+    Column.text('updated_at'),
+    Column.integer('photo_consent'),
+  ]),
+  // 25. Teacher Access Tokens
+  Table('teacher_access_tokens', [
+    Column.text('school_id'),
+    Column.text('teacher_id'),
+    Column.text('granted_by_teacher_id'),
+    Column.text('access_code'),
+    Column.text('permission_type'),
+    Column.integer('is_used'),
+    Column.text('used_at'),
+    Column.text('expires_at'),
+    Column.text('created_at'),
+  ]),
+  // 26. Teachers
+  Table('teachers', [
+    Column.text('school_id'),
+    Column.text('full_name'),
+    Column.text('admin_uid'),
+    Column.text('created_at'),
+    Column.text('updated_at'),
+  ]),
+  // 27. User Profiles
+  Table('user_profiles', [
+    Column.text('email'),
+    Column.text('full_name'),
+    Column.text('role'),
+    Column.text('school_id'),
+    Column.integer('is_banned'),
+    Column.text('avatar_url'),
+    Column.text('created_at'),
+  ]),
+]);// lib/power/db.dart
+import 'package:fees_up/utils/app_constants.dart';
+import 'package:logging/logging.dart';
+import 'package:path/path.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:powersync/powersync.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'schema.dart';
+
+final _log = Logger('PowerSync');
+
+/// The global PowerSync database instance.
+late final PowerSyncDatabase powerSyncDb;
+
+/// Initializes the PowerSync database and connects to the backend.
+Future<void> openPowerSyncDatabase() async {
+  // 1. Locate the database file
+  final dir = await getApplicationSupportDirectory();
+  final path = join(dir.path, 'fees_up.db');
+
+  // 2. Initialize the database with the schema
+  powerSyncDb = PowerSyncDatabase(schema: schema, path: path);
+  await powerSyncDb.initialize();
+
+  // 3. Connect to the backend (Supabase)
+  final connector = _SupabaseConnector(powerSyncDb);
+  powerSyncDb.connect(connector: connector);
+
+  _log.info('PowerSync initialized and connected.');
+}
+
+/// A connector that bridges PowerSync (local) with Supabase (remote).
+class _SupabaseConnector extends PowerSyncBackendConnector {
+  final PowerSyncDatabase db;
+
+  _SupabaseConnector(this.db);
+
+  @override
+  Future<PowerSyncCredentials?> fetchCredentials() async {
+    // Get the current session from Supabase Auth
+    final session = Supabase.instance.client.auth.currentSession;
+    if (session == null) {
+      // Not logged in
+      return null;
+    }
+
+    // Return the credentials to connect to the PowerSync service
+    return PowerSyncCredentials(
+      endpoint: AppConstants.powerSyncUrl,
+      token: session.accessToken,
+    );
+  }
+
+  @override
+  Future<void> uploadData(PowerSyncDatabase database) async {
+    // This function is called when there are local changes to sync up.
+    // We process the transaction queue and write to Supabase.
+    final transaction = await database.getNextCrudTransaction();
+    if (transaction == null) return;
+
+    final supabase = Supabase.instance.client;
+
+    try {
+      for (var op in transaction.crud) {
+        final table = op.table;
+        final id = op.id;
+
+        // Map local operations to Supabase REST calls
+        if (op.op == UpdateType.put) {
+          // INSERT or UPDATE (Upsert)
+          await supabase.from(table).upsert(op.opData!).match({'id': id});
+        } else if (op.op == UpdateType.patch) {
+          // UPDATE (Partial)
+          await supabase.from(table).update(op.opData!).match({'id': id});
+        } else if (op.op == UpdateType.delete) {
+          // DELETE
+          await supabase.from(table).delete().match({'id': id});
+        }
+      }
+
+      // Mark the transaction as complete
+      await transaction.complete();
+    } catch (e) {
+      _log.severe('Error uploading data to Supabase', e);
+      // If an error occurs, we throw it so PowerSync will retry later.
+      rethrow;
+    }
+  }
+}

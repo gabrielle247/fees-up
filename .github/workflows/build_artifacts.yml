@@ -1,0 +1,112 @@
+name: Fees Up - Build Artifacts
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+jobs:
+  build-all:
+    name: Build Android & Linux
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Checkout Code
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      # 2. Setup Java (For Android)
+      - name: ☕ Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      # 3. Setup Flutter
+      - name: 🐦 Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          # Match local/toolchain version (Flutter 3.38.x)
+          flutter-version: '3.38.4'
+
+      # 4. Install Linux Dependencies
+      - name: 🐧 Install Linux Build Tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libsecret-1-dev libjsoncpp-dev
+
+      # 5. Get Dependencies
+      - name: 📦 Flutter Pub Get
+        run: flutter pub get
+
+      # --- BUILD ANDROID ---
+      - name: 📱 Build Android APK
+        run: |
+          flutter build apk --release --no-tree-shake-icons \
+            --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} \
+            --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }} \
+            --dart-define=POWERSYNC_ENDPOINT_URL=${{ secrets.POWERSYNC_ENDPOINT_URL }} \
+            --dart-define=ENVIRONMENT=production
+
+      - name: 📤 Upload Android Artifact
+        if: ${{ hashFiles('build/app/outputs/flutter-apk/app-release.apk') != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: fees-up-android-release
+          path: build/app/outputs/flutter-apk/app-release.apk
+
+      # --- BUILD LINUX ---
+      - name: 🖥️ Build Linux Executable
+        run: |
+          flutter build linux --release \
+            --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} \
+            --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }} \
+            --dart-define=POWERSYNC_ENDPOINT_URL=${{ secrets.POWERSYNC_ENDPOINT_URL }} \
+            --dart-define=ENVIRONMENT=production
+
+      - name: 📦 Compress Linux Build
+        run: tar -czvf fees-up-linux.tar.gz build/linux/x64/release/bundle/
+
+      - name: 📤 Upload Linux Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: fees-up-linux-release
+          path: fees-up-linux.tar.gz
+  build-windows:
+    name: Build Windows
+    runs-on: windows-latest
+
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🐦 Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          flutter-version: '3.38.4'
+
+      - name: 📦 Flutter Pub Get
+        run: flutter pub get
+
+      - name: 🪟 Build Windows EXE
+        run: |
+          flutter build windows --release \
+            --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} \
+            --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }} \
+            --dart-define=POWERSYNC_ENDPOINT_URL=${{ secrets.POWERSYNC_ENDPOINT_URL }} \
+            --dart-define=ENVIRONMENT=production
+
+      - name: 📦 Compress Windows Build
+        shell: powershell
+        run: |
+          $out = 'fees-up-windows-release.zip'
+          if (Test-Path $out) { Remove-Item $out }
+          Compress-Archive -Path 'build\\windows\\runner\\Release\\*' -DestinationPath $out
+
+      - name: 📤 Upload Windows Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: fees-up-windows-release
+          path: fees-up-windows-release.zip
