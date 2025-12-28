@@ -4,8 +4,10 @@ class Campaign {
   final String createdById;
   final String name;
   final String? description;
-  final String? status; // 'active'
+  final String type; // Added to match Schema 'campaign_type'
+  final String status; 
   final double goalAmount;
+  final DateTime createdAt; // Useful for sorting
 
   Campaign({
     required this.id,
@@ -13,20 +15,38 @@ class Campaign {
     required this.createdById,
     required this.name,
     this.description,
+    this.type = 'General',
     this.status = 'active',
     this.goalAmount = 0.0,
+    required this.createdAt,
   });
 
   factory Campaign.fromRow(Map<String, dynamic> row) {
     return Campaign(
       id: row['id'] as String,
       schoolId: row['school_id'] as String,
-      createdById: row['created_by_id'] as String,
+      createdById: row['created_by_id'] ?? '',
       name: row['name'] as String,
       description: row['description'] as String?,
+      type: row['campaign_type'] ?? 'General',
       status: row['status'] ?? 'active',
       goalAmount: (row['goal_amount'] as num?)?.toDouble() ?? 0.0,
+      createdAt: DateTime.tryParse(row['created_at'] ?? '') ?? DateTime.now(),
     );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'school_id': schoolId,
+      'created_by_id': createdById,
+      'name': name,
+      'description': description,
+      'campaign_type': type,
+      'status': status,
+      'goal_amount': goalAmount,
+      'created_at': createdAt.toIso8601String(),
+    };
   }
 }
 

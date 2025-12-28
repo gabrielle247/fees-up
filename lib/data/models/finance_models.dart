@@ -113,3 +113,54 @@ class Payment {
     };
   }
 }
+
+class Expense {
+  final String id;
+  final String schoolId;
+  final String title;
+  final double amount;
+  final String? category;
+  final DateTime incurredAt;
+  final String? description; // Maps to 'description' column
+  final String? recipient;
+
+  Expense({
+    required this.id,
+    required this.schoolId,
+    required this.title,
+    required this.amount,
+    this.category,
+    required this.incurredAt,
+    this.description,
+    this.recipient,
+  });
+
+  factory Expense.fromRow(Map<String, dynamic> row) {
+    return Expense(
+      id: row['id'] as String,
+      schoolId: row['school_id'] as String,
+      title: row['title'] as String,
+      amount: (row['amount'] as num).toDouble(),
+      category: row['category'] as String?,
+      incurredAt: DateTime.tryParse(row['incurred_at'] ?? '') ?? DateTime.now(),
+      description: row['description'] as String?,
+      recipient: row['recipient'] as String?,
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'school_id': schoolId,
+      'title': title,
+      'amount': amount,
+      'category': category,
+      'incurred_at': incurredAt.toIso8601String(),
+      'description': description,
+      'recipient': recipient,
+      // 'created_at' is usually handled by Supabase defaults, 
+      // but for PowerSync offline-first, we often include it.
+      'created_at': DateTime.now().toIso8601String(), 
+    };
+  }
+}
