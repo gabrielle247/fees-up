@@ -9,27 +9,18 @@ class SupabaseConnector extends PowerSyncBackendConnector {
 
   @override
   Future<PowerSyncCredentials?> fetchCredentials() async {
-    // 1. Get current session
     final session = db.auth.currentSession;
-    if (session == null) {
-      return null;
-    }
+    if (session == null) return null;
 
-    // 2. Fetch credentials using the Environment Variable from Makefile
-    // passed via --dart-define=POWERSYNC_ENDPOINT_URL=...
     const endpoint = String.fromEnvironment('POWERSYNC_ENDPOINT_URL');
-
     if (endpoint.isEmpty) {
       throw Exception('POWERSYNC_ENDPOINT_URL not set in --dart-define');
     }
 
-    final token = session.accessToken;
-    final userId = session.user.id;
-
     return PowerSyncCredentials(
       endpoint: endpoint,
-      token: token,
-      userId: userId,
+      token: session.accessToken,
+      userId: session.user.id,
     );
   }
 
@@ -44,20 +35,39 @@ class SupabaseConnector extends PowerSyncBackendConnector {
         final id = op.id;
         final data = op.opData;
 
-        // Map PowerSync CRUD to Supabase
+        // "Create or Update" Logic
         if (op.op == UpdateType.put) {
-          await db.from(table).upsert({...data!, 'id': id});
+          // .upsert is the safest bet: it handles both new and existing records.
+          // onConflict: 'id' ensures we don't get duplicate key errors.
+          await db.from(table).upsert(
+            {...data!, 'id': id},
+            onConflict: 'id',
+            ignoreDuplicates: false,
+          );
         } else if (op.op == UpdateType.patch) {
           await db.from(table).update(data!).eq('id', id);
         } else if (op.op == UpdateType.delete) {
           await db.from(table).delete().eq('id', id);
         }
       }
+      
+      // Clear the queue once finished
       await transaction.complete();
+      
+    } on PostgrestException catch (e) {
+      // 42501 = RLS Violation.
+      // 23503 = Foreign Key Violation (Key is not present in table).
+      // If we don't .complete() here, this one row blocks the WHOLE app sync loop.
+      if (e.code == '42501' || e.code == '23503') {
+        debugPrint('❌ Sync Error ${e.code} on $transaction: ${e.message}. Skipping to unblock queue.');
+        await transaction.complete(); 
+      } else {
+        // For network or server 500 errors, we rethrow so PowerSync retries later.
+        rethrow;
+      }
     } catch (e) {
-      // Error handling: if it's a permanent error, we might need to complete() it 
-      // to unblock the queue, but for connectivity issues, we leave it.
-      debugPrint('Sync Upload Error: $e'); 
+      debugPrint('Sync Upload Error: $e');
+      rethrow;
     }
   }
 }

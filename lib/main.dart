@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:logging/logging.dart'; // <--- ADD THIS IMPORT
 
 import 'core/theme/app_theme.dart';
 import 'core/routes/app_router.dart';
@@ -9,12 +10,15 @@ import 'data/services/database_service.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // 0. SILENCE LOGS (Production Setting)
+  // This stops the infinite warning loop in the console
+  Logger.root.level = Level.SEVERE; 
+
   // 1. Load Keys from Environment (Makefile)
   const supabaseUrl = String.fromEnvironment('SUPABASE_URL');
   const supabaseAnonKey = String.fromEnvironment('SUPABASE_ANON_KEY');
 
   if (supabaseUrl.isEmpty || supabaseAnonKey.isEmpty) {
-    // Graceful fallback for UI dev if keys aren't present (optional)
     debugPrint("⚠️ WARNING: Supabase Keys missing. Run with 'make run'.");
   } else {
     // 2. Initialize Supabase
@@ -25,15 +29,15 @@ void main() async {
   }
 
   // 3. Initialize Database Engine (PowerSync)
-  // We wrap this in a try-catch to ensure the app still launches even if DB fails initially
   try {
     final dbService = DatabaseService();
     await dbService.initialize();
+    // await dbService.factoryReset();
   } catch (e) {
     debugPrint("❌ Database Init Failed: $e");
   }
 
-  // 4. Run App wrapped in ProviderScope (Crucial for Riverpod)
+  // 4. Run App wrapped in ProviderScope
   runApp(
     const ProviderScope(
       child: GreywayApp(),
@@ -46,15 +50,12 @@ class GreywayApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // We watch the routerProvider from app_router.dart
-    final router = ref.watch(AppRouter.routerProvider);
+    final router = ref.watch(appRouterProvider);
 
     return MaterialApp.router(
       debugShowCheckedModeBanner: false,
       title: 'Fees Up',
       theme: AppTheme.darkTheme,
-      
-      // Router Configuration
       routerConfig: router,
     );
   }

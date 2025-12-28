@@ -1,3 +1,4 @@
+import 'package:fees_up/pc/widgets/logout_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
@@ -23,11 +24,23 @@ class _DashboardSidebarState extends State<DashboardSidebar> {
 
   final List<Map<String, dynamic>> _menuItems = [
     {'icon': Icons.grid_view_rounded, 'label': 'Overview', 'route': '/'},
-    {'icon': Icons.receipt_long_rounded, 'label': 'Transactions', 'route': '/transactions'},
-    {'icon': Icons.description_outlined, 'label': 'Invoices', 'route': '/invoices'},
+    {
+      'icon': Icons.receipt_long_rounded,
+      'label': 'Transactions',
+      'route': '/transactions'
+    },
+    {
+      'icon': Icons.description_outlined,
+      'label': 'Invoices',
+      'route': '/invoices'
+    },
     {'icon': Icons.school_outlined, 'label': 'Students', 'route': '/students'},
     {'icon': Icons.bar_chart_rounded, 'label': 'Reports', 'route': '/reports'},
-    {'icon': Icons.campaign_outlined, 'label': 'Announcements', 'route': '/announcements'},
+    {
+      'icon': Icons.campaign_outlined,
+      'label': 'Announcements',
+      'route': '/announcements'
+    },
   ];
 
   @override
@@ -36,7 +49,7 @@ class _DashboardSidebarState extends State<DashboardSidebar> {
 
     return Container(
       width: 260,
-      color: const Color(0xFF0F1115), 
+      color: const Color(0xFF0F1115),
       child: Column(
         children: [
           // 1. BRAND HEADER
@@ -51,7 +64,8 @@ class _DashboardSidebarState extends State<DashboardSidebar> {
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(color: Colors.white12),
                   ),
-                  child: const Icon(Icons.shield_outlined, color: AppColors.primaryBlue, size: 20),
+                  child: const Icon(Icons.shield_outlined,
+                      color: AppColors.primaryBlue, size: 20),
                 ),
                 const SizedBox(width: 12),
                 Column(
@@ -59,18 +73,22 @@ class _DashboardSidebarState extends State<DashboardSidebar> {
                   children: [
                     const Text(
                       "School Admin",
-                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14),
                     ),
                     Text(
                       "Financial Portal",
-                      style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12),
+                      style: TextStyle(
+                          color: Colors.white.withAlpha(127), fontSize: 12),
                     ),
                   ],
                 )
               ],
             ),
           ),
-          
+
           const SizedBox(height: 10),
 
           // 2. NAVIGATION ITEMS
@@ -80,7 +98,7 @@ class _DashboardSidebarState extends State<DashboardSidebar> {
               itemCount: _menuItems.length,
               itemBuilder: (context, index) {
                 final item = _menuItems[index];
-                
+
                 return _SidebarItem(
                   icon: item['icon'],
                   label: item['label'],
@@ -110,11 +128,15 @@ class _DashboardSidebarState extends State<DashboardSidebar> {
                 _SidebarItem(
                   icon: Icons.logout_rounded,
                   label: "Log Out",
-                  isSelected: false,
-                  isDestructive: true,
+                  isDestructive: true, // If you have this property
                   onTap: () {
-                    // Implement Logout
-                  },
+                    showDialog(
+                      context: context,
+                      barrierColor: Colors.black
+                          .withAlpha((0.7*255).toInt()), // Darken background heavily
+                      builder: (context) => const LogoutDialog(),
+                    );
+                  }, isSelected: false,
                 ),
               ],
             ),
@@ -149,16 +171,16 @@ class _SidebarItemState extends State<_SidebarItem> {
 
   @override
   Widget build(BuildContext context) {
-    final Color bgColor = widget.isSelected 
-        ? AppColors.primaryBlue 
-        : (_isHovered ? Colors.white.withOpacity(0.05) : Colors.transparent);
-    
-    final Color textColor = widget.isDestructive 
-        ? AppColors.errorRed 
+    final Color bgColor = widget.isSelected
+        ? AppColors.primaryBlue
+        : (_isHovered ? Colors.white.withAlpha(12) : Colors.transparent);
+
+    final Color textColor = widget.isDestructive
+        ? AppColors.errorRed
         : (widget.isSelected ? Colors.white : Colors.white70);
-        
-    final Color iconColor = widget.isDestructive 
-        ? AppColors.errorRed 
+
+    final Color iconColor = widget.isDestructive
+        ? AppColors.errorRed
         : (widget.isSelected ? Colors.white : Colors.white54);
 
     return MouseRegion(
@@ -184,7 +206,8 @@ class _SidebarItemState extends State<_SidebarItem> {
                 widget.label,
                 style: TextStyle(
                   color: textColor,
-                  fontWeight: widget.isSelected ? FontWeight.bold : FontWeight.w500,
+                  fontWeight:
+                      widget.isSelected ? FontWeight.bold : FontWeight.w500,
                   fontSize: 14,
                 ),
               ),

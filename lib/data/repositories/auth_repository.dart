@@ -56,30 +56,32 @@ class AuthRepository {
 
       // 2. Generate IDs
       final schoolId = const Uuid().v4();
+      final now = DateTime.now().toIso8601String();
       
-      // 3. Write Data Locally (Offline First)
-      // A. Create School
-      await _db.insert('schools', {
-        'id': schoolId,
-        'name': schoolName,
-        'subscription_tier': 'free',
-        'max_students': 50,
-        'is_suspended': 0,
-        'created_at': DateTime.now().toIso8601String(),
-      });
+      // 3. Write Data Locally (Atomic Transaction)
+      // We wrap this in writeTransaction to ensure PowerSync uploads both 
+      // the school and the profile in the SAME batch. This prevents the 
+      // "Foreign Key Violation" error on the backend.
+      await _db.db.writeTransaction((tx) async {
+        // A. Create School
+        await tx.execute(
+          'INSERT INTO schools (id, name, subscription_tier, max_students, is_suspended, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+          [schoolId, schoolName, 'free', 5, 0, now]
+        );
 
-      // B. Create User Profile
-      await _db.db.execute(
-        'INSERT OR REPLACE INTO user_profiles (id, email, full_name, role, school_id, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-        [
-          user.id,
-          email,
-          fullName,
-          'school_admin',
-          schoolId,
-          DateTime.now().toIso8601String(),
-        ]
-      );
+        // B. Create User Profile
+        await tx.execute(
+          'INSERT OR REPLACE INTO user_profiles (id, email, full_name, role, school_id, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+          [
+            user.id,
+            email,
+            fullName,
+            'school_admin',
+            schoolId,
+            now,
+          ]
+        );
+      });
 
     } on AuthException catch (e) {
       throw _getHumanReadableError(e.message);

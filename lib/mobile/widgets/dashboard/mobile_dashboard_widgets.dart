@@ -139,7 +139,7 @@ class MobileTransactionTile extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.surfaceGrey,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withOpacity(0.05)),
+        border: Border.all(color: Colors.white.withAlpha(12)),
       ),
       child: Row(
         children: [
@@ -166,7 +166,7 @@ class MobileTransactionTile extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
-                  color: isPaid ? AppColors.successGreen.withOpacity(0.2) : AppColors.errorRed.withOpacity(0.2),
+                  color: isPaid ? AppColors.successGreen.withAlpha(51) : AppColors.errorRed.withAlpha(51),
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(

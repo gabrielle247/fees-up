@@ -58,7 +58,7 @@ class StatCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: iconBgColor ?? Colors.white.withOpacity(0.05),
+                    color: iconBgColor ?? Colors.white.withAlpha(12),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Icon(icon, size: 18, color: iconColor),
@@ -111,7 +111,7 @@ class AlertBadge extends StatelessWidget {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
-            color: AppColors.errorRed.withOpacity(0.1),
+            color: AppColors.errorRed.withAlpha(25),
             borderRadius: BorderRadius.circular(4),
           ),
           child: Row(

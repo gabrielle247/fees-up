@@ -1,4 +1,4 @@
-.PHONY: help run run-verbose clean-run stop analyze format test dev-menu quick-run logs backup-lib commit push force lib save-point fresh-start setup-repo
+.PHONY: help run run-verbose clean-run stop analyze format test dev-menu quick-run logs backup-lib commit push force lib save-point fresh-start setup-repo opacity .dart nuke
 
 help:
 	@echo "╔════════════════════════════════════════════════════════════════╗"
@@ -8,6 +8,10 @@ help:
 	@echo "Quick Start:"
 	@echo "  make run              - Run app on Linux (hot reload)"
 	@echo "  make setup-repo       - Initialize Git & link GitHub repo"
+	@echo ""
+	@echo "🛠️ Code Tools:"
+	@echo "  make opacity          - Convert .withOpacity(x) -> .withAlpha(255*x)"
+	@echo "  make .dart            - Dump all LIB files to 'lib_dart_files.txt'"
 	@echo ""
 	@echo "🛡️ Safety & Git:"
 	@echo "  make save-point       - Commit & Push EVERYTHING (Your safety net)"
@@ -23,7 +27,7 @@ help:
 	@echo "Maintenance:"
 	@echo "  make clean            - Clean build"
 	@echo "  make stop             - Kill processes"
-	@echo "  make lib              - Map all Dart files"
+	@echo "  make nuke             - ☢️  WIPE LOCAL DATABASE (Fixes sync loops)"
 	@echo ""
 
 # --- 🚀 RUNNING ---
@@ -62,6 +66,28 @@ stop:
 clean:
 	@echo "🧹 Cleaning Flutter build..."
 	flutter clean
+
+nuke:
+	@echo "☢️  Nuking local database..."
+	@find ~ -name "greyway_feesup.db" -delete
+	@find ~ -name "greyway_feesup.db-shm" -delete
+	@find ~ -name "greyway_feesup.db-wal" -delete
+	@echo "✅ Database wiped. Run 'make run' to generate a fresh one."
+
+# --- 🛠️ CODE TOOLS ---
+
+opacity:
+	@echo "🔧 Running Opacity Fixer..."
+	@chmod +x fix_opacity.sh
+	@./fix_opacity.sh
+
+.dart:
+	@echo "📁 Mapping all .dart files in lib/..."
+	@find lib -name "*.dart" -exec sh -c 'echo "\n// =========================================="; echo "// FILE: {}"; echo "// ==========================================\n"; cat {}' \; > lib_dart_files.txt 2>/dev/null || true
+	@echo "✅ All code saved to: lib_dart_files.txt"
+
+# Alias for .dart so 'make lib' still works if you used it before
+lib: .dart
 
 # --- 🛡️ SAFETY COMMANDS ---
 
@@ -117,10 +143,5 @@ force: setup-repo
 	@echo "💪 Force pushing..."
 	@git push origin main --force
 	@echo "✅ Done!"
-
-lib:
-	@echo "📁 Mapping lib directory..."
-	@find lib -name "*.dart" -exec sh -c 'echo "// {}" ; cat {}' \; > lib_dart_files.txt 2>/dev/null || true
-	@echo "✅ Created lib_dart_files.txt"
 
 .DEFAULT_GOAL := help

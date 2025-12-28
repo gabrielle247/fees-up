@@ -1,92 +1,103 @@
 import 'package:flutter/material.dart';
-import '../../../core/constants/app_colors.dart';
+
+/// Define your action types here to make it easy to switch between them
+enum QuickActionType {
+  recordPayment,
+  addExpense,
+  registerStudent,
+  createCampaign,
+}
+
+class QuickActionItem {
+  final String label;
+  final IconData icon;
+  final Color color;
+  final QuickActionType type;
+
+  const QuickActionItem({
+    required this.label,
+    required this.icon,
+    required this.color,
+    required this.type,
+  });
+}
 
 class QuickActionsGrid extends StatelessWidget {
-  const QuickActionsGrid({super.key});
+  /// The parent widget will provide the logic for what happens on tap
+  final Function(QuickActionType) onActionSelected;
 
-  void _showPlaceholderDialog(BuildContext context, String title) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.surfaceGrey,
-        title: Text(title, style: const TextStyle(color: Colors.white)),
-        content: const Text(
-          "This feature is coming soon.\nWe will replace this dialog with the actual form.",
-          style: TextStyle(color: Colors.white70),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text("Close"),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx),
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryBlue),
-            child: const Text("Proceed (Mock)"),
-          )
-        ],
-      ),
-    );
-  }
+  const QuickActionsGrid({
+    super.key,
+    required this.onActionSelected,
+  });
+
+  // -----------------------------------------------------------
+  // CONFIGURATION: Add new buttons here
+  // -----------------------------------------------------------
+  final List<QuickActionItem> _actions = const [
+    QuickActionItem(
+      label: "Record Payment",
+      icon: Icons.attach_money,
+      color: Color(0xFF4ADE80), // Green
+      type: QuickActionType.recordPayment,
+    ),
+    QuickActionItem(
+      label: "Add Expense",
+      icon: Icons.receipt_long,
+      color: Color(0xFFF87171), // Red
+      type: QuickActionType.addExpense,
+    ),
+    QuickActionItem(
+      label: "New Student",
+      icon: Icons.person_add,
+      color: Color(0xFF60A5FA), // Blue
+      type: QuickActionType.registerStudent,
+    ),
+    QuickActionItem(
+      label: "New Campaign",
+      icon: Icons.campaign,
+      color: Color(0xFFA78BFA), // Purple
+      type: QuickActionType.createCampaign,
+    ),
+  ];
 
   @override
   Widget build(BuildContext context) {
+    const surfaceColor = Color(0xFF1F2227); // Matching PaymentDialog
+    const borderColor = Colors.white10;
+
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: const Color(0xFF15181E),
+        color: surfaceColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white10),
+        border: Border.all(color: borderColor),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            "Quick Actions", 
-            style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)
+            "Quick Actions",
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
           Expanded(
-            child: GridView.count(
-              crossAxisCount: 2,
-              crossAxisSpacing: 12,
-              mainAxisSpacing: 12,
-              childAspectRatio: 1.3,
+            child: GridView.builder(
               physics: const NeverScrollableScrollPhysics(),
-              children: [
-                _buildActionBtn(
-                  context,
-                  Icons.add_card, 
-                  "Record\nPayment", 
-                  AppColors.primaryBlue.withOpacity(0.2), 
-                  AppColors.primaryBlue,
-                  () => _showPlaceholderDialog(context, "Record Payment"),
-                ),
-                _buildActionBtn(
-                  context,
-                  Icons.receipt, 
-                  "Generate\nInvoice", 
-                  Colors.white10, 
-                  Colors.white,
-                  () => _showPlaceholderDialog(context, "Generate Invoice"),
-                ),
-                _buildActionBtn(
-                  context,
-                  Icons.account_balance_wallet, 
-                  "Manage\nExpenses", 
-                  Colors.white10, 
-                  Colors.white,
-                  () => _showPlaceholderDialog(context, "Manage Expenses"),
-                ),
-                _buildActionBtn(
-                  context,
-                  Icons.bar_chart, 
-                  "Financial\nReports", 
-                  Colors.white10, 
-                  Colors.white,
-                  () => _showPlaceholderDialog(context, "View Reports"),
-                ),
-              ],
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 12,
+                childAspectRatio: 1.5, // Wider buttons
+              ),
+              itemCount: _actions.length,
+              itemBuilder: (context, index) {
+                return _buildActionCard(_actions[index]);
+              },
             ),
           ),
         ],
@@ -94,35 +105,38 @@ class QuickActionsGrid extends StatelessWidget {
     );
   }
 
-  Widget _buildActionBtn(
-    BuildContext context,
-    IconData icon, 
-    String label, 
-    Color bg, 
-    Color iconColor, 
-    VoidCallback onTap
-  ) {
+  Widget _buildActionCard(QuickActionItem action) {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: onTap,
+        onTap: () => onActionSelected(action.type),
         borderRadius: BorderRadius.circular(12),
-        hoverColor: Colors.white.withOpacity(0.05),
+        hoverColor: Colors.white.withAlpha(10),
         child: Container(
           decoration: BoxDecoration(
-            color: bg,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.white.withOpacity(0.05)),
+            border: Border.all(color: Colors.white.withAlpha(15)),
+            color: Colors.white.withAlpha(5),
           ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, color: iconColor, size: 28),
-              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: action.color.withAlpha(30),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(action.icon, color: action.color, size: 22),
+              ),
+              const SizedBox(height: 10),
               Text(
-                label, 
-                textAlign: TextAlign.center, 
-                style: const TextStyle(color: Colors.white70, fontSize: 12)
+                action.label,
+                style: const TextStyle(
+                  color: Colors.white70,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ],
           ),
