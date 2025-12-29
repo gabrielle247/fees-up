@@ -1,0 +1,31 @@
+[FUTURE] SERVER-SIDE NOTIFICATION AUTOMATION BOT
+---------------------------------------------------
+DATE: 2025-12-29
+MODULE: Notifications & Announcements
+BRAND: Greyway.Co / Fees Up
+
+1. THE "WATCHDOG" BOT STRATEGY
+   - We will deploy a server-side "Watchdog" process (Node.js/Python) that runs 
+     independently of user sessions.
+   - Triggers:
+     a) Database Events (Postgres Triggers via Supabase).
+     b) Scheduled Cron Jobs (Daily at 08:00 AM, Monthly 1st).
+
+2. AUTOMATED ANNOUNCEMENT GENERATION
+   - The bot will automatically insert records into the `announcements` table 
+     based on system health and financial thresholds.
+   - Example Scenarios:
+     * "Server Load High": If API latency > 500ms for 5 mins.
+     * "Monthly Ledger Ready": On the 1st of the month, auto-generate PDF and 
+       post a "Financial" announcement with the download link.
+     * "Low Attendance": If daily attendance < 80%, post an "Academic" alert.
+
+3. SMART ROUTING
+   - Critical Alerts (Red): Pushed via FCM (Firebase Cloud Messaging) immediately 
+     to all Admin devices.
+   - Warnings (Yellow): Email summary at end of day.
+   - Info (Blue/Grey): In-app badge increment only.
+
+4. REQUIRED BACKEND INFRASTRUCTURE
+   - `system_health_logs` table.
+   - `announcement_rules` table (to configure thresholds).

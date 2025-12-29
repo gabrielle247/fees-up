@@ -71,6 +71,12 @@ class DatabaseService {
     );
   }
 
+  /// Runs a raw SQL SELECT query and returns the list of results once.
+  /// Useful for one-off fetches like getting the last invoice number.
+  Future<List<Map<String, dynamic>>> select(String sql, [List<Object?>? arguments]) async {
+    return await _db.getAll(sql, arguments ?? []);
+  }
+
   Future<Map<String, dynamic>?> getById(String table, String id) async {
     final results = await _db.getAll('SELECT * FROM $table WHERE id = ?', [id]);
     return results.isNotEmpty ? results.first : null;

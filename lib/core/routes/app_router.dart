@@ -1,16 +1,27 @@
 import 'dart:async';
 
-import 'package:fees_up/mobile/screens/mobile_home_screen.dart';
-import 'package:fees_up/shared/layout/responsive_layout.dart';
+import 'package:fees_up/pc/screens/announcements_screen.dart';
+import 'package:fees_up/pc/screens/invoices_screen.dart';
+import 'package:fees_up/pc/screens/profile_screen.dart'; // <--- NEW IMPORT
+import 'package:fees_up/pc/screens/reports_screen.dart';
+import 'package:fees_up/pc/screens/settings_screen.dart';
+import 'package:fees_up/pc/screens/students_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-// --- IMPORTS FOR LAYOUTS ---
+// --- LAYOUT & SHARED ---
+import '../../shared/layout/responsive_layout.dart';
+
+// --- MOBILE SCREENS ---
+import '../../mobile/screens/mobile_home_screen.dart';
 import '../../mobile/screens/auth/mobile_signup_screen.dart';
-import '../../pc/screens/auth/pc_signup_screen.dart';
+
+// --- PC SCREENS ---
 import '../../pc/screens/pc_home_screen.dart';
+import '../../pc/screens/auth/pc_signup_screen.dart';
+import '../../pc/screens/transactions_screen.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
   return GoRouter(
@@ -25,12 +36,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       final session = Supabase.instance.client.auth.currentSession;
       final isAuthRoute = state.uri.toString() == '/login' || state.uri.toString() == '/signup';
 
-      // CASE A: User is NOT logged in
       if (session == null) {
         return isAuthRoute ? null : '/login';
       }
 
-      // CASE B: User IS logged in
       if (isAuthRoute) {
         return '/';
       }
@@ -39,7 +48,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     },
 
     routes: [
-      // --- HOME ROUTE (Responsive) ---
+      // -----------------------------------------------------------------------
+      // CORE ROUTES
+      // -----------------------------------------------------------------------
+      
+      // 1. HOME / OVERVIEW
       GoRoute(
         path: '/',
         builder: (context, state) => const ResponsiveLayout(
@@ -48,26 +61,79 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         ),
       ),
 
-      // --- LOGIN ROUTE (Responsive) ---
+      // 2. TRANSACTIONS (Connected)
+      GoRoute(
+        path: '/transactions',
+        builder: (context, state) => const ResponsiveLayout(
+          // Mobile placeholder until you build the mobile version
+          mobileScaffold: Scaffold(body: Center(child: Text("Mobile Transactions"))), 
+          pcScaffold: TransactionsScreen(), 
+        ),
+      ),
+
+      // -----------------------------------------------------------------------
+      // FEATURE ROUTES
+      // -----------------------------------------------------------------------
+      
+      // 3. INVOICES
+      GoRoute(
+        path: '/invoices',
+        builder: (context, state) => const InvoicesScreen(),
+      ),
+
+      // 4. STUDENTS
+      GoRoute(
+        path: '/students',
+        builder: (context, state) => const StudentsScreen(),
+      ),
+
+      // 5. REPORTS
+      GoRoute(
+        path: '/reports',
+        builder: (context, state) => const ReportsScreen(),
+      ),
+
+      // 6. ANNOUNCEMENTS
+      GoRoute(
+        path: '/announcements',
+        builder: (context, state) => const AnnouncementsScreen(),
+      ),
+
+      // 7. SETTINGS
+      GoRoute(
+        path: '/settings',
+        builder: (context, state) => const SettingsScreen(),
+      ),
+
+      // 8. PROFILE (New Standalone Screen)
+      GoRoute(
+        path: '/profile',
+        builder: (context, state) => const ProfileScreen(),
+      ),
+
+      // -----------------------------------------------------------------------
+      // AUTH ROUTES
+      // -----------------------------------------------------------------------
       GoRoute(
         path: '/login',
         builder: (context, state) => const ResponsiveLayout(
           mobileScaffold: MobileAuthScreen(initialIsLogin: true),
-          pcScaffold: PCSignupScreen(initialIsLogin: true,), // Shows centered card on PC
+          pcScaffold: PCSignupScreen(initialIsLogin: true),
         ),
       ),
 
-      // --- SIGNUP ROUTE (Responsive) ---
       GoRoute(
         path: '/signup',
         builder: (context, state) => const ResponsiveLayout(
           mobileScaffold: MobileAuthScreen(initialIsLogin: false),
-          pcScaffold: PCSignupScreen(initialIsLogin: false), // Shows centered card on PC
+          pcScaffold: PCSignupScreen(initialIsLogin: false),
         ),
       ),
     ],
   );
 });
+
+// --- HELPER CLASSES ---
 
 class GoRouterRefreshStream extends ChangeNotifier {
   late final StreamSubscription<dynamic> _subscription;

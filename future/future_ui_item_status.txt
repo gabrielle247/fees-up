@@ -1,0 +1,34 @@
+[BUG] Connectivity UI Status Mismatch
+---------------------------------------------------
+DATE: 2025-12-29
+PRIORITY: Medium
+STATUS: Pending
+
+ISSUE DESCRIPTION:
+The application Dashboard and Headers display "Offline" or "Waiting for Sync..." 
+even when the debug console confirms a successful PowerSync connection.
+
+EVIDENCE:
+- Console logs show: 
+  "✅ Database Service Initialized & Connected"
+  "[PowerSync] Validated and applied checkpoint"
+- UI Top Bar shows: "Offline Mode" / "Waiting for Sync..."
+
+ROOT CAUSE ANALYSIS (HYPOTHESIS):
+The current implementation in 'PCHomeScreen' and Headers reads:
+  `final bool isConnected = DatabaseService().db.currentStatus.connected;`
+  
+This is a one-time read during the `build()` method. It does NOT listen to 
+updates. When the app starts, it is offline for a split second, the UI builds 
+as "Offline", and never rebuilds when the status changes to "Connected".
+
+PROPOSED FIX:
+1. Do not check `db.currentStatus.connected` directly in the build method.
+2. Create a Riverpod StreamProvider for connectivity:
+   
+   final connectivityProvider = StreamProvider<bool>((ref) {
+     return DatabaseService().db.statusStream.map((status) => status.connected);
+   });
+
+3. Watch this provider in the Headers and Home Screen to trigger a rebuild 
+   automatically when the connection state changes.

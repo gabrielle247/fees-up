@@ -1,0 +1,31 @@
+[CRITICAL] SCHOOL SETTINGS & DATA INTEGRITY POLICY
+---------------------------------------------------
+DATE: 2025-12-29
+MODULE: Settings & Configuration
+BRAND: Greyway.Co / Fees Up
+
+1. ONLINE-ONLY CONSTRAINT
+   - Modifications to "School Details", "Billing Configurations", and "Tax Rates" 
+     are STRICTLY RESTRICTED to Online Mode.
+   - REASON: These are "Source of Truth" configurations. Sync conflicts here 
+     could corrupt financial calculations for all students.
+   - IMPLEMENTATION: The 'Save' buttons must be disabled if 
+     `DatabaseService.isConnected` is false.
+
+2. LIABILITY & DATA RECOVERY
+   - ACTIONS ARE PERMANENT. There is NO "Undo" feature for configuration changes.
+   - Greyway.Co and its subsidiaries (including "Fees Up") explicitly disclaim 
+     responsibility for data erasure, corruption, or financial discrepancies 
+     resulting from user misconfiguration.
+   - We do not offer data recovery services for "School Year" deletions or 
+     "Billing Cycle" resets initiated by the user.
+
+3. TERMS OF SERVICE (REAL-TIME EXECUTION)
+   - By clicking "Save Changes" on the Settings screen, the user acknowledges:
+     a) They are authorized to make financial changes.
+     b) The changes apply immediately to the Server (Postgres).
+     c) They accept full liability for the accuracy of tax rates and fees.
+
+4. UI REQUIREMENT
+   - A visible "Warning: No Undo" badge must appear near the Save button.
+   - The "Terms of Service" link must be accessible on this screen.

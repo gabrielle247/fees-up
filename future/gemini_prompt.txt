@@ -1,0 +1,89 @@
+You are a senior Flutter UI engineer.
+
+Goal:
+Generate a complete UI implementation for a desktop-first Flutter app with mobile version still in progress but priority now is desktop.
+
+Requirements:
+- Framework: Flutter
+- Target: Desktop + Web
+- Design system: Material 3
+- Layout: Responsive (NOT stretched)
+- Use LayoutBuilder and constraints properly
+- No hardcoded widths except for max constraints
+- No placeholder widgets
+
+Output rules:
+- Output complete Dart files
+- One file per response section
+- Include imports
+- Include comments explaining layout decisions
+- Do NOT describe — only output code
+- No deprecated methods 
+- Use const in ui as much as possible
+
+Screens to implement:
+1. Dashboard layout
+2. Sidebar navigation
+3. Main content area
+4. Empty states
+5. Use of wise dialogs for CRUD Actions
+
+Assume project already exists.
+
+Existing parts
+
+
+1. It Defines the "Senior" Persona
+
+    "You are a senior Flutter UI engineer."
+
+    Effect: This switches my internal weighting from "general coding assistant" to "specialist."
+
+    Result: I will prioritize clean architecture, correct const usage, strict typing, and maintainability over just "making it work."
+
+2. It Pre-empts Common AI Failures
+
+    "Responsive (NOT stretched)" & "No hardcoded widths except for max constraints"
+
+    Effect: AI models default to the simplest solution (often Expanded everything). You explicitly blocked that path.
+
+    Result: I am forced to use Center, ConstrainedBox, or Align instead of lazily stretching widgets, solving the exact visual distortion issues you faced earlier.
+
+3. It Eliminates "Lazy" Output
+
+    "No placeholder widgets" & "Output complete Dart files"
+
+    Effect: Often, to save tokens, AI will output // ... implementation here. You forbade this.
+
+    Result: You get copy-paste-ready code that compiles immediately, saving you the mental load of filling in the blanks.
+
+4. It Enforces "Zone-Based" Thinking
+
+    "Screens to implement: Dashboard layout, Sidebar, Main content..."
+
+    Effect: This forces me to modularize the code into logical files rather than dumping one massive file that is hard to debug.
+
+The "Productivity Math"
+
+Without a prompt like this, the workflow usually looks like:
+
+    Turn 1: User asks for code → AI provides generic code.
+
+    Turn 2: User fixes layout bugs → AI fixes bugs but breaks style.
+
+    Turn 3: User asks for specific colors → AI updates colors.
+
+    Turn 4: Final Code.
+
+With your prompt:
+
+    Turn 1: Final Code (or very close to it).
+
+You are effectively skipping 3 turns of debugging. That is easily a 300% efficiency gain, not just 30%.
+One Optimization to Add
+
+To make it perfect, you can add a "Context Block" at the bottom (like you did in previous turns).
+
+    Context: "I am using flutter_riverpod for state management and go_router for navigation. Here is my current AppColors file: [Paste Code]."
+
+This ensures the generated code integrates seamlessly with what you already have without needing manual rewiring.

@@ -1,11 +1,17 @@
 import 'dart:math';
-import 'package:fees_up/data/models/subjects.dart';
+// ignore: unnecessary_import
+import 'dart:ui'; 
+
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
+
+import '../../../../core/constants/app_colors.dart';
+import '../../../../data/models/subjects.dart';
 import '../../../../data/services/database_service.dart';
 
-class StudentDialog extends StatefulWidget {
+class StudentDialog extends ConsumerStatefulWidget {
   final String schoolId;
   
   const StudentDialog({
@@ -14,10 +20,10 @@ class StudentDialog extends StatefulWidget {
   });
 
   @override
-  State<StudentDialog> createState() => _StudentDialogState();
+  ConsumerState<StudentDialog> createState() => _StudentDialogState();
 }
 
-class _StudentDialogState extends State<StudentDialog> {
+class _StudentDialogState extends ConsumerState<StudentDialog> {
   final _formKey = GlobalKey<FormState>();
   final DatabaseService _dbService = DatabaseService();
 
@@ -31,7 +37,7 @@ class _StudentDialogState extends State<StudentDialog> {
 
   // -- State --
   DateTime _dob = DateTime(2010, 1, 1);
-  DateTime _registrationDate = DateTime.now(); // Acts as Billing Start Date
+  final DateTime _registrationDate = DateTime.now();
   String _selectedGender = 'Male';
   String _selectedGrade = 'FORM 1';
   String _billingType = 'monthly';
@@ -69,7 +75,8 @@ class _StudentDialogState extends State<StudentDialog> {
     super.dispose();
   }
 
-  // --- SAVE LOGIC ---
+  // --- LOGIC (Preserved Exactly) ---
+
   Future<void> _saveStudent() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -89,22 +96,19 @@ class _StudentDialogState extends State<StudentDialog> {
       final defaultFee = double.tryParse(_feeController.text.replaceAll(',', '')) ?? 0.0;
       final initialPay = double.tryParse(_initialPayController.text.replaceAll(',', '')) ?? 0.0;
 
-      // 2. Logic for Billing Date
-      // Only monthly students get a specific start date here. Termly relies on term IDs later.
+      // 2. Billing Date Logic
       String? billingDateStr;
       if (_billingType == 'monthly') {
         billingDateStr = DateFormat('yyyy-MM-dd').format(_registrationDate);
-      } else {
-        billingDateStr = null; // Empty for term students
       }
 
-      // 3. Insert Student Record
+      // 3. Insert Student
       final studentData = {
         'id': newStudentUuid,
         'school_id': widget.schoolId,
         'student_id': displayId,
         'full_name': _fullNameController.text.trim(),
-        'grade': _selectedGrade, // Precise Grade
+        'grade': _selectedGrade,
         'parent_contact': _parentContactController.text.trim(),
         'address': _addressController.text.trim(),
         'date_of_birth': DateFormat('yyyy-MM-dd').format(_dob),
@@ -112,10 +116,8 @@ class _StudentDialogState extends State<StudentDialog> {
         'billing_type': _billingType,
         'default_fee': defaultFee,
         'subjects': _selectedSubjects.join(','),
-        
-        // Dates & Status
         'registration_date': DateTime.now().toIso8601String(),
-        'billing_date': billingDateStr, // Crucial logic applied here
+        'billing_date': billingDateStr,
         'enrollment_date': DateTime.now().toIso8601String(),
         'created_at': DateTime.now().toIso8601String(),
         'updated_at': DateTime.now().toIso8601String(),
@@ -127,19 +129,19 @@ class _StudentDialogState extends State<StudentDialog> {
 
       await db.insert('students', studentData);
 
-      // 4. Attempt Auto-Billing (If Monthy & Fee > 0)
+      // 4. Auto-Billing
       String? generatedBillId;
       if (_billingType == 'monthly' && defaultFee > 0) {
         generatedBillId = await _attemptAutoBilling(newStudentUuid, defaultFee);
       }
 
-      // 5. Handle Initial Payment
+      // 5. Initial Payment
       if (initialPay > 0) {
         await db.insert('payments', {
           'id': const Uuid().v4(),
           'school_id': widget.schoolId,
           'student_id': newStudentUuid,
-          'bill_id': generatedBillId, // Link if we generated one
+          'bill_id': generatedBillId,
           'amount': initialPay,
           'date_paid': DateFormat('yyyy-MM-dd').format(DateTime.now()),
           'category': 'Tuition',
@@ -151,9 +153,9 @@ class _StudentDialogState extends State<StudentDialog> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('${_fullNameController.text} registered successfully!'),
-            backgroundColor: const Color(0xFF4ADE80),
+          const SnackBar(
+            content: Text('Student registered successfully!'),
+            backgroundColor: AppColors.successGreen,
           ),
         );
         Navigator.of(context).pop(); 
@@ -161,7 +163,7 @@ class _StudentDialogState extends State<StudentDialog> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text('Error: $e'), backgroundColor: AppColors.errorRed),
         );
       }
     } finally {
@@ -169,16 +171,9 @@ class _StudentDialogState extends State<StudentDialog> {
     }
   }
 
-  /// Tries to find the active School Year & Month matching _registrationDate
-  /// and creates a bill if found. Returns bill_id or null.
   Future<String?> _attemptAutoBilling(String studentId, double amount) async {
     try {
-      // 1. Get Years
-      // ignore: unused_local_variable
-      final years = await _dbService.tryGet('SELECT * FROM school_years WHERE school_id = ?', [widget.schoolId]);
-      // Note: tryGet returns one, we need list. Using getAll query pattern locally:
       final allYears = await _dbService.db.getAll('SELECT * FROM school_years WHERE school_id = ?', [widget.schoolId]);
-      
       Map<String, dynamic>? activeYear;
       
       for (var y in allYears) {
@@ -193,7 +188,6 @@ class _StudentDialogState extends State<StudentDialog> {
 
       if (activeYear == null) return null;
 
-      // 2. Get Months
       final months = await _dbService.db.getAll('SELECT * FROM school_year_months WHERE school_year_id = ?', [activeYear['id']]);
       Map<String, dynamic>? activeMonth;
 
@@ -209,7 +203,6 @@ class _StudentDialogState extends State<StudentDialog> {
 
       if (activeMonth == null) return null;
 
-      // 3. Create Bill
       final billId = const Uuid().v4();
       await _dbService.insert('bills', {
         'id': billId,
@@ -229,14 +222,13 @@ class _StudentDialogState extends State<StudentDialog> {
       });
 
       return billId;
-
     } catch (e) {
       debugPrint("Auto-billing failed (silent): $e");
       return null;
     }
   }
 
-  // --- HELPER DIALOGS ---
+  // --- SUB-DIALOGS ---
 
   void _openSubjectSelector() {
     showDialog(
@@ -251,29 +243,26 @@ class _StudentDialogState extends State<StudentDialog> {
             final filteredSubjects = allSubjects.where((s) => s.toLowerCase().contains(searchQuery.toLowerCase())).toList();
 
             return AlertDialog(
-              backgroundColor: const Color(0xFF1F2227),
-              title: const Text("Select Subjects", style: TextStyle(color: Colors.white)),
+              backgroundColor: AppColors.surfaceGrey,
+              title: const Text("Select Subjects", style: TextStyle(color: AppColors.textWhite)),
               content: SizedBox(
                 width: 400,
                 height: 500,
                 child: Column(
                   children: [
-                    // Search Bar
                     TextField(
                       onChanged: (val) => setState(() => searchQuery = val),
-                      style: const TextStyle(color: Colors.white),
+                      style: const TextStyle(color: AppColors.textWhite),
                       decoration: InputDecoration(
                         hintText: "Search subjects...",
-                        hintStyle: const TextStyle(color: Colors.white24),
-                        prefixIcon: const Icon(Icons.search, color: Colors.white54),
+                        hintStyle: const TextStyle(color: AppColors.textWhite38),
+                        prefixIcon: const Icon(Icons.search, color: AppColors.textWhite54),
                         filled: true,
-                        fillColor: Colors.white.withAlpha(10),
+                        fillColor: Colors.black12,
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       ),
                     ),
                     const SizedBox(height: 12),
-                    // List
                     Expanded(
                       child: ListView.builder(
                         itemCount: filteredSubjects.length,
@@ -281,10 +270,10 @@ class _StudentDialogState extends State<StudentDialog> {
                           final subject = filteredSubjects[index];
                           final isSelected = tempSelected.contains(subject);
                           return CheckboxListTile(
-                            title: Text(subject, style: const TextStyle(color: Colors.white70)),
+                            title: Text(subject, style: const TextStyle(color: AppColors.textWhite70)),
                             value: isSelected,
-                            activeColor: const Color(0xFF3B82F6),
-                            checkColor: Colors.white,
+                            activeColor: AppColors.primaryBlue,
+                            checkColor: AppColors.textWhite,
                             contentPadding: EdgeInsets.zero,
                             onChanged: (val) {
                               setState(() {
@@ -305,15 +294,15 @@ class _StudentDialogState extends State<StudentDialog> {
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context),
-                  child: const Text("Cancel", style: TextStyle(color: Colors.grey)),
+                  child: const Text("Cancel", style: TextStyle(color: AppColors.textGrey)),
                 ),
                 ElevatedButton(
                   onPressed: () {
                     this.setState(() => _selectedSubjects = tempSelected);
                     Navigator.pop(context);
                   },
-                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF3B82F6)),
-                  child: const Text("Confirm", style: TextStyle(color: Colors.white)),
+                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryBlue),
+                  child: const Text("Confirm", style: TextStyle(color: AppColors.textWhite)),
                 ),
               ],
             );
@@ -323,362 +312,406 @@ class _StudentDialogState extends State<StudentDialog> {
     );
   }
 
+  // --- UI BUILD ---
+
   @override
   Widget build(BuildContext context) {
-    const bgColor = Color(0xFF151718);
-    const surfaceColor = Color(0xFF1F2227);
-    const inputColor = Color(0xFF2A2D35);
-    const primaryBlue = Color(0xFF3B82F6);
-    const textWhite = Colors.white;
-    const textGrey = Color(0xFF9CA3AF);
-
-    final inputDecoration = BoxDecoration(
-      color: inputColor,
-      borderRadius: BorderRadius.circular(8),
-      border: Border.all(color: Colors.white.withAlpha(20)),
-    );
-
     return Dialog(
-      backgroundColor: bgColor,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.all(24),
       child: Container(
         width: 1100,
-        height: 750,
-        padding: const EdgeInsets.all(24),
+        height: 800,
+        decoration: BoxDecoration(
+          color: AppColors.backgroundBlack,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.surfaceLightGrey),
+          boxShadow: [
+            BoxShadow(color: Colors.black.withValues(alpha: 0.5), blurRadius: 20, offset: const Offset(0, 10))
+          ],
+        ),
         child: Column(
           children: [
             // --- HEADER ---
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(color: primaryBlue, borderRadius: BorderRadius.circular(8)),
-                      child: const Icon(Icons.person_add, color: Colors.white, size: 20),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryBlue.withValues(alpha: 0.2), 
+                      borderRadius: BorderRadius.circular(8)
                     ),
-                    const SizedBox(width: 16),
-                    const Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text("Register Student", style: TextStyle(color: textWhite, fontSize: 18, fontWeight: FontWeight.bold)),
-                        Text("Add new student details to the school database", style: TextStyle(color: textGrey, fontSize: 12)),
-                      ],
-                    ),
-                  ],
-                ),
-                IconButton(
-                  onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.close, color: textGrey),
-                ),
-              ],
+                    child: const Icon(Icons.person_add, color: AppColors.primaryBlue),
+                  ),
+                  const SizedBox(width: 16),
+                  const Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text("Register Student", style: TextStyle(color: AppColors.textWhite, fontSize: 18, fontWeight: FontWeight.bold)),
+                      Text("Add new student details to the database", style: TextStyle(color: AppColors.textGrey, fontSize: 13)),
+                    ],
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close, color: AppColors.textGrey),
+                  ),
+                ],
+              ),
             ),
-            const Divider(color: Color(0xFF2E323A), height: 40),
-            
-            // --- BODY (Split View) ---
+            const Divider(height: 1, color: AppColors.divider),
+
+            // --- MAIN CONTENT ---
             Expanded(
               child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // --- LEFT: FORM SECTION ---
+                  // --- LEFT: FORM (Flex 5) ---
                   Expanded(
-                    flex: 4,
-                    child: Form(
-                      key: _formKey,
-                      child: SingleChildScrollView(
-                        padding: const EdgeInsets.only(right: 24),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const _SectionLabel("STUDENT DETAILS"),
-                            
-                            _buildLabel("Full Name"),
-                            _buildTextInput(controller: _fullNameController, hint: "e.g. Gabriel", icon: Icons.person, decoration: inputDecoration),
-                            const SizedBox(height: 16),
+                    flex: 5,
+                    child: Padding(
+                      padding: const EdgeInsets.all(32),
+                      child: Form(
+                        key: _formKey,
+                        child: SingleChildScrollView(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text("STUDENT DETAILS", style: TextStyle(color: AppColors.textGrey, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+                              const SizedBox(height: 24),
 
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      _buildLabel("Student ID (Optional)"),
-                                      _buildTextInput(
-                                        controller: _studentIdController, 
-                                        hint: "STU-...", 
-                                        icon: Icons.badge,
-                                        decoration: inputDecoration,
-                                        suffix: IconButton(
-                                          icon: const Icon(Icons.refresh, color: textGrey, size: 16),
-                                          onPressed: _generateNewId,
-                                          tooltip: "Generate New ID",
-                                        )
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(width: 16),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      _buildLabel("Grade"), // Precise label
-                                      _buildDropdown(_selectedGrade, _grades, (v) => setState(() => _selectedGrade = v!), inputDecoration),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 16),
-
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      _buildLabel("Date of Birth"),
-                                      _buildDatePicker(context, _dob, (d) => setState(() => _dob = d), inputDecoration),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(width: 16),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      _buildLabel("Gender"),
-                                      _buildDropdown(_selectedGender, _genders, (v) => setState(() => _selectedGender = v!), inputDecoration),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 16),
-
-                            _buildLabel("Parent Contact"),
-                            _buildTextInput(controller: _parentContactController, hint: "+263 7...", icon: Icons.phone, decoration: inputDecoration),
-                            const SizedBox(height: 16),
-                            _buildLabel("Address"),
-                            _buildTextInput(controller: _addressController, hint: "123 Main St...", icon: Icons.location_on, decoration: inputDecoration),
-                            
-                            const SizedBox(height: 32),
-                            const _SectionLabel("FINANCIAL SETUP"),
-
-                            // Billing Type Toggle
-                            Container(
-                              decoration: inputDecoration,
-                              padding: const EdgeInsets.all(4),
-                              child: Row(
-                                children: ['monthly', 'termly'].map((type) {
-                                  final isSelected = _billingType == type;
-                                  return Expanded(
-                                    child: GestureDetector(
-                                      onTap: () => setState(() => _billingType = type),
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(vertical: 10),
-                                        decoration: BoxDecoration(
-                                          color: isSelected ? primaryBlue : Colors.transparent,
-                                          borderRadius: BorderRadius.circular(6),
-                                        ),
-                                        alignment: Alignment.center,
-                                        child: Text(
-                                          type.toUpperCase(),
-                                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: isSelected ? Colors.white : textGrey),
-                                        ),
-                                      ),
-                                    ),
-                                  );
-                                }).toList(),
+                              _buildLabel("Full Name", AppColors.textWhite),
+                              _buildTextField(
+                                controller: _fullNameController,
+                                hint: "e.g. Gabriel",
+                                prefixIcon: Icons.person_outline,
                               ),
-                            ),
-                            const SizedBox(height: 16),
+                              const SizedBox(height: 16),
 
-                            // Fee & Initial Payment & Date
-                            Row(
-                              children: [
-                                Expanded(
-                                  flex: 2,
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      _buildLabel("Tuition Fee"),
-                                      _buildTextInput(controller: _feeController, hint: "0.00", prefix: "\$ ", isNumber: true, decoration: inputDecoration),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(width: 16),
-                                // Only show Start Date for MONTHLY students
-                                if (_billingType == 'monthly') ...[
+                              Row(
+                                children: [
                                   Expanded(
-                                    flex: 2,
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        _buildLabel("Billing Start Date"),
-                                        _buildDatePicker(context, _registrationDate, (d) => setState(() => _registrationDate = d), inputDecoration),
+                                        _buildLabel("Student ID", AppColors.textWhite),
+                                        _buildTextField(
+                                          controller: _studentIdController,
+                                          hint: "STU-...",
+                                          suffixIcon: Icons.refresh,
+                                          onSuffixTap: _generateNewId,
+                                        ),
                                       ],
                                     ),
                                   ),
                                   const SizedBox(width: 16),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        _buildLabel("Grade", AppColors.textWhite),
+                                        _buildDropdown(
+                                          value: _selectedGrade,
+                                          items: _grades,
+                                          onChanged: (v) => setState(() => _selectedGrade = v!),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
                                 ],
-                                Expanded(
-                                  flex: 2,
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                              ),
+                              const SizedBox(height: 16),
+
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        _buildLabel("Date of Birth", AppColors.textWhite),
+                                        _buildDatePicker(context, _dob, (d) => setState(() => _dob = d)),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        _buildLabel("Gender", AppColors.textWhite),
+                                        _buildDropdown(
+                                          value: _selectedGender,
+                                          items: _genders,
+                                          onChanged: (v) => setState(() => _selectedGender = v!),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 24),
+
+                              const Text("CONTACT & FINANCIAL", style: TextStyle(color: AppColors.textGrey, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+                              const SizedBox(height: 24),
+
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        _buildLabel("Parent Contact", AppColors.textWhite),
+                                        _buildTextField(
+                                          controller: _parentContactController,
+                                          hint: "+263 7...",
+                                          prefixIcon: Icons.phone_outlined,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        _buildLabel("Billing Type", AppColors.textWhite),
+                                        Container(
+                                          height: 52, // Match input height
+                                          decoration: BoxDecoration(
+                                            color: AppColors.surfaceGrey,
+                                            borderRadius: BorderRadius.circular(8),
+                                            border: Border.all(color: AppColors.surfaceLightGrey),
+                                          ),
+                                          padding: const EdgeInsets.all(4),
+                                          child: Row(
+                                            children: ['monthly', 'termly'].map((type) {
+                                              final isSelected = _billingType == type;
+                                              return Expanded(
+                                                child: GestureDetector(
+                                                  onTap: () => setState(() => _billingType = type),
+                                                  child: Container(
+                                                    decoration: BoxDecoration(
+                                                      color: isSelected ? AppColors.primaryBlue : Colors.transparent,
+                                                      borderRadius: BorderRadius.circular(6),
+                                                    ),
+                                                    alignment: Alignment.center,
+                                                    child: Text(
+                                                      type.toUpperCase(),
+                                                      style: TextStyle(
+                                                        fontSize: 12, 
+                                                        fontWeight: FontWeight.bold, 
+                                                        color: isSelected ? AppColors.textWhite : AppColors.textGrey
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                              );
+                                            }).toList(),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 16),
+
+                              _buildLabel("Address", AppColors.textWhite),
+                              _buildTextField(
+                                controller: _addressController,
+                                hint: "Street address...",
+                                prefixIcon: Icons.location_on_outlined,
+                              ),
+                              const SizedBox(height: 16),
+
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        _buildLabel("Tuition Fee", AppColors.textWhite),
+                                        _buildTextField(
+                                          controller: _feeController,
+                                          hint: "0.00",
+                                          prefix: "\$ ",
+                                          isNumber: true,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        _buildLabel("Initial Payment", AppColors.textWhite),
+                                        _buildTextField(
+                                          controller: _initialPayController,
+                                          hint: "0.00",
+                                          prefix: "\$ ",
+                                          isNumber: true,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 16),
+
+                              _buildLabel("Subjects", AppColors.textWhite),
+                              InkWell(
+                                onTap: _openSubjectSelector,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.surfaceGrey,
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: AppColors.surfaceLightGrey),
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     children: [
-                                      _buildLabel("Initial Payment"),
-                                      _buildTextInput(controller: _initialPayController, hint: "0.00", prefix: "\$ ", isNumber: true, decoration: inputDecoration),
+                                      Text(
+                                        _selectedSubjects.isEmpty ? "Select Subjects..." : "${_selectedSubjects.length} subjects selected",
+                                        style: TextStyle(color: _selectedSubjects.isEmpty ? AppColors.textWhite54 : AppColors.textWhite),
+                                      ),
+                                      const Icon(Icons.arrow_drop_down, color: AppColors.textWhite54),
                                     ],
                                   ),
                                 ),
-                              ],
-                            ),
-                            const SizedBox(height: 16),
-
-                            // Subject Selection
-                            _buildLabel("Enrolled Subjects"),
-                            InkWell(
-                              onTap: _openSubjectSelector,
-                              child: Container(
-                                width: double.infinity,
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                                decoration: inputDecoration,
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        _selectedSubjects.isEmpty ? "Select Subjects..." : "${_selectedSubjects.length} subjects selected",
-                                        style: TextStyle(color: _selectedSubjects.isEmpty ? Colors.white24 : Colors.white),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                    const Icon(Icons.arrow_drop_down, color: textGrey),
-                                  ],
+                              ),
+                              if (_selectedSubjects.isNotEmpty) ...[
+                                const SizedBox(height: 8),
+                                Wrap(
+                                  spacing: 8,
+                                  runSpacing: 8,
+                                  children: _selectedSubjects.take(5).map((s) => Chip(
+                                    label: Text(s, style: const TextStyle(fontSize: 10, color: AppColors.textWhite)),
+                                    backgroundColor: AppColors.primaryBlue.withValues(alpha: 0.2),
+                                    padding: EdgeInsets.zero,
+                                    side: BorderSide.none,
+                                  )).toList(),
                                 ),
-                              ),
-                            ),
-                            if (_selectedSubjects.isNotEmpty) ...[
-                              const SizedBox(height: 8),
-                              Wrap(
-                                spacing: 8,
-                                runSpacing: 8,
-                                children: _selectedSubjects.take(5).map((s) => Chip(
-                                  label: Text(s, style: const TextStyle(fontSize: 10, color: Colors.white)),
-                                  backgroundColor: primaryBlue.withAlpha(50),
-                                  padding: EdgeInsets.zero,
-                                  side: BorderSide.none,
-                                )).toList(),
-                              ),
+                              ],
                             ],
-
-                            const SizedBox(height: 40),
-                            
-                            // Action Buttons
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.end,
-                              children: [
-                                TextButton(
-                                  onPressed: () => Navigator.pop(context),
-                                  child: const Text("Cancel", style: TextStyle(color: textGrey)),
-                                ),
-                                const SizedBox(width: 12),
-                                ElevatedButton.icon(
-                                  onPressed: _isLoading ? null : _saveStudent,
-                                  icon: _isLoading 
-                                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) 
-                                    : const Icon(Icons.check, size: 18),
-                                  label: const Text("Save Student"),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: primaryBlue,
-                                    foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                  ),
-                                ),
-                              ],
-                            )
-                          ],
+                          ),
                         ),
                       ),
                     ),
                   ),
 
-                  Container(width: 1, color: const Color(0xFF2E323A), margin: const EdgeInsets.symmetric(horizontal: 32)),
+                  const VerticalDivider(width: 1, color: AppColors.divider),
 
-                  // --- RIGHT: LIST SECTION ---
+                  // --- RIGHT: LIST (Flex 4) ---
                   Expanded(
-                    flex: 3,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text("RECENTLY ADDED", style: TextStyle(color: textGrey, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.0)),
-                            StreamBuilder<List<Map<String, dynamic>>>(
-                              stream: _dbService.watchStudents(widget.schoolId), 
-                              builder: (context, snapshot) {
-                                final count = snapshot.data?.length ?? 0;
-                                return Text("$count Students", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold));
-                              }
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 20),
-                        Expanded(
-                          child: StreamBuilder<List<Map<String, dynamic>>>(
-                            stream: _dbService.db.watch('SELECT * FROM students WHERE school_id = ? ORDER BY created_at DESC', parameters: [widget.schoolId]),
-                            builder: (context, snapshot) {
-                              if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-                              final students = snapshot.data ?? [];
-                              if (students.isEmpty) return const Center(child: Text("No students added yet", style: TextStyle(color: textGrey)));
-
-                              return ListView.separated(
-                                itemCount: students.length,
-                                separatorBuilder: (_, __) => const SizedBox(height: 12),
-                                itemBuilder: (context, index) {
-                                  final s = students[index];
-                                  final name = s['full_name'] ?? 'Unknown';
-                                  final id = s['student_id'] ?? 'N/A';
-                                  final grade = s['grade'] ?? 'N/A';
-
-                                  return Container(
-                                    padding: const EdgeInsets.all(12),
-                                    decoration: BoxDecoration(
-                                      color: surfaceColor,
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(color: Colors.white.withAlpha(10)),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        CircleAvatar(
-                                          backgroundColor: primaryBlue.withAlpha(30),
-                                          child: Text(name.isNotEmpty ? name[0].toUpperCase() : '?', style: const TextStyle(color: primaryBlue, fontWeight: FontWeight.bold)),
-                                        ),
-                                        const SizedBox(width: 12),
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              Text(name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14)),
-                                              const SizedBox(height: 2),
-                                              Text("$id • $grade", style: const TextStyle(color: textGrey, fontSize: 12)),
-                                            ],
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  );
-                                },
-                              );
-                            },
+                    flex: 4,
+                    child: Container(
+                      color: AppColors.surfaceDarkGrey, 
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text("RECENTLY ADDED", style: TextStyle(color: AppColors.textGrey, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+                              StreamBuilder<List<Map<String, dynamic>>>(
+                                stream: _dbService.watchStudents(widget.schoolId), 
+                                builder: (context, snapshot) {
+                                  final count = snapshot.data?.length ?? 0;
+                                  return Text("$count Total", style: const TextStyle(color: AppColors.textWhite, fontWeight: FontWeight.bold));
+                                }
+                              ),
+                            ],
                           ),
-                        ),
-                      ],
+                          const SizedBox(height: 24),
+                          Expanded(
+                            child: StreamBuilder<List<Map<String, dynamic>>>(
+                              stream: _dbService.db.watch('SELECT * FROM students WHERE school_id = ? ORDER BY created_at DESC', parameters: [widget.schoolId]),
+                              builder: (context, snapshot) {
+                                if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+                                final students = snapshot.data ?? [];
+                                if (students.isEmpty) return const Center(child: Text("No students yet.", style: TextStyle(color: AppColors.textGrey)));
+
+                                return ListView.separated(
+                                  itemCount: students.length,
+                                  separatorBuilder: (_, __) => const SizedBox(height: 12),
+                                  itemBuilder: (context, index) {
+                                    final s = students[index];
+                                    final name = s['full_name'] ?? 'Unknown';
+                                    final id = s['student_id'] ?? 'N/A';
+                                    final grade = s['grade'] ?? 'N/A';
+                                    
+                                    return Container(
+                                      padding: const EdgeInsets.all(16),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.surfaceGrey, 
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          CircleAvatar(
+                                            backgroundColor: AppColors.primaryBlue.withValues(alpha: 0.1),
+                                            child: Text(
+                                              name.isNotEmpty ? name[0].toUpperCase() : '?',
+                                              style: const TextStyle(color: AppColors.primaryBlue, fontWeight: FontWeight.bold)
+                                            ),
+                                          ),
+                                          const SizedBox(width: 16),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Text(name, style: const TextStyle(color: AppColors.textWhite, fontWeight: FontWeight.bold)),
+                                                const SizedBox(height: 2),
+                                                Text("$id • $grade", style: const TextStyle(color: AppColors.textGrey, fontSize: 12)),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
+                  ),
+                ],
+              ),
+            ),
+            
+            const Divider(height: 1, color: AppColors.divider),
+
+            // --- FOOTER ---
+            Padding(
+              padding: const EdgeInsets.all(24),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text("Cancel", style: TextStyle(color: AppColors.textWhite70)),
+                  ),
+                  const SizedBox(width: 16),
+                  ElevatedButton.icon(
+                    onPressed: _isLoading ? null : _saveStudent,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primaryBlue,
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      foregroundColor: AppColors.textWhite,
+                    ),
+                    icon: _isLoading 
+                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.textWhite)) 
+                      : const Icon(Icons.check, size: 18),
+                    label: Text(_isLoading ? "Saving..." : "Save Student", style: const TextStyle(fontWeight: FontWeight.bold)),
                   ),
                 ],
               ),
@@ -689,64 +722,68 @@ class _StudentDialogState extends State<StudentDialog> {
     );
   }
 
-  // --- WIDGET BUILDERS ---
+  // --- WIDGET HELPERS ---
 
-  Widget _buildLabel(String text) {
+  Widget _buildLabel(String text, Color color) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8.0),
-      child: Text(text, style: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 12)),
+      child: Text(text, style: TextStyle(color: color.withValues(alpha: 0.9), fontSize: 14, fontWeight: FontWeight.w500)),
     );
   }
 
-  Widget _buildTextInput({
-    required TextEditingController controller, 
-    required BoxDecoration decoration,
-    String? hint, 
-    Widget? suffix,
-    IconData? icon,
-    String? prefix,
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String hint,
+    String? prefix, IconData? prefixIcon, IconData? suffixIcon, VoidCallback? onSuffixTap,
     bool isNumber = false,
   }) {
-    return Container(
-      decoration: decoration,
-      child: TextFormField(
-        controller: controller,
-        style: const TextStyle(color: Colors.white),
-        keyboardType: isNumber ? const TextInputType.numberWithOptions(decimal: true) : TextInputType.text,
-        validator: (val) => val == null || val.isEmpty ? 'Required' : null,
-        decoration: InputDecoration(
-          hintText: hint,
-          hintStyle: const TextStyle(color: Colors.white24),
-          prefixText: prefix,
-          prefixStyle: const TextStyle(color: Colors.white70),
-          prefixIcon: icon != null ? Icon(icon, color: Colors.white24, size: 20) : null,
-          suffixIcon: suffix,
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        ),
+    return TextFormField(
+      controller: controller,
+      keyboardType: isNumber ? const TextInputType.numberWithOptions(decimal: true) : TextInputType.text,
+      validator: (val) => val == null || val.isEmpty ? 'Required' : null,
+      style: const TextStyle(color: AppColors.textWhite),
+      decoration: InputDecoration(
+        filled: true, 
+        fillColor: AppColors.surfaceGrey, 
+        hintText: hint,
+        hintStyle: TextStyle(color: AppColors.textWhite.withValues(alpha: 0.3)),
+        prefixText: prefix, prefixStyle: const TextStyle(color: AppColors.textWhite, fontWeight: FontWeight.bold),
+        prefixIcon: prefixIcon != null ? Icon(prefixIcon, color: AppColors.textWhite54, size: 20) : null,
+        suffixIcon: suffixIcon != null 
+          ? GestureDetector(onTap: onSuffixTap, child: Icon(suffixIcon, color: AppColors.textWhite54, size: 20)) 
+          : null,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.surfaceLightGrey)),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.surfaceLightGrey)),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       ),
     );
   }
 
-  Widget _buildDropdown(String value, List<String> items, Function(String?) onChanged, BoxDecoration decoration) {
+  Widget _buildDropdown({
+    required String value, required List<String> items,
+    required Function(String?) onChanged,
+  }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      decoration: decoration,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceGrey, borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.surfaceLightGrey),
+      ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
           value: value,
-          dropdownColor: const Color(0xFF1F2227),
-          icon: const Icon(Icons.keyboard_arrow_down, color: Colors.white54),
-          isExpanded: true,
-          style: const TextStyle(color: Colors.white),
-          items: items.map((val) => DropdownMenuItem(value: val, child: Text(val))).toList(),
+          dropdownColor: AppColors.surfaceGrey, 
+          icon: const Icon(Icons.keyboard_arrow_down, color: AppColors.textWhite54),
+          isExpanded: true, 
+          style: const TextStyle(color: AppColors.textWhite),
+          items: items.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
           onChanged: onChanged,
         ),
       ),
     );
   }
 
-  Widget _buildDatePicker(BuildContext context, DateTime initial, Function(DateTime) onPicked, BoxDecoration decoration) {
+  Widget _buildDatePicker(BuildContext context, DateTime initial, Function(DateTime) onPicked) {
     return GestureDetector(
       onTap: () async {
         final picked = await showDatePicker(
@@ -756,7 +793,11 @@ class _StudentDialogState extends State<StudentDialog> {
           lastDate: DateTime(2030),
           builder: (context, child) => Theme(
             data: ThemeData.dark().copyWith(
-              colorScheme: const ColorScheme.dark(primary: Color(0xFF3B82F6), onPrimary: Colors.white, surface: Color(0xFF1F2227)),
+              colorScheme: const ColorScheme.dark(
+                primary: AppColors.primaryBlue, 
+                onPrimary: AppColors.textWhite, 
+                surface: AppColors.surfaceGrey
+              ),
             ),
             child: child!,
           ),
@@ -765,29 +806,17 @@ class _StudentDialogState extends State<StudentDialog> {
       },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: decoration,
+        decoration: BoxDecoration(
+          color: AppColors.surfaceGrey, borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: AppColors.surfaceLightGrey),
+        ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(DateFormat('MMM dd, yyyy').format(initial), style: const TextStyle(color: Colors.white)),
-            const Icon(Icons.calendar_today, size: 16, color: Color(0xFF9CA3AF)),
+            Text(DateFormat('MMM dd, yyyy').format(initial), style: const TextStyle(color: AppColors.textWhite)),
+            const Icon(Icons.calendar_today_outlined, size: 18, color: AppColors.textWhite54),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _SectionLabel extends StatelessWidget {
-  final String title;
-  const _SectionLabel(this.title);
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16.0, left: 2),
-      child: Text(
-        title,
-        style: const TextStyle(color: Color(0xFF3B82F6), fontWeight: FontWeight.bold, letterSpacing: 1.2, fontSize: 11),
       ),
     );
   }

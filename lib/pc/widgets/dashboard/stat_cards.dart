@@ -15,7 +15,7 @@ class StatCard extends StatelessWidget {
     required this.title,
     required this.value,
     required this.icon,
-    this.iconColor = Colors.white,
+    this.iconColor = AppColors.textWhite,
     this.iconBgColor,
     this.footer,
     this.isAlert = false,
@@ -23,75 +23,75 @@ class StatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: Container(
-        margin: const EdgeInsets.only(right: 16),
-        // FIX: Reduced padding from 20 to 16 to save vertical space (4px saved top + 4px bottom = 8px total)
-        padding: const EdgeInsets.all(16), 
-        decoration: BoxDecoration(
-          color: AppColors.surfaceGrey,
-          borderRadius: BorderRadius.circular(16),
-          border: isAlert 
-              ? const Border(left: BorderSide(color: AppColors.errorRed, width: 4))
-              : Border.all(color: Colors.white10),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            // Header
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Flexible(
-                  child: Text(
-                    title.toUpperCase(),
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Colors.white54,
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 0.5,
-                    ),
+    // ⚠️ CRITICAL FIX: Do NOT wrap this in Expanded. 
+    // The parent widget (Home Screen) controls the size.
+    return Container(
+      padding: const EdgeInsets.all(16), 
+      decoration: BoxDecoration(
+        color: AppColors.surfaceGrey,
+        borderRadius: BorderRadius.circular(16),
+        border: isAlert 
+            ? const Border(left: BorderSide(color: AppColors.errorRed, width: 4))
+            : Border.all(color: AppColors.divider),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          // Header
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Flexible(
+                child: Text(
+                  title.toUpperCase(),
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppColors.textWhite54,
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.5,
                   ),
                 ),
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: iconBgColor ?? Colors.white.withAlpha(12),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(icon, size: 18, color: iconColor),
+              ),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: iconBgColor ?? AppColors.textWhite.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-              ],
-            ),
-            
-            const SizedBox(height: 8), // Reduced gap slightly
-            
-            // Value
-            FittedBox(
+                child: Icon(icon, size: 18, color: iconColor),
+              ),
+            ],
+          ),
+          
+          const SizedBox(height: 8),
+          
+          // Value
+          Flexible(
+            child: FittedBox(
               fit: BoxFit.scaleDown,
               alignment: Alignment.centerLeft,
               child: Text(
                 value,
                 style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 28, // Kept large font
+                  color: AppColors.textWhite,
+                  fontSize: 28,
                   fontWeight: FontWeight.bold,
                 ),
               ),
             ),
-            
-            const SizedBox(height: 8), // Reduced gap slightly
-            
-            // Footer
-            if (footer != null) 
-              SizedBox(
-                height: 24, 
-                child: footer!,
-              ),
-          ],
-        ),
+          ),
+          
+          const SizedBox(height: 8),
+          
+          // Footer
+          if (footer != null) 
+            SizedBox(
+              height: 24, 
+              child: footer!,
+            ),
+        ],
       ),
     );
   }
@@ -111,7 +111,7 @@ class AlertBadge extends StatelessWidget {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
-            color: AppColors.errorRed.withAlpha(25),
+            color: AppColors.errorRed.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(4),
           ),
           child: Row(
@@ -131,7 +131,7 @@ class AlertBadge extends StatelessWidget {
           child: Text(
             subText,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(color: Colors.white38, fontSize: 11),
+            style: const TextStyle(color: AppColors.textWhite38, fontSize: 11),
           ),
         ),
       ],

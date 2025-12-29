@@ -180,12 +180,19 @@ const Schema appSchema = Schema([
     Column.text('school_id'),
     Column.text('student_id'),
     Column.text('title'),
+    
+    // --- NEW COLUMNS FOR INVOICING ---
+    Column.text('invoice_number'), // e.g. "INV-00231"
+    Column.text('status'),         // e.g. "draft", "sent", "paid", "overdue"
+    Column.text('pdf_url'),        // Link to Supabase Storage bucket
+    // ---------------------------------
+
     Column.real('total_amount'),
-    Column.integer('is_paid'),
+    Column.integer('is_paid'), // Keep for backward compatibility/quick checks
     Column.text('bill_type'),
     Column.text('billing_cycle_end'),
     Column.text('billing_cycle_start'),
-    Column.real('paid_amount'),
+    Column.real('paid_amount'), // Cache for performance
     Column.text('term_id'),
     Column.text('month_year'),
     Column.text('due_date'),
