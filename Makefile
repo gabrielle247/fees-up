@@ -40,6 +40,7 @@ run:
 		--dart-define=SUPABASE_ANON_KEY="$${SUPABASE_ANON_KEY}" \
 		--dart-define=POWERSYNC_ENDPOINT_URL="$${POWERSYNC_ENDPOINT_URL}" \
 		--dart-define=POWERSYNC_API_KEY="$${POWERSYNC_API_KEY}" \
+		--dart-define=UFT_PASSWORD="$${UFT_PASSWORD}" \
 		--dart-define=ENVIRONMENT=development
 
 run-verbose:
@@ -51,6 +52,7 @@ run-verbose:
 		--dart-define=SUPABASE_ANON_KEY="$${SUPABASE_ANON_KEY}" \
 		--dart-define=POWERSYNC_ENDPOINT_URL="$${POWERSYNC_ENDPOINT_URL}" \
 		--dart-define=POWERSYNC_API_KEY="$${POWERSYNC_API_KEY}" \
+		--dart-define=UFT_PASSWORD="$${UFT_PASSWORD}" \
 		--dart-define=ENVIRONMENT=development \
 		--verbose
 
@@ -91,7 +93,6 @@ lib: .dart
 
 # --- 🛡️ SAFETY COMMANDS ---
 
-# 0. SETUP REPO: Ensures Git is init, branch is main, and remote is linked
 setup-repo:
 	@echo "🔗 Configuring repository..."
 	@git init -q
@@ -105,8 +106,6 @@ setup-repo:
 	fi
 	@echo "✅ Repository linked: https://github.com/gabrielle247/fees-up/"
 
-# 1. SAVE POINT: Locks in your current progress
-# Dependencies: setup-repo (ensures we have a place to push to)
 save-point: setup-repo
 	@echo "💾 Creating a SAFETY CHECKPOINT..."
 	@git add .
@@ -115,7 +114,6 @@ save-point: setup-repo
 	@git push -u origin main
 	@echo "✅ Safe Point Established."
 
-# 2. FRESH START: Saves current work, then moves you to a new branch
 fresh-start: save-point
 	@echo "🌱 Starting fresh workspace..."
 	$(eval BRANCH := $(if $(b),$(b),ui-revamp-$(shell date +'%Y%m%d')))

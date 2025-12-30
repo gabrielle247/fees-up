@@ -2614,3 +2614,123 @@ final schoolPreferencesProvider = FutureProvider<SchoolPreferences>((ref) async 
   // Logic: Fetch FROM user_school_preferences WHERE school_id = dashboard.schoolId
   return SchoolPreferences(notifyPayment: true, notifyOverdue: false, landingPage: 'transactions');
 });
+
+
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/constants/app_colors.dart';
+
+// --- ENUMS & MODEL ---
+enum AnnouncementCategory { financial, academic, system, urgent }
+
+class Announcement {
+  final String id;
+  final String title;
+  final String body;
+  final DateTime time;
+  final AnnouncementCategory category;
+  final bool isRead;
+
+  Announcement({
+    required this.id,
+    required this.title,
+    required this.body,
+    required this.time,
+    required this.category,
+    this.isRead = false,
+  });
+
+  Announcement copyWith({bool? isRead}) {
+    return Announcement(
+      id: id,
+      title: title,
+      body: body,
+      time: time,
+      category: category,
+      isRead: isRead ?? this.isRead,
+    );
+  }
+
+  // Helpers for UI
+  String get badgeLabel {
+    switch (category) {
+      case AnnouncementCategory.financial: return "Financial";
+      case AnnouncementCategory.academic: return "Academic";
+      case AnnouncementCategory.system: return "System";
+      case AnnouncementCategory.urgent: return "Urgent";
+    }
+  }
+
+  Color get color {
+    switch (category) {
+      case AnnouncementCategory.financial: return AppColors.successGreen;
+      case AnnouncementCategory.academic: return AppColors.primaryBlue; // Or a standard blue
+      case AnnouncementCategory.system: return const Color(0xFF9333EA); // Purple
+      case AnnouncementCategory.urgent: return AppColors.errorRed;
+    }
+  }
+
+  IconData get icon {
+    switch (category) {
+      case AnnouncementCategory.financial: return Icons.attach_money;
+      case AnnouncementCategory.academic: return Icons.school;
+      case AnnouncementCategory.system: return Icons.dns;
+      case AnnouncementCategory.urgent: return Icons.warning_amber;
+    }
+  }
+}
+
+// --- STATE NOTIFIER ---
+class AnnouncementNotifier extends StateNotifier<List<Announcement>> {
+  AnnouncementNotifier() : super(_initialData);
+
+  void markAllAsRead() {
+    state = [
+      for (final item in state) item.copyWith(isRead: true)
+    ];
+  }
+
+  void addAnnouncement(Announcement item) {
+    state = [item, ...state];
+  }
+
+  // Mock Data
+  static final List<Announcement> _initialData = [
+    Announcement(
+      id: '1',
+      title: "Overdue Fees Alert",
+      body: "12 Students have overdue tuition fees exceeding \$500 for the Fall Semester.",
+      time: DateTime.now().subtract(const Duration(hours: 1)),
+      category: AnnouncementCategory.urgent,
+      isRead: false,
+    ),
+    Announcement(
+      id: '2',
+      title: "Donation Received",
+      body: "New donation of \$5,000.00 received from the Alumni Association via Wire Transfer.",
+      time: DateTime.now().subtract(const Duration(days: 1, hours: 4)),
+      category: AnnouncementCategory.financial,
+      isRead: true,
+    ),
+    Announcement(
+      id: '3',
+      title: "Grade 5 Report Cards Published",
+      body: "Report cards for Grade 5 Term 2 have been published and notifications sent to parents.",
+      time: DateTime.now().subtract(const Duration(days: 1, hours: 8)),
+      category: AnnouncementCategory.academic,
+      isRead: true,
+    ),
+    Announcement(
+      id: '4',
+      title: "System Maintenance",
+      body: "Scheduled maintenance will occur this Saturday at 10:00 PM EST.",
+      time: DateTime.now().subtract(const Duration(days: 3)),
+      category: AnnouncementCategory.system,
+      isRead: true,
+    ),
+  ];
+}
+
+final announcementsProvider = StateNotifierProvider<AnnouncementNotifier, List<Announcement>>((ref) {
+  return AnnouncementNotifier();
+});

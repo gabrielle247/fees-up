@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../../core/constants/app_colors.dart';
+import 'package:fees_up/pc/widgets/profile/two_factor_dialog.dart'; // Absolute import for safety
 
 class AccountSecurityCard extends StatelessWidget {
   const AccountSecurityCard({super.key});
@@ -68,15 +69,22 @@ class AccountSecurityCard extends StatelessWidget {
                   ),
                 ),
                 TextButton(
-                  onPressed: () {},
+                  onPressed: () {
+                    showDialog(
+                      context: context,
+                      barrierColor: Colors.black.withValues(alpha: 0.7),
+                      builder: (context) => const EnableTwoFactorDialog(),
+                    );
+                  },
                   style: TextButton.styleFrom(
                     backgroundColor: Colors.orange,
                     foregroundColor: Colors.black,
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    // Use VisualDensity for compact layout without killing the hit target
+                    visualDensity: VisualDensity.compact, 
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
                   ),
-                  child: const Text("Enable", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                  child: const Text("Enable", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                 ),
               ],
             ),

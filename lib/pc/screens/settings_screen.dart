@@ -28,6 +28,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     "Integrations"
   ];
 
+  void _handleSearchNavigation(int tabIndex) {
+    setState(() {
+      _selectedTabIndex = tabIndex;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -38,8 +44,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           Expanded(
             child: Column(
               children: [
-                // 1. Reusing the Standard Header
-                const SettingsHeader(),
+                // 1. Header with wired search callback
+                SettingsHeader(onSearchNavigation: _handleSearchNavigation),
                 
                 // 2. Inner Navigation Bar
                 Container(
@@ -94,7 +100,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       case 0:
         return const GeneralFinancialView();
       case 1:
-        // Placeholder for School Year Management (Future)
         return const SchoolYearSettingsView();
       case 2:
         return const UsersPermissionsView();
@@ -105,36 +110,5 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       default:
         return const SizedBox();
     }
-  }
-
-  // ignore: unused_element
-  Widget _buildPlaceholder(String title, IconData icon) {
-    return Container(
-      height: 400,
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: AppColors.surfaceGrey,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.divider),
-      ),
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 64, color: AppColors.textWhite.withValues(alpha: 0.1)),
-            const SizedBox(height: 16),
-            Text(
-              "$title Coming Soon",
-              style: const TextStyle(color: AppColors.textWhite54, fontSize: 18),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              "This module is currently under development.",
-              style: TextStyle(color: AppColors.textWhite38, fontSize: 14),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }

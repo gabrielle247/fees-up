@@ -2,7 +2,8 @@ import 'dart:async';
 
 import 'package:fees_up/pc/screens/announcements_screen.dart';
 import 'package:fees_up/pc/screens/invoices_screen.dart';
-import 'package:fees_up/pc/screens/profile_screen.dart'; // <--- NEW IMPORT
+import 'package:fees_up/pc/screens/notifications_screen.dart'; // <--- WIRED
+import 'package:fees_up/pc/screens/profile_screen.dart';
 import 'package:fees_up/pc/screens/reports_screen.dart';
 import 'package:fees_up/pc/screens/settings_screen.dart';
 import 'package:fees_up/pc/screens/students_screen.dart';
@@ -61,11 +62,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         ),
       ),
 
-      // 2. TRANSACTIONS (Connected)
+      // 2. TRANSACTIONS
       GoRoute(
         path: '/transactions',
         builder: (context, state) => const ResponsiveLayout(
-          // Mobile placeholder until you build the mobile version
           mobileScaffold: Scaffold(body: Center(child: Text("Mobile Transactions"))), 
           pcScaffold: TransactionsScreen(), 
         ),
@@ -93,19 +93,33 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const ReportsScreen(),
       ),
 
-      // 6. ANNOUNCEMENTS
+      // -----------------------------------------------------------------------
+      // MESSAGING ROUTES (Broadcasts & Notifications)
+      // -----------------------------------------------------------------------
+      
+      // 6. ANNOUNCEMENTS (Broadcasts)
       GoRoute(
         path: '/announcements',
         builder: (context, state) => const AnnouncementsScreen(),
       ),
 
-      // 7. SETTINGS
+      // 7. NOTIFICATIONS (Personal Inbox) - NEW
+      GoRoute(
+        path: '/notifications',
+        builder: (context, state) => const NotificationsScreen(),
+      ),
+
+      // -----------------------------------------------------------------------
+      // PREFERENCES
+      // -----------------------------------------------------------------------
+
+      // 8. SETTINGS
       GoRoute(
         path: '/settings',
         builder: (context, state) => const SettingsScreen(),
       ),
 
-      // 8. PROFILE (New Standalone Screen)
+      // 9. PROFILE
       GoRoute(
         path: '/profile',
         builder: (context, state) => const ProfileScreen(),

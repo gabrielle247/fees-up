@@ -12,42 +12,35 @@ class DashboardSidebar extends StatefulWidget {
 
 class _DashboardSidebarState extends State<DashboardSidebar> {
   
-  /// Calculates the active index based on the current URI.
-  int _calculateSelectedIndex(BuildContext context) {
-    final String location = GoRouterState.of(context).uri.toString();
-    
-    if (location.startsWith('/transactions')) return 1;
-    if (location.startsWith('/invoices')) return 2;
-    if (location.startsWith('/students')) return 3;
-    if (location.startsWith('/reports')) return 4;
-    if (location.startsWith('/announcements')) return 5;
-    
-    // Bottom items return -1 to ensure the main list isn't highlighted
-    if (location.startsWith('/profile')) return -1; 
-    if (location.startsWith('/settings')) return -1;
-
-    // Default to Overview
-    if (location == '/' || location.startsWith('/overview')) return 0;
-    
-    return -1; 
+  /// Calculates the active index to highlight the correct item
+  /// Returns a unique ID or index for logic if needed.
+  String _getCurrentRoute(BuildContext context) {
+    return GoRouterState.of(context).uri.toString();
   }
 
-  final List<Map<String, dynamic>> _menuItems = [
+  bool _isActive(String currentRoute, String itemRoute) {
+    if (itemRoute == '/' && currentRoute != '/') return false;
+    return currentRoute.startsWith(itemRoute);
+  }
+
+  // GROUP 1: OPERATIONAL (Day-to-day Management)
+  final List<Map<String, dynamic>> _operationalItems = [
     {'icon': Icons.grid_view_rounded, 'label': 'Overview', 'route': '/'},
     {'icon': Icons.receipt_long_rounded, 'label': 'Transactions', 'route': '/transactions'},
     {'icon': Icons.description_outlined, 'label': 'Invoices', 'route': '/invoices'},
     {'icon': Icons.school_outlined, 'label': 'Students', 'route': '/students'},
     {'icon': Icons.bar_chart_rounded, 'label': 'Reports', 'route': '/reports'},
-    {'icon': Icons.campaign_outlined, 'label': 'Announcements', 'route': '/announcements'},
+  ];
+
+  // GROUP 2: MESSAGING (Communication Hub)
+  final List<Map<String, dynamic>> _messagingItems = [
+    {'icon': Icons.campaign_outlined, 'label': 'Broadcasts', 'route': '/announcements'}, // System-wide
+    {'icon': Icons.notifications_none_rounded, 'label': 'Notifications', 'route': '/notifications'}, // Personal
   ];
 
   @override
   Widget build(BuildContext context) {
-    final int selectedIndex = _calculateSelectedIndex(context);
-    final String location = GoRouterState.of(context).uri.toString();
-    
-    final bool isSettingsSelected = location.startsWith('/settings');
-    final bool isProfileSelected = location.startsWith('/profile');
+    final currentRoute = _getCurrentRoute(context);
 
     return Container(
       width: 260,
@@ -78,7 +71,7 @@ class _DashboardSidebarState extends State<DashboardSidebar> {
                     ),
                     Text(
                       "Financial Portal",
-                      style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12),
+                      style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12),
                     ),
                   ],
                 )
@@ -86,65 +79,58 @@ class _DashboardSidebarState extends State<DashboardSidebar> {
             ),
           ),
 
-          const SizedBox(height: 10),
-
-          // 2. MAIN NAVIGATION
+          // 2. SCROLLABLE MENU AREA
           Expanded(
-            child: ListView.builder(
+            child: ListView(
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: _menuItems.length,
-              itemBuilder: (context, index) {
-                final item = _menuItems[index];
-                return _SidebarItem(
+              children: [
+                // --- SECTION: OPERATIONS ---
+                ..._operationalItems.map((item) => _SidebarItem(
                   icon: item['icon'],
                   label: item['label'],
-                  isSelected: selectedIndex == index,
+                  isSelected: _isActive(currentRoute, item['route']),
                   onTap: () => context.go(item['route']),
-                );
-              },
+                )),
+
+                const SizedBox(height: 24),
+                
+                // --- SECTION: MESSAGING ---
+                _sectionLabel("MESSAGING"),
+                ..._messagingItems.map((item) => _SidebarItem(
+                  icon: item['icon'],
+                  label: item['label'],
+                  isSelected: _isActive(currentRoute, item['route']),
+                  onTap: () => context.go(item['route']),
+                )),
+              ],
             ),
           ),
 
-          // 3. BOTTOM ACTIONS (PREFERENCES GROUP)
+          // 3. BOTTOM PREFERENCES
           const Divider(color: Colors.white10, indent: 20, endIndent: 20),
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Group Label
-                Padding(
-                  padding: const EdgeInsets.only(left: 12, bottom: 12, top: 4),
-                  child: Text(
-                    "PREFERENCES",
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.4),
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 1.2,
-                    ),
-                  ),
-                ),
+                _sectionLabel("PREFERENCES"),
                 
-                // Profile Item
                 _SidebarItem(
                   icon: Icons.person_outline_rounded,
                   label: "Profile",
-                  isSelected: isProfileSelected,
+                  isSelected: _isActive(currentRoute, '/profile'),
                   onTap: () => context.go('/profile'),
                 ),
                 const SizedBox(height: 4),
 
-                // Settings Item
                 _SidebarItem(
                   icon: Icons.settings_outlined,
                   label: "Settings",
-                  isSelected: isSettingsSelected,
+                  isSelected: _isActive(currentRoute, '/settings'),
                   onTap: () => context.go('/settings'),
                 ),
                 const SizedBox(height: 4),
 
-                // Log Out Item
                 _SidebarItem(
                   icon: Icons.logout_rounded,
                   label: "Log Out",
@@ -153,7 +139,7 @@ class _DashboardSidebarState extends State<DashboardSidebar> {
                   onTap: () {
                     showDialog(
                       context: context,
-                      barrierColor: Colors.black.withOpacity(0.7),
+                      barrierColor: Colors.black.withValues(alpha: 0.7),
                       builder: (context) => const LogoutDialog(),
                     );
                   },
@@ -162,6 +148,21 @@ class _DashboardSidebarState extends State<DashboardSidebar> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _sectionLabel(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 12, bottom: 8, top: 4),
+      child: Text(
+        text,
+        style: TextStyle(
+          color: Colors.white.withValues(alpha: 0.4),
+          fontSize: 11,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 1.2,
+        ),
       ),
     );
   }
@@ -193,7 +194,7 @@ class _SidebarItemState extends State<_SidebarItem> {
   Widget build(BuildContext context) {
     final Color bgColor = widget.isSelected
         ? AppColors.primaryBlue
-        : (_isHovered ? Colors.white.withOpacity(0.05) : Colors.transparent);
+        : (_isHovered ? Colors.white.withValues(alpha: 0.05) : Colors.transparent);
 
     final Color textColor = widget.isDestructive
         ? AppColors.errorRed

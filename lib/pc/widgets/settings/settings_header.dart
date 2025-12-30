@@ -4,8 +4,34 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../data/providers/dashboard_provider.dart';
 import '../../../../data/services/database_service.dart';
 
+// Search Data Model
+class _SearchOption {
+  final String label;
+  final int tabIndex;
+  const _SearchOption(this.label, this.tabIndex);
+}
+
 class SettingsHeader extends ConsumerWidget {
-  const SettingsHeader({super.key});
+  final Function(int) onSearchNavigation;
+
+  const SettingsHeader({super.key, required this.onSearchNavigation});
+
+  // --- Search Registry ---
+  static const List<_SearchOption> _searchOptions = [
+    _SearchOption("General Settings", 0),
+    _SearchOption("School Profile", 0),
+    _SearchOption("Currency & Finance", 0),
+    _SearchOption("Academic Years", 1),
+    _SearchOption("Terms & Semesters", 1),
+    _SearchOption("Users", 2),
+    _SearchOption("Permissions & Roles", 2),
+    _SearchOption("Teachers & Admins", 2),
+    _SearchOption("Notifications", 3),
+    _SearchOption("Email Alerts", 3),
+    _SearchOption("Integrations", 4),
+    _SearchOption("API Tokens", 4),
+    _SearchOption("QuickBooks / Xero", 4),
+  ];
 
   String _getInitials(String name) {
     if (name.isEmpty) return "U";
@@ -19,8 +45,6 @@ class SettingsHeader extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final dashboardAsync = ref.watch(dashboardDataProvider);
-    
-    // Direct connectivity check for real-time UI feedback
     final bool isConnected = DatabaseService().db.currentStatus.connected;
 
     return Container(
@@ -51,38 +75,102 @@ class SettingsHeader extends ConsumerWidget {
           
           const Spacer(),
 
-          // --- Global Search Bar (Standardized) ---
+          // --- Autocomplete Search Bar ---
           SizedBox(
             width: 300,
-            height: 40,
-            child: TextField(
-              textAlignVertical: TextAlignVertical.center,
-              style: const TextStyle(color: AppColors.textWhite, fontSize: 13),
-              decoration: InputDecoration(
-                isDense: true,
-                filled: true,
-                fillColor: AppColors.surfaceGrey,
-                hintText: "Search settings...",
-                hintStyle: const TextStyle(color: AppColors.textWhite38),
-                prefixIcon: const Icon(Icons.search, size: 18, color: AppColors.textWhite54),
-                
-                // Content Padding zero to center text vertically
-                contentPadding: EdgeInsets.zero, 
+            child: Autocomplete<_SearchOption>(
+              optionsBuilder: (TextEditingValue textEditingValue) {
+                if (textEditingValue.text == '') {
+                  return const Iterable<_SearchOption>.empty();
+                }
+                return _searchOptions.where((option) {
+                  return option.label
+                      .toLowerCase()
+                      .contains(textEditingValue.text.toLowerCase());
+                });
+              },
+              displayStringForOption: (_SearchOption option) => option.label,
+              onSelected: (_SearchOption selection) {
+                onSearchNavigation(selection.tabIndex);
+              },
+              
+              // Custom Input Field Styling
+              fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
+                return SizedBox(
+                  height: 40,
+                  child: TextField(
+                    controller: controller,
+                    focusNode: focusNode,
+                    textAlignVertical: TextAlignVertical.center,
+                    style: const TextStyle(color: AppColors.textWhite, fontSize: 13),
+                    decoration: InputDecoration(
+                      isDense: true,
+                      filled: true,
+                      fillColor: AppColors.surfaceGrey,
+                      hintText: "Search settings...",
+                      hintStyle: const TextStyle(color: AppColors.textWhite38),
+                      prefixIcon: const Icon(Icons.search, size: 18, color: AppColors.textWhite54),
+                      contentPadding: EdgeInsets.zero,
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(color: AppColors.divider),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(color: AppColors.primaryBlue),
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(color: AppColors.divider),
+                      ),
+                    ),
+                  ),
+                );
+              },
 
-                // Borders
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: const BorderSide(color: AppColors.divider),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: const BorderSide(color: AppColors.primaryBlue),
-                ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: const BorderSide(color: AppColors.divider),
-                ),
-              ),
+              // Custom Dropdown Styling for Dark Mode
+              optionsViewBuilder: (context, onSelected, options) {
+                return Align(
+                  alignment: Alignment.topLeft,
+                  child: Material(
+                    color: Colors.transparent,
+                    child: Container(
+                      width: 300,
+                      margin: const EdgeInsets.only(top: 10),
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceGrey,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppColors.divider),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.2),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          )
+                        ],
+                      ),
+                      child: ListView.builder(
+                        padding: EdgeInsets.zero,
+                        shrinkWrap: true,
+                        itemCount: options.length,
+                        itemBuilder: (BuildContext context, int index) {
+                          final option = options.elementAt(index);
+                          return InkWell(
+                            onTap: () => onSelected(option),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                              child: Text(
+                                option.label,
+                                style: const TextStyle(color: AppColors.textWhite, fontSize: 13),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                );
+              },
             ),
           ),
           
@@ -107,9 +195,7 @@ class SettingsHeader extends ConsumerWidget {
             error: (err, _) => _buildProfileError(isConnected),
             data: (data) {
               final initials = _getInitials(data.userName);
-              
-              // Determine subtitle status (Offline / Syncing / Role)
-              String subtitle = "Administrator"; // Default role text from design
+              String subtitle = "Administrator";
               Color subtitleColor = AppColors.textWhite38;
 
               if (data.schoolName == 'Loading...') {
@@ -132,10 +218,7 @@ class SettingsHeader extends ConsumerWidget {
                       ),
                       Text(
                         subtitle, 
-                        style: TextStyle(
-                          color: subtitleColor, 
-                          fontSize: 11
-                        )
+                        style: TextStyle(color: subtitleColor, fontSize: 11)
                       ),
                     ],
                   ),
@@ -157,7 +240,6 @@ class SettingsHeader extends ConsumerWidget {
   }
 
   // --- Loading/Error States ---
-
   Widget _buildProfileLoading() {
     return Row(
       children: [
