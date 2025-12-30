@@ -1,52 +1,50 @@
 import React from 'react';
-import { Link, Outlet, useLocation } from 'react-router-dom';
-import { Book, Home, Users, FileText, CreditCard, BarChart, Settings, Menu } from 'lucide-react';
+import { Outlet, NavLink } from 'react-router-dom';
 import './Layout.css';
 
 const Layout = () => {
-  const location = useLocation();
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
-
-  const navItems = [
-    { path: '/', label: 'Introduction', icon: <Book size={20} /> },
-    { path: '/getting-started', label: 'Getting Started', icon: <Home size={20} /> },
-    { path: '/dashboard', label: 'Dashboard', icon: <BarChart size={20} /> },
-    { path: '/students', label: 'Students', icon: <Users size={20} /> },
-    { path: '/invoices', label: 'Invoices', icon: <FileText size={20} /> },
-    { path: '/transactions', label: 'Transactions', icon: <CreditCard size={20} /> },
-    { path: '/reports', label: 'Reports', icon: <BarChart size={20} /> },
-    { path: '/settings', label: 'Settings', icon: <Settings size={20} /> },
-  ];
-
   return (
-    <div className="app-container">
-      <header className="mobile-header">
-        <h1>Fees Up Docs</h1>
-        <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
-          <Menu />
-        </button>
-      </header>
-
-      <aside className={`sidebar ${isMobileMenuOpen ? 'open' : ''}`}>
-        <div className="sidebar-header">
-          <h2>Fees Up Docs</h2>
+    <div className="docs-wrapper">
+      <aside className="docs-sidebar">
+        {/* Profile Section (Matching your top-right profile in app) */}
+        <div className="sidebar-profile">
+          <div className="profile-icon">NG</div>
+          <div className="profile-info">
+            <span className="user-name">Nyasha Gabriel</span>
+            <span className="user-role">Cores Point HQ</span>
+          </div>
         </div>
-        <nav>
-          <ul>
-            {navItems.map((item) => (
-              <li key={item.path} className={location.pathname === item.path ? 'active' : ''}>
-                <Link to={item.path} onClick={() => setIsMobileMenuOpen(false)}>
-                  {item.icon}
-                  <span>{item.label}</span>
-                </Link>
-              </li>
-            ))}
-          </ul>
+
+        <nav className="sidebar-group">
+          <NavLink to="/dashboard" className="nav-item"><span>📊</span> Overview</NavLink>
+          <NavLink to="/transactions" className="nav-item"><span>💳</span> Transactions</NavLink>
+          <NavLink to="/invoices" className="nav-item"><span>📄</span> Invoices</NavLink>
+          <NavLink to="/students" className="nav-item"><span>👥</span> Students</NavLink>
+          <NavLink to="/reports" className="nav-item"><span>📈</span> Reports</NavLink>
         </nav>
+
+        <div className="group-label">MESSAGING</div>
+        <nav className="sidebar-group">
+          <NavLink to="/broadcasts" className="nav-item"><span>📢</span> Broadcasts</NavLink>
+          <NavLink to="/notifications" className="nav-item"><span>🔔</span> Notifications</NavLink>
+        </nav>
+
+        <div className="group-label">PREFERENCES</div>
+        <nav className="sidebar-group">
+          <NavLink to="/profile" className="nav-item"><span>👤</span> Profile</NavLink>
+          <NavLink to="/settings" className="nav-item"><span>⚙️</span> Settings</NavLink>
+        </nav>
+
+        <div className="sidebar-footer">
+          <button className="logout-btn"><span>🚪</span> Log Out</button>
+        </div>
       </aside>
 
-      <main className="content">
-        <div className="content-container">
+      <main className="docs-main">
+        <header className="docs-header">
+          <span className="breadcrumb">Docs / Financial Dashboard</span>
+        </header>
+        <div className="docs-body">
           <Outlet />
         </div>
       </main>
