@@ -1,0 +1,8 @@
+:root {
+  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+}
+/* We use Layout.css mostly, so we can clear this file or keep minimal resets */
+body {
+  margin: 0;
+  padding: 0;
+}
