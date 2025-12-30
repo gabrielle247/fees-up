@@ -1,0 +1,385 @@
+import 'package:flutter/material.dart';
+import '../constants/app_colors.dart';
+
+class AppTheme {
+  // Private constructor
+  const AppTheme._();
+
+  static ThemeData get darkTheme {
+    return ThemeData(
+      useMaterial3: true,
+      brightness: Brightness.dark,
+      primaryColor: AppColors.primaryBlue,
+      scaffoldBackgroundColor: AppColors.backgroundBlack,
+      
+      // Color Scheme
+      colorScheme: const ColorScheme.dark(
+        primary: AppColors.primaryBlue,
+        secondary: AppColors.primaryBlueLight,
+        surface: AppColors.surfaceGrey,
+        error: AppColors.errorRed,
+        onPrimary: AppColors.textWhite,
+        onSecondary: AppColors.backgroundBlack,
+        onSurface: AppColors.textWhite,
+        onError: AppColors.backgroundBlack,
+      ),
+
+      // AppBar Theme
+      appBarTheme: const AppBarTheme(
+        backgroundColor: AppColors.surfaceGrey,
+        elevation: 0,
+        centerTitle: false,
+        iconTheme: IconThemeData(color: AppColors.textWhite),
+        titleTextStyle: TextStyle(
+          color: AppColors.textWhite,
+          fontSize: 20,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+
+      // Card Theme
+      cardTheme: CardThemeData(
+        color: AppColors.surfaceGrey,
+        elevation: 2,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+      ),
+
+      // Button Themes
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.primaryBlue,
+          foregroundColor: AppColors.textWhite,
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+          elevation: 2,
+        ),
+      ),
+
+      // Input Decoration Theme (TextFields)
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: AppColors.surfaceLightGrey,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide.none,
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(
+            color: AppColors.primaryBlue, 
+            width: 2,
+          ),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(
+            color: AppColors.errorRed, 
+            width: 1,
+          ),
+        ),
+        labelStyle: const TextStyle(color: AppColors.textGrey),
+        hintStyle: TextStyle(
+          color: AppColors.textGrey.withAlpha(128), // Using withAlpha as requested
+        ),
+      ),
+    );
+  }
+}import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+// --- MOCK PROVIDER ---
+// Toggle this to 'true' to simulate a paid account, 'false' for free tier.
+// We keep it true for now so you can work without disturbance.
+final isPremiumProvider = Provider<bool>((ref) => true); 
+
+class PremiumGuard extends ConsumerWidget {
+  final Widget child;
+  final String featureName;
+
+  const PremiumGuard({
+    super.key, 
+    required this.child,
+    this.featureName = "This Feature",
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isPremium = ref.watch(isPremiumProvider);
+
+    // If Premium, show the actual feature
+    if (isPremium) {
+      return child;
+    }
+
+    // If Limited, show the "Blank Canvas" / Upgrade Prompt
+    return Stack(
+      children: [
+        // 1. Blurred/Disabled Child (Optional, or just hide it)
+        Opacity(
+          opacity: 0.1,
+          child: AbsorbPointer(child: child),
+        ),
+
+        // 2. The Upgrade Overlay
+        Center(
+          child: Container(
+            margin: const EdgeInsets.all(24),
+            padding: const EdgeInsets.all(32),
+            decoration: BoxDecoration(
+              color: const Color(0xFF151718),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: Colors.white10),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withAlpha((0.5*255) as int),
+                  blurRadius: 30,
+                  offset: const Offset(0, 10),
+                )
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.diamond_outlined, size: 48, color: Color(0xFFA855F7)), // Purple
+                const SizedBox(height: 20),
+                Text(
+                  "Unlock $featureName",
+                  style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  "This feature is available on the Unlimited Plan. \nUpgrade to remove limits.",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.grey, height: 1.5),
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton(
+                  onPressed: () {
+                    // TODO: Navigate to Payment/Subscription Screen
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text("Subscription Flow Coming Soon")),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFA855F7),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                  ),
+                  child: const Text("Get Unlimited Access"),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}String appName = "Fees Up";
+String appVersion = "1.0.0";
+String defaultLanguage = "en";
+import 'package:flutter/material.dart';
+
+class AppColors {
+  const AppColors._();
+
+  // --- BRAND COLORS ---
+  // A vivid, electric blue that pops against the slate background
+  static const Color primaryBlue = Color(0xFF2962FF); 
+  static const Color primaryBlueLight = Color(0xFF768FFF);
+  static const Color primaryBlueDark = Color(0xFF0039CB);
+  
+  // A vibrant purple for secondary actions
+  static const Color accentPurple = Color(0xFFA855F7); 
+  static const Color accentPurpleLight = Color(0xFFD180FF);
+  static const Color accentPurpleDark = Color(0xFFAA00FF);
+
+  // --- BACKGROUNDS (The "Lively Slate" Theme) ---
+  // Replaced muddy teal-blacks with deep, rich Slate Blue-Greys
+  static const Color backgroundBlack = Color(0xFF0F172A); // Deepest Slate (Main BG)
+  static const Color surfaceGrey = Color(0xFF1E293B);     // Card/Dialog Surface
+  static const Color surfaceLightGrey = Color(0xFF334155); // Borders / Input Fills
+  static const Color surfaceDarkGrey = Color(0xFF020617);  // Sidebar / Contrast Areas
+  
+  // --- TEXT COLORS ---
+  static const Color textWhite = Color(0xFFF8FAFC); // Slightly off-white for less eye strain
+  static const Color textWhite70 = Color(0xB3F8FAFC);
+  static const Color textWhite54 = Color(0x8AF8FAFC);
+  static const Color textWhite38 = Color(0x61F8FAFC);
+  static const Color textGrey = Color(0xFF94A3B8); // Slate-tinted grey text
+
+  // --- UI ELEMENTS ---
+  static const Color divider = Color(0xFF334155); // Matching the surface light
+  static const Color iconGrey = Color(0xFF64748B);
+  static const Color overlayDark = Color(0xD9020617);
+
+  // --- FUNCTIONAL COLORS ---
+  // Adjusted to be slightly more vibrant to match the lively theme
+  static const Color errorRed = Color(0xFFEF4444);
+  static const Color successGreen = Color(0xFF10B981); // Emerald green
+  static const Color warningOrange = Color(0xFFF59E0B); // Amber
+  static const Color disabledGrey = Color(0xFF475569);
+
+  // --- TRANSPARENT BACKGROUNDS ---
+  // Perfect for chips and subtle highlights
+  static const Color errorRedBg = Color(0x22EF4444);
+  static const Color purpleBg = Color(0x22A855F7);
+  static const Color primaryBlueBg = Color(0x222962FF);
+  static const Color successGreenBg = Color(0x2210B981);
+}import 'dart:async';
+
+import 'package:fees_up/pc/screens/announcements_screen.dart';
+import 'package:fees_up/pc/screens/invoices_screen.dart';
+import 'package:fees_up/pc/screens/profile_screen.dart'; // <--- NEW IMPORT
+import 'package:fees_up/pc/screens/reports_screen.dart';
+import 'package:fees_up/pc/screens/settings_screen.dart';
+import 'package:fees_up/pc/screens/students_screen.dart';
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+// --- LAYOUT & SHARED ---
+import '../../shared/layout/responsive_layout.dart';
+
+// --- MOBILE SCREENS ---
+import '../../mobile/screens/mobile_home_screen.dart';
+import '../../mobile/screens/auth/mobile_signup_screen.dart';
+
+// --- PC SCREENS ---
+import '../../pc/screens/pc_home_screen.dart';
+import '../../pc/screens/auth/pc_signup_screen.dart';
+import '../../pc/screens/transactions_screen.dart';
+
+final appRouterProvider = Provider<GoRouter>((ref) {
+  return GoRouter(
+    initialLocation: '/',
+    debugLogDiagnostics: true,
+    
+    // 1. LISTEN TO AUTH CHANGES
+    refreshListenable: GoRouterRefreshStream(Supabase.instance.client.auth.onAuthStateChange),
+    
+    // 2. REDIRECT LOGIC
+    redirect: (context, state) {
+      final session = Supabase.instance.client.auth.currentSession;
+      final isAuthRoute = state.uri.toString() == '/login' || state.uri.toString() == '/signup';
+
+      if (session == null) {
+        return isAuthRoute ? null : '/login';
+      }
+
+      if (isAuthRoute) {
+        return '/';
+      }
+
+      return null;
+    },
+
+    routes: [
+      // -----------------------------------------------------------------------
+      // CORE ROUTES
+      // -----------------------------------------------------------------------
+      
+      // 1. HOME / OVERVIEW
+      GoRoute(
+        path: '/',
+        builder: (context, state) => const ResponsiveLayout(
+          mobileScaffold: MobileHomeScreen(),
+          pcScaffold: PCHomeScreen(),
+        ),
+      ),
+
+      // 2. TRANSACTIONS (Connected)
+      GoRoute(
+        path: '/transactions',
+        builder: (context, state) => const ResponsiveLayout(
+          // Mobile placeholder until you build the mobile version
+          mobileScaffold: Scaffold(body: Center(child: Text("Mobile Transactions"))), 
+          pcScaffold: TransactionsScreen(), 
+        ),
+      ),
+
+      // -----------------------------------------------------------------------
+      // FEATURE ROUTES
+      // -----------------------------------------------------------------------
+      
+      // 3. INVOICES
+      GoRoute(
+        path: '/invoices',
+        builder: (context, state) => const InvoicesScreen(),
+      ),
+
+      // 4. STUDENTS
+      GoRoute(
+        path: '/students',
+        builder: (context, state) => const StudentsScreen(),
+      ),
+
+      // 5. REPORTS
+      GoRoute(
+        path: '/reports',
+        builder: (context, state) => const ReportsScreen(),
+      ),
+
+      // 6. ANNOUNCEMENTS
+      GoRoute(
+        path: '/announcements',
+        builder: (context, state) => const AnnouncementsScreen(),
+      ),
+
+      // 7. SETTINGS
+      GoRoute(
+        path: '/settings',
+        builder: (context, state) => const SettingsScreen(),
+      ),
+
+      // 8. PROFILE (New Standalone Screen)
+      GoRoute(
+        path: '/profile',
+        builder: (context, state) => const ProfileScreen(),
+      ),
+
+      // -----------------------------------------------------------------------
+      // AUTH ROUTES
+      // -----------------------------------------------------------------------
+      GoRoute(
+        path: '/login',
+        builder: (context, state) => const ResponsiveLayout(
+          mobileScaffold: MobileAuthScreen(initialIsLogin: true),
+          pcScaffold: PCSignupScreen(initialIsLogin: true),
+        ),
+      ),
+
+      GoRoute(
+        path: '/signup',
+        builder: (context, state) => const ResponsiveLayout(
+          mobileScaffold: MobileAuthScreen(initialIsLogin: false),
+          pcScaffold: PCSignupScreen(initialIsLogin: false),
+        ),
+      ),
+    ],
+  );
+});
+
+// --- HELPER CLASSES ---
+
+class GoRouterRefreshStream extends ChangeNotifier {
+  late final StreamSubscription<dynamic> _subscription;
+
+  GoRouterRefreshStream(Stream<dynamic> stream) {
+    notifyListeners();
+    _subscription = stream.asBroadcastStream().listen(
+      (dynamic _) => notifyListeners(),
+    );
+  }
+
+  @override
+  void dispose() {
+    _subscription.cancel();
+    super.dispose();
+  }
+}

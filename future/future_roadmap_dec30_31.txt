@@ -1,0 +1,49 @@
+[STRATEGIC ROADMAP] YEAR-END SPRINT (DEC 30 - 31)
+---------------------------------------------------
+PROJECT: Fees Up (Admin Portal)
+STATUS: UI Complete / Logic Pending
+
+===================================================
+DAY 1: DECEMBER 30th (Logic & Connections)
+focus: "Making it Real"
+===================================================
+
+1. SETTINGS REPOSITORY IMPLEMENTATION
+   - Task: Replace the mock Providers in `settings_provider.dart` with real 
+     Supabase queries.
+   - Goal: Ensure toggling "Dark Mode" or "Email Alerts" actually persists 
+     to the `user_global_settings` table.
+
+2. SCHOOL YEAR LOGIC (CRITICAL)
+   - Task: Implement the "Active Year" switch logic.
+   - Goal: Changing the "Current School Year" in settings must update the 
+     dashboard context so that all financial data reflects that specific year.
+
+3. USER MANAGEMENT WIRING
+   - Task: Connect the `AddUserDialog` to the `link_user_to_school` RPC.
+   - Goal: Successfully invite a 'teacher' email and see them appear in the 
+     table after refresh.
+
+===================================================
+DAY 2: DECEMBER 31st (Security & Polish)
+focus: "Hardening the System"
+===================================================
+
+1. API TOKEN GENERATION
+   - Task: Implement the backend logic for `generate_teacher_token`.
+   - Goal: Clicking "Generate Token" should return a secure string (e.g., 
+     `tk_live_...`) that actually works for marking attendance in the mobile app.
+
+2. PROFILE IMAGE UPLOAD
+   - Task: Implement Supabase Storage bucket for `avatars`.
+   - Goal: Allow the "Camera" icon on the Profile screen to upload an image 
+     and update the user's `avatar_url`.
+
+3. ANNOUNCEMENT "READ" STATE
+   - Task: Create a local SQLite table (PowerSync) for `read_announcements`.
+   - Goal: Clicking an announcement should mark it as read locally so the 
+     "Unread" badge count decreases immediately.
+
+4. FINAL YEAR-END COMMITS
+   - Task: Full code cleanup, removal of "TODO" comments, and formatting.
+   - Goal: A clean, stable `main` branch ready for 2025 development.

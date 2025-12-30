@@ -4,15 +4,35 @@ import '../widgets/sidebar.dart';
 import '../widgets/profile/profile_header_card.dart';
 import '../widgets/profile/personal_info_form.dart';
 import '../widgets/profile/account_security_card.dart';
+import '../widgets/profile/security_password_view.dart';
+import '../widgets/profile/role_permissions_view.dart';
+import '../widgets/profile/activity_log_view.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
+
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  int _selectedIndex = 0;
+
+  final List<Map<String, dynamic>> _navItems = [
+    {'icon': Icons.person_outline, 'label': 'Personal Information'},
+    {'icon': Icons.lock_outline, 'label': 'Security & Password'},
+    {'icon': Icons.shield_outlined, 'label': 'Role & Permissions'},
+    {'icon': Icons.history, 'label': 'Activity Log'},
+  ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.backgroundBlack,
       body: Row(
+        // FIX: Pin Sidebar and Content to the top to prevent vertical jumping
+        // when content height changes during navigation.
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const DashboardSidebar(),
           Expanded(
@@ -21,35 +41,42 @@ class ProfileScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text("Profile Settings", style: TextStyle(color: AppColors.textWhite, fontSize: 24, fontWeight: FontWeight.bold)),
+                  const Text("Profile Settings",
+                      style: TextStyle(
+                          color: AppColors.textWhite,
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold)),
                   const SizedBox(height: 24),
-                  
+
                   // 1. Top Hero Card
                   const ProfileHeaderCard(),
                   const SizedBox(height: 24),
 
-                  // 2. Main Content Area (Split View)
+                  // 2. Main Content Area
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // LEFT: Navigation & Security Summary
+                      // LEFT COLUMN: Nav & Widget
                       Expanded(
                         flex: 1,
                         child: Column(
                           children: [
                             _buildInnerNav(),
-                            const SizedBox(height: 24),
-                            const AccountSecurityCard(),
+                            // Only show the security summary on Personal & Security tabs
+                            if (_selectedIndex == 0 || _selectedIndex == 1) ...[
+                              const SizedBox(height: 24),
+                              const AccountSecurityCard(),
+                            ],
                           ],
                         ),
                       ),
-                      
+
                       const SizedBox(width: 24),
 
-                      // RIGHT: Active Form
-                      const Expanded(
+                      // RIGHT COLUMN: Dynamic Content
+                      Expanded(
                         flex: 2,
-                        child: PersonalInfoForm(),
+                        child: _buildActiveContent(),
                       ),
                     ],
                   ),
@@ -62,6 +89,21 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
+  Widget _buildActiveContent() {
+    switch (_selectedIndex) {
+      case 0:
+        return const PersonalInfoForm();
+      case 1:
+        return const SecurityPasswordView();
+      case 2:
+        return const RolePermissionsView();
+      case 3:
+        return const ActivityLogView();
+      default:
+        return const PersonalInfoForm();
+    }
+  }
+
   Widget _buildInnerNav() {
     return Container(
       decoration: BoxDecoration(
@@ -69,43 +111,62 @@ class ProfileScreen extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.divider),
       ),
-      child: Column(
-        children: [
-          _navItem(Icons.person, "Personal Information", true),
-          const Divider(height: 1, color: AppColors.divider),
-          _navItem(Icons.lock, "Security & Password", false),
-          const Divider(height: 1, color: AppColors.divider),
-          _navItem(Icons.notifications, "Notifications", false),
-          const Divider(height: 1, color: AppColors.divider),
-          _navItem(Icons.shield, "Role & Permissions", false),
-          const Divider(height: 1, color: AppColors.divider),
-          _navItem(Icons.history, "Activity Log", false),
-        ],
-      ),
-    );
-  }
-
-  Widget _navItem(IconData icon, String label, bool isActive) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-      decoration: isActive ? BoxDecoration(
-        border: const Border(left: BorderSide(color: AppColors.primaryBlue, width: 3)),
-        color: AppColors.primaryBlue.withValues(alpha: 0.05),
-      ) : null,
-      child: Row(
-        children: [
-          Icon(icon, size: 18, color: isActive ? AppColors.primaryBlue : AppColors.textWhite54),
-          const SizedBox(width: 12),
-          Text(
-            label, 
-            style: TextStyle(
-              color: isActive ? AppColors.primaryBlue : AppColors.textWhite70,
-              fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-              fontSize: 13
-            )
-          ),
-        ],
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Column(
+          children: List.generate(_navItems.length, (index) {
+            final item = _navItems[index];
+            final isSelected = _selectedIndex == index;
+            return Column(
+              children: [
+                if (index > 0)
+                  const Divider(height: 1, color: AppColors.divider),
+                InkWell(
+                  onTap: () => setState(() => _selectedIndex = index),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 16),
+                    decoration: isSelected
+                        ? BoxDecoration(
+                            border: const Border(
+                                left: BorderSide(
+                                    color: AppColors.primaryBlue, width: 3)),
+                            color:
+                                AppColors.primaryBlue.withValues(alpha: 0.05),
+                          )
+                        : null,
+                    child: Row(
+                      children: [
+                        Icon(item['icon'],
+                            size: 20,
+                            color: isSelected
+                                ? AppColors.primaryBlue
+                                : AppColors.textWhite54),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            item['label'],
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                                color: isSelected
+                                    ? AppColors.primaryBlue
+                                    : AppColors.textWhite70,
+                                fontWeight: isSelected
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
+                                fontSize: 13),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            );
+          }),
+        ),
       ),
     );
   }
