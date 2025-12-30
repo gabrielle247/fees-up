@@ -1,4 +1,0 @@
-[submodule "lib/documentation"]
-	path = lib/documentation
-	url = https://github.com/gabrielle247/fees-up.git
-	branch = react-documentation-site-8373010006430163565

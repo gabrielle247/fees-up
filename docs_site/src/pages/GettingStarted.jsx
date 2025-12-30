@@ -5,46 +5,51 @@ const GettingStarted = () => {
     <div>
       <h1>Getting Started</h1>
 
-      <h2>System Requirements</h2>
       <p>
-        Fees Up is a cross-platform application.
-      </p>
-      <ul>
-        <li><strong>PC</strong>: Windows, macOS, or Linux.</li>
-        <li><strong>Mobile</strong>: Android or iOS device.</li>
-      </ul>
-
-      <h2>Installation</h2>
-      <p>
-        Currently, Fees Up is distributed as a standalone application. Please contact your administrator or the IT department to get the latest installer for your device.
+        Welcome to Fees Up! This guide will help you log in and set up your account so you can start managing student fees effectively.
       </p>
 
-      <h2>Authentication</h2>
+      <h2>Accessing the Application</h2>
       <p>
-        To access the system, you need a valid account.
+        Fees Up is available on both your computer (Windows, macOS, Linux) and mobile device (Android, iOS).
       </p>
 
-      <h3>Logging In</h3>
+      <h2>Logging In</h2>
+      <p>
+        To access your dashboard, you need to log in with your registered account credentials.
+      </p>
+
+      <h3>Steps to Log In</h3>
       <ol>
-        <li>Open the Fees Up application.</li>
-        <li>You will be presented with the Login screen.</li>
-        <li>Enter your registered <strong>Email</strong> and <strong>Password</strong>.</li>
-        <li>Click the <strong>Login</strong> button.</li>
-      </ol>
-
-      <h3>Sign Up</h3>
-      <p>
-        If you do not have an account, you can create one if your institution allows it:
-      </p>
-      <ol>
-        <li>On the Login screen, click on "Create an account" or "Sign Up".</li>
-        <li>Fill in the required details (Name, Email, Password).</li>
-        <li>Submit the form. You may need to verify your email address.</li>
+        <li>Open the <strong>Fees Up</strong> application on your device.</li>
+        <li>You will see the Login screen.</li>
+        <li>Enter your <strong>Email Address</strong>.</li>
+        <li>Enter your <strong>Password</strong>.</li>
+        <li>Click or tap the <strong>Login</strong> button.</li>
       </ol>
 
       <div className="tip-box">
-        If you have trouble logging in, please contact support or reset your password using the "Forgot Password" link.
+        <strong>Forgot Password?</strong> If you cannot remember your password, click the "Forgot Password?" link on the login screen to reset it via email.
       </div>
+
+      <h3>First Time Login</h3>
+      <p>
+        If this is your first time using the app:
+      </p>
+      <ul>
+        <li>Ensure you have internet connection to sync the initial data.</li>
+        <li>Review your profile settings to ensure your information is correct.</li>
+      </ul>
+
+      <h2>Sign Up (New Users)</h2>
+      <p>
+        If your institution allows self-registration:
+      </p>
+      <ol>
+        <li>Click <strong>Create an Account</strong> on the login screen.</li>
+        <li>Fill in your full name, email address, and a strong password.</li>
+        <li>Tap <strong>Sign Up</strong>.</li>
+      </ol>
     </div>
   );
 };

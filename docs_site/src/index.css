@@ -1,39 +1,8 @@
-/* Import Google Fonts */
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
-
 :root {
-  /* Greyway.Co Palette */
-  --bg-primary: #0a0e14;
-  --bg-secondary: #121820;
-  --accent-blue: #2196F3;
-  --text-main: #e0e6ed;
-  --text-dim: #94a3b8;
-  --border-color: rgba(33, 150, 243, 0.15);
-  
-  /* Fonts */
-  --font-main: 'Poppins', sans-serif;
-  --font-code: 'JetBrains Mono', monospace;
-
-  font-family: var(--font-main);
-  background-color: var(--bg-primary);
-  color: var(--text-main);
+  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
 }
-
+/* We use Layout.css mostly, so we can clear this file or keep minimal resets */
 body {
   margin: 0;
   padding: 0;
-  overflow-x: hidden;
-  background-color: var(--bg-primary);
-}
-
-/* Remove the centered max-width constraint */
-#root {
-  width: 100vw;
-  height: 100vh;
-  margin: 0;
-  padding: 0;
-}
-
-code, pre {
-  font-family: var(--font-code) !important;
 }
