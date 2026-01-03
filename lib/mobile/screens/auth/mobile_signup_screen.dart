@@ -217,7 +217,7 @@ class _MobileAuthScreenState extends ConsumerState<MobileAuthScreen> {
                           padding: const EdgeInsets.symmetric(horizontal: 16),
                           child: Text(
                             "Or continue with",
-                            style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12),
+                            style: TextStyle(color: Colors.white.withAlpha(128), fontSize: 12),
                           ),
                         ),
                         const Expanded(child: Divider(color: Colors.white12)),
@@ -231,9 +231,9 @@ class _MobileAuthScreenState extends ConsumerState<MobileAuthScreen> {
                         onPressed: _isLoading ? null : _handleGoogleLogin,
                         style: OutlinedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 16),
-                          side: BorderSide(color: Colors.white.withOpacity(0.1)),
+                          side: BorderSide(color: Colors.white.withAlpha(26)),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          backgroundColor: Colors.white.withOpacity(0.05),
+                          backgroundColor: Colors.white.withAlpha(13),
                         ),
                         child: const Row(
                           mainAxisAlignment: MainAxisAlignment.center,

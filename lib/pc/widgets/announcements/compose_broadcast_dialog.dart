@@ -32,7 +32,7 @@ class _ComposeBroadcastDialogState extends ConsumerState<ComposeBroadcastDialog>
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Error posting broadcast: $e"), backgroundColor: AppColors.errorRed),
+          SnackBar(content: Text("Error: $e"), backgroundColor: AppColors.errorRed),
         );
       }
     } finally {
@@ -54,45 +54,36 @@ class _ComposeBroadcastDialogState extends ConsumerState<ComposeBroadcastDialog>
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text("Post School Broadcast", style: TextStyle(color: AppColors.textWhite, fontSize: 18, fontWeight: FontWeight.bold)),
+              const Text("Post Broadcast", style: TextStyle(color: AppColors.textWhite, fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 24),
-
-              // Title Input
               TextFormField(
                 controller: _titleCtrl,
                 style: const TextStyle(color: AppColors.textWhite),
-                validator: (v) => v!.isEmpty ? "Title is required" : null,
-                decoration: _inputDecoration("Subject / Title"),
+                validator: (v) => v!.isEmpty ? "Required" : null,
+                decoration: _inputDecoration("Title"),
               ),
               const SizedBox(height: 16),
-
-              // Body Input
               TextFormField(
                 controller: _bodyCtrl,
                 style: const TextStyle(color: AppColors.textWhite),
-                validator: (v) => v!.isEmpty ? "Message body is required" : null,
+                validator: (v) => v!.isEmpty ? "Required" : null,
                 maxLines: 4,
-                decoration: _inputDecoration("Message Body"),
+                decoration: _inputDecoration("Body"),
               ),
               const SizedBox(height: 16),
-
-              // Priority Selector
               DropdownButtonFormField<String>(
-                value: _priority,
+                initialValue: _priority, // Controlled value
                 dropdownColor: AppColors.surfaceGrey,
                 style: const TextStyle(color: AppColors.textWhite),
-                decoration: _inputDecoration("Priority Level"),
+                decoration: _inputDecoration("Priority"),
                 items: const [
                   DropdownMenuItem(value: 'normal', child: Text("Normal")),
-                  DropdownMenuItem(value: 'high', child: Text("High Priority")),
-                  DropdownMenuItem(value: 'critical', child: Text("Critical Alert")),
+                  DropdownMenuItem(value: 'high', child: Text("High")),
+                  DropdownMenuItem(value: 'critical', child: Text("Critical")),
                 ],
                 onChanged: (v) => setState(() => _priority = v!),
               ),
-
               const SizedBox(height: 32),
-
-              // Actions
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
@@ -106,12 +97,8 @@ class _ComposeBroadcastDialogState extends ConsumerState<ComposeBroadcastDialog>
                     icon: _isLoading 
                         ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                         : const Icon(Icons.send, size: 16),
-                    label: Text(_isLoading ? "Posting..." : "Post Broadcast"),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primaryBlue,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                    ),
+                    label: Text(_isLoading ? "Posting..." : "Post"),
+                    style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryBlue, foregroundColor: Colors.white),
                   ),
                 ],
               ),
@@ -129,8 +116,6 @@ class _ComposeBroadcastDialogState extends ConsumerState<ComposeBroadcastDialog>
       filled: true,
       fillColor: AppColors.backgroundBlack,
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.divider)),
-      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.divider)),
-      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.primaryBlue)),
     );
   }
 }

@@ -111,7 +111,7 @@ class _NotificationsListState extends ConsumerState<NotificationsList> {
                     child: CircularProgressIndicator())),
             error: (e, s) => Center(
                 child: Padding(
-                    padding: EdgeInsets.all(40),
+                    padding: const EdgeInsets.all(40),
                     child: Text("System connection error: $e",
                         style: const TextStyle(color: AppColors.errorRed)))),
           ),

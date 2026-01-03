@@ -1,0 +1,227 @@
+#!/bin/bash
+# save-dart-targeted - Targeted analysis utility for Batch One
+# Usage: save-dart-targeted [options] <file_paths...>
+
+set -euo pipefail
+
+# Configuration
+SCRIPT_NAME="save-dart-targeted"
+TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+OUTPUT_DIR="./analysis_dumps"
+DEFAULT_OUTPUT_FILE="$OUTPUT_DIR/${SCRIPT_NAME}_${TIMESTAMP}.txt"
+
+# Default security-sensitive file patterns
+SECURITY_TARGETS=(
+  "data/services/*_service.dart"
+  "data/repositories/*_repository.dart" 
+  "data/providers/*_provider.dart"
+  "core/widgets/premium_guard.dart"
+  "data/services/schema.dart"
+  "data/services/supabase_connector.dart"
+  "data/services/billing_engine.dart"
+  "data/services/billing_suspension_service.dart"
+)
+
+# Parse command line options
+OUTPUT_FILE="$DEFAULT_OUTPUT_FILE"
+SECURITY_MODE=false
+PERFORMANCE_MODE=false
+INCLUDE_IMPORTS=true
+
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    -o|--output)
+      OUTPUT_FILE="$2"
+      shift 2
+      ;;
+    -s|--security)
+      SECURITY_MODE=true
+      shift
+      ;;
+    -p|--performance)
+      PERFORMANCE_MODE=true
+      shift
+      ;;
+    --no-imports)
+      INCLUDE_IMPORTS=false
+      shift
+      ;;
+    -h|--help)
+      echo "Usage: $SCRIPT_NAME [options] <file_paths...>"
+      echo "Options:"
+      echo "  -o, --output FILE     Output file (default: $DEFAULT_OUTPUT_FILE)"
+      echo "  -s, --security        Include security-sensitive targets"
+      echo "  -p, --performance     Include performance analysis patterns"
+      echo "  --no-imports          Exclude import statements"
+      echo "  -h, --help           Show this help"
+      echo ""
+      echo "Examples:"
+      echo "  $SCRIPT_NAME lib/data/services/billing_suspension_service.dart"
+      echo "  $SCRIPT_NAME -s -o security_analysis_$(date +%Y%m%d).txt"
+      exit 0
+      ;;
+    -*)
+      echo "Unknown option: $1" >&2
+      exit 1
+      ;;
+    *)
+      break
+      ;;
+  esac
+done
+
+# Create output directory
+mkdir -p "$OUTPUT_DIR"
+
+# Initialize output file with metadata
+{
+  echo "# Batch One - Targeted Analysis Dump"
+  echo "# Generated: $(date)"
+  echo "# Tool: $SCRIPT_NAME"
+  echo "# Mode: $(if [[ $SECURITY_MODE == true ]]; then echo "Security"; elif [[ $PERFORMANCE_MODE == true ]]; then echo "Performance"; else echo "Custom"; fi)"
+  echo "# Files: $*"
+  echo ""
+} > "$OUTPUT_FILE"
+
+# Function to extract security-relevant patterns
+extract_security_patterns() {
+  local file="$1"
+  local temp_security="$file.security.tmp"
+  
+  # Extract security-related patterns
+  {
+    echo "## Security Analysis for: $file"
+    echo ""
+    
+    # Find authentication/authorization checks
+    if grep -n -A2 -B2 -E "(auth|Auth|auth\.|\.auth|auth\.user|auth\.currentUser|role|permission|check.*permission|validate.*access)" "$file" 2>/dev/null; then
+      echo ""
+    fi
+    
+    # Find database operations
+    if grep -n -A2 -B2 -E "(\.from\(|\.insert\(|\.update\(|\.delete\(|\.select\(|\.eq\(|\.neq\(|\.gt\(|\.lt\()" "$file" 2>/dev/null; then
+      echo ""
+    fi
+    
+    # Find sensitive data handling
+    if grep -n -A2 -B2 -E "(password|token|secret|key|credential|api.*key|jwt|oauth)" "$file" 2>/dev/null; then
+      echo ""
+    fi
+    
+    # Find encryption/decryption
+    if grep -n -A2 -B2 -E "(encrypt|decrypt|cipher|crypto|hash|encode|decode)" "$file" 2>/dev/null; then
+      echo ""
+    fi
+    
+    # Find PowerSync operations
+    if grep -n -A2 -B2 -E "(PowerSync|powersync|sync|upload|download|offline)" "$file" 2>/dev/null; then
+      echo ""
+    fi
+    
+    # Find error handling
+    if grep -n -A2 -B2 -E "(try|catch|finally|Exception|error|throw|\.onError)" "$file" 2>/dev/null; then
+      echo ""
+    fi
+  } > "$temp_security" 2>/dev/null || true
+  
+  if [[ -s "$temp_security" ]]; then
+    cat "$temp_security" >> "$OUTPUT_FILE"
+    rm -f "$temp_security"
+  fi
+}
+
+# Function to extract performance-relevant patterns
+extract_performance_patterns() {
+  local file="$1"
+  local temp_perf="$file.perf.tmp"
+  
+  {
+    echo "## Performance Analysis for: $file"
+    echo ""
+    
+    # Find potential performance bottlenecks
+    if grep -n -A2 -B2 -E "(for.*in|while|\.forEach|\.map|\.where|\.toList|\.toSet)" "$file" 2>/dev/null; then
+      echo ""
+    fi
+    
+    # Find database queries in loops
+    if grep -n -A3 -B3 -E "(for|while|\.forEach).*\.(from|select|query)" "$file" 2>/dev/null; then
+      echo ""
+    fi
+    
+    # Find expensive operations
+    if grep -n -A2 -B2 -E "(jsonEncode|jsonDecode|base64|large|download|upload|stream|listen)" "$file" 2>/dev/null; then
+      echo ""
+    fi
+    
+    # Find UI performance patterns
+    if grep -n -A2 -B2 -E "(build|Widget|ListView|GridView|Sliver|Scroll)" "$file" 2>/dev/null; then
+      echo ""
+    fi
+  } > "$temp_perf" 2>/dev/null || true
+  
+  if [[ -s "$temp_perf" ]]; then
+    cat "$temp_perf" >> "$OUTPUT_FILE"
+    rm -f "$temp_perf"
+  fi
+}
+
+# Process files
+FILES_TO_PROCESS=()
+
+# Add security targets if in security mode
+if [[ $SECURITY_MODE == true ]]; then
+  for pattern in "${SECURITY_TARGETS[@]}"; do
+    for file in $pattern; do
+      if [[ -f "$file" ]]; then
+        FILES_TO_PROCESS+=("$file")
+      fi
+    done
+  done
+fi
+
+# Add command-line files
+while [[ $# -gt 0 ]]; do
+  if [[ -f "$1" ]]; then
+    FILES_TO_PROCESS+=("$1")
+  else
+    echo "Warning: File not found: $1" >&2
+  fi
+  shift
+done
+
+# Process each file
+for file in "${FILES_TO_PROCESS[@]}"; do
+  echo "Processing: $file"
+  
+  {
+    echo "# File: $file"
+    echo "# =========================================="
+    
+    # Include file content with conditional import handling
+    if [[ $INCLUDE_IMPORTS == false ]]; then
+      # Exclude import statements
+      sed -n '/^import\|^part /!p' "$file"
+    else
+      cat "$file"
+    fi
+    
+    echo ""
+    echo "# =========================================="
+    echo ""
+    
+    # Extract security patterns if in security mode
+    if [[ $SECURITY_MODE == true ]]; then
+      extract_security_patterns "$file"
+    fi
+    
+    # Extract performance patterns if in performance mode
+    if [[ $PERFORMANCE_MODE == true ]]; then
+      extract_performance_patterns "$file"
+    fi
+    
+    echo ""
+  } >> "$OUTPUT_FILE"
+done
+
+echo "Targeted analysis complete. Output saved to: $OUTPUT_FILE"

@@ -101,7 +101,7 @@ class _StatCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
-                  color: iconColor.withOpacity(0.15),
+                  color: iconColor.withAlpha(38),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Icon(icon, color: iconColor, size: 18),
@@ -143,7 +143,7 @@ class _CreateInvoiceCard extends StatelessWidget {
             Container(
               width: 48, height: 48,
               decoration: BoxDecoration(
-                color: AppColors.primaryBlue.withOpacity(0.1),
+                color: AppColors.primaryBlue.withAlpha(26),
                 shape: BoxShape.circle,
               ),
               child: const Icon(Icons.add, color: AppColors.primaryBlue, size: 24),

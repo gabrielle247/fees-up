@@ -1,0 +1,77 @@
+#!/bin/bash
+# security-audit - Security analysis utility for Batch One
+# Usage: security-audit <file_paths...>
+
+set -euo pipefail
+
+TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+OUTPUT_FILE="./security_audits/security_audit_${TIMESTAMP}.md"
+
+mkdir -p "./security_audits"
+
+{
+  echo "# Batch One - Security Audit Report"
+  echo "## Generated: $(date)"
+  echo "## Files Analyzed:"
+  for file in "$@"; do
+    echo "  - $file"
+  done
+  echo ""
+  echo "## Security Findings"
+  echo ""
+} > "$OUTPUT_FILE"
+
+for file in "$@"; do
+  if [[ ! -f "$file" ]]; then
+    continue
+  fi
+  
+  {
+    echo "### File: $file"
+    echo ""
+    
+    # Check for missing null checks
+    null_checks=$(grep -n -E "(\.length|\.isEmpty|\.isNotEmpty|\.first|\.last|\.elementAt)" "$file" 2>/dev/null || true)
+    if [[ -n "$null_checks" ]]; then
+      echo "**Potential Null Safety Issues:**"
+      echo "\`\`\`dart"
+      echo "$null_checks"
+      echo "\`\`\`"
+      echo ""
+    fi
+    
+    # Check for direct database access without validation
+    direct_db=$(grep -n -E "\.from\(|\.insert\(|\.update\(|\.delete\(" "$file" 2>/dev/null || true)
+    if [[ -n "$direct_db" ]]; then
+      echo "**Direct Database Operations (review validation):**"
+      echo "\`\`\`dart"
+      echo "$direct_db"
+      echo "\`\`\`"
+      echo ""
+    fi
+    
+    # Check for hardcoded values
+    hardcoded=$(grep -n -E "('.*secret.*'|'.*password.*'|'.*key.*'|'.*token.*'|'.*admin.*')" "$file" 2>/dev/null || true)
+    if [[ -n "$hardcoded" ]]; then
+      echo "**Potential Hardcoded Sensitive Values:**"
+      echo "\`\`\`dart"
+      echo "$hardcoded"
+      echo "\`\`\`"
+      echo ""
+    fi
+    
+    # Check for PowerSync schema compliance
+    schema_refs=$(grep -n -E "(appSchema|Schema|Table|Column)" "$file" 2>/dev/null || true)
+    if [[ -n "$schema_refs" ]]; then
+      echo "**PowerSync Schema References:**"
+      echo "\`\`\`dart"
+      echo "$schema_refs"
+      echo "\`\`\`"
+      echo ""
+    fi
+    
+    echo ""
+  } >> "$OUTPUT_FILE"
+done
+
+echo "Security audit complete. Report saved to: $OUTPUT_FILE"

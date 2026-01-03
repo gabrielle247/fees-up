@@ -201,7 +201,7 @@ class InvoicesTable extends StatelessWidget {
     switch (status) {
       case "Paid": statusColor = AppColors.successGreen; statusBg = AppColors.successGreenBg; break;
       case "Overdue": statusColor = AppColors.errorRed; statusBg = AppColors.errorRedBg; break;
-      default: statusColor = AppColors.warningOrange; statusBg = AppColors.warningOrange.withOpacity(0.2);
+      default: statusColor = AppColors.warningOrange; statusBg = AppColors.warningOrange.withAlpha(51);
     }
     
     // Highlight overdue dates in red
@@ -230,7 +230,7 @@ class InvoicesTable extends StatelessWidget {
               children: [
                 CircleAvatar(
                   radius: 14,
-                  backgroundColor: avatarColor.withOpacity(0.2),
+                  backgroundColor: avatarColor.withAlpha(51),
                   child: Text(student.substring(0,2).toUpperCase(), style: TextStyle(color: avatarColor, fontSize: 10, fontWeight: FontWeight.bold)),
                 ),
                 const SizedBox(width: 12),

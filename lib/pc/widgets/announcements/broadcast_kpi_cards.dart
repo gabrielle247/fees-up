@@ -8,57 +8,58 @@ class BroadcastKpiCards extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final feedAsync = ref.watch(broadcastFeedProvider);
+    // --- THE FIX: AGGREGATED CONTEXT ---
+    // We watch both streams to provide a holistic view for the Super Admin
+    final schoolFeedAsync = ref.watch(schoolBroadcastProvider);
+    final hqFeedAsync = ref.watch(internalHQBroadcastProvider);
 
-    return feedAsync.when(
-      data: (broadcasts) {
-        //  logic
-        
-        // 1. Critical: Priority is 'high' or 'critical'
-        final criticalCount = broadcasts.where((b) => 
-          b.priority == 'high' || b.priority == 'critical'
-        ).length;
+    return Row(
+      children: [
+        // 1. Critical Alerts (From School Feed)
+        _buildAsyncCard(
+          schoolFeedAsync,
+          title: "Critical Alerts",
+          icon: Icons.warning_amber_rounded,
+          color: AppColors.errorRed,
+          bgColor: AppColors.errorRedBg,
+          countLogic: (list) => list.where((b) => b.priority == 'critical').length,
+        ),
+        const SizedBox(width: 24),
 
-        // 2. System: Messages from HQ (isSystemMessage == true)
-        final systemCount = broadcasts.where((b) => b.isSystemMessage).length;
+        // 2. System Notices (From Greyway HQ Feed)
+        // Loophole Closed: This now tracks Global HQ alerts specifically [cite: 2025-12-30]
+        _buildAsyncCard(
+          hqFeedAsync,
+          title: "HQ Internal",
+          icon: Icons.security_outlined,
+          color: AppColors.accentPurple,
+          bgColor: AppColors.accentPurple.withAlpha(25),
+          countLogic: (list) => list.length,
+        ),
+        const SizedBox(width: 24),
 
-        // 3. Active: Total messages currently in the feed (Service handles expiration)
-        final activeCount = broadcasts.length;
-
-        return Row(
-          children: [
-            _buildCard(
-              "Critical Alerts", 
-              criticalCount.toString(), 
-              Icons.warning_amber_rounded, 
-              AppColors.errorRed, 
-              AppColors.errorRedBg
-            ),
-            const SizedBox(width: 24),
-            _buildCard(
-              "System Notices", 
-              systemCount.toString(), 
-              Icons.verified_user_outlined, 
-              const Color(0xFF9333EA), // Purple for HQ
-              const Color(0xFF9333EA).withValues(alpha: 0.1),
-            ),
-            const SizedBox(width: 24),
-            _buildCard(
-              "Active Broadcasts", 
-              activeCount.toString(), 
-              Icons.campaign_outlined, 
-              AppColors.successGreen, 
-              AppColors.successGreenBg
-            ),
-          ],
-        );
-      },
-      loading: () => _buildLoadingState(),
-      error: (e, s) => _buildErrorState(),
+        // 3. Active Broadcasts (Total Local School messages)
+        _buildAsyncCard(
+          schoolFeedAsync,
+          title: "Active Broadcasts",
+          icon: Icons.campaign_outlined,
+          color: AppColors.successGreen,
+          bgColor: AppColors.successGreenBg,
+          countLogic: (list) => list.length,
+        ),
+      ],
     );
   }
 
-  Widget _buildCard(String title, String count, IconData icon, Color color, Color bg) {
+  /// Helper to build cards that handle their own loading/error states per stream [cite: 2025-12-30]
+  Widget _buildAsyncCard(
+    AsyncValue<List<dynamic>> asyncValue, {
+    required String title,
+    required IconData icon,
+    required Color color,
+    required Color bgColor,
+    required int Function(List<dynamic>) countLogic,
+  }) {
     return Expanded(
       child: Container(
         padding: const EdgeInsets.all(20),
@@ -67,50 +68,31 @@ class BroadcastKpiCards extends ConsumerWidget {
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: AppColors.divider),
         ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(8)),
-              child: Icon(icon, color: color, size: 24),
-            ),
-            const SizedBox(width: 16),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: const TextStyle(color: AppColors.textWhite70, fontSize: 13)),
-                Text(count, style: const TextStyle(color: AppColors.textWhite, fontSize: 24, fontWeight: FontWeight.bold)),
-              ],
-            ),
-          ],
+        child: asyncValue.when(
+          data: (list) => Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(8)),
+                child: Icon(icon, color: color, size: 24),
+              ),
+              const SizedBox(width: 16),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: const TextStyle(color: AppColors.textWhite70, fontSize: 13)),
+                  Text(
+                    countLogic(list).toString(),
+                    style: const TextStyle(color: AppColors.textWhite, fontSize: 24, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          loading: () => const Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))),
+          error: (_, __) => const Icon(Icons.error_outline, color: AppColors.errorRed, size: 20),
         ),
       ),
-    );
-  }
-
-  Widget _buildLoadingState() {
-    return Row(children: List.generate(3, (i) => Expanded(
-      child: Container(
-        height: 100,
-        margin: EdgeInsets.only(left: i == 0 ? 0 : 24),
-        decoration: BoxDecoration(
-          color: AppColors.surfaceGrey,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.divider),
-        ),
-        child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-      ),
-    )));
-  }
-
-  Widget _buildErrorState() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        border: Border.all(color: AppColors.errorRed.withValues(alpha: 0.3)),
-        borderRadius: BorderRadius.circular(8)
-      ),
-      child: const Text("Unable to load statistics", style: TextStyle(color: AppColors.errorRed)),
     );
   }
 }

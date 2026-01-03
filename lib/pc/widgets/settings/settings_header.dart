@@ -57,7 +57,7 @@ class SettingsHeader extends ConsumerWidget {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: AppColors.primaryBlue.withOpacity(0.1),
+              color: AppColors.primaryBlue.withAlpha(26),
               borderRadius: BorderRadius.circular(8),
             ),
             child: const Icon(Icons.settings, color: AppColors.primaryBlue, size: 20),
@@ -143,7 +143,7 @@ class SettingsHeader extends ConsumerWidget {
                         border: Border.all(color: AppColors.divider),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.2),
+                            color: Colors.black.withAlpha(51),
                             blurRadius: 10,
                             offset: const Offset(0, 4),
                           )
@@ -224,7 +224,7 @@ class SettingsHeader extends ConsumerWidget {
                   ),
                   const SizedBox(width: 12),
                   CircleAvatar(
-                    backgroundColor: AppColors.primaryBlue.withOpacity(0.2),
+                    backgroundColor: AppColors.primaryBlue.withAlpha(51),
                     child: Text(
                       initials, 
                       style: const TextStyle(color: AppColors.primaryBlue, fontWeight: FontWeight.bold, fontSize: 12)

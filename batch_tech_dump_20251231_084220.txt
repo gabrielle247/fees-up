@@ -1,0 +1,3372 @@
+
+// ==========================================
+// FILE: ./repositories/dashboard_repository.dart
+// ==========================================
+
+import '../services/database_service.dart';
+
+class DashboardRepository {
+  final DatabaseService _db;
+
+  DashboardRepository(this._db);
+
+  /// 1. Get the Current User's School ID and Name
+  Future<Map<String, dynamic>?> getSchoolDetails(String userId) async {
+    // First, find the user's profile to get the school_id
+    final profile = await _db.getById('user_profiles', userId);
+    if (profile == null || profile['school_id'] == null) return null;
+
+    final schoolId = profile['school_id'];
+    
+    // Then get the school details
+    final school = await _db.getById('schools', schoolId);
+    
+    return {
+      'school_id': schoolId,
+      'school_name': school?['name'] ?? 'My School',
+      'user_role': profile['role'] ?? 'Admin',
+      'user_name': profile['full_name'] ?? 'User',
+    };
+  }
+
+  /// 2. Watch Key Stats (Real-time)
+  /// We combine multiple streams into one or just watch specific tables.
+  /// For performance, we usually watch tables and calculate sums in Dart for small datasets,
+  /// or use SQL queries if PowerSync supports the aggregate subscription (it does via watch()).
+  
+  Stream<int> watchStudentCount(String schoolId) {
+    return _db.db.watch(
+      'SELECT count(*) as count FROM students WHERE school_id = ? AND is_active = 1',
+      parameters: [schoolId]
+    ).map((results) => results.first['count'] as int);
+  }
+
+  Stream<double> watchOutstandingBills(String schoolId) {
+    return _db.db.watch(
+      'SELECT sum(total_amount - paid_amount) as total FROM bills WHERE school_id = ? AND is_paid = 0',
+      parameters: [schoolId]
+    ).map((results) => (results.first['total'] as num?)?.toDouble() ?? 0.0);
+  }
+
+  Stream<double> watchDailyAttendance(String schoolId) {
+    // Simple calculation: Present / Total Students today
+    // This is a simplified logic for the dashboard view
+    final today = DateTime.now().toIso8601String().split('T')[0];
+    return _db.db.watch(
+      "SELECT count(*) as count FROM attendance WHERE school_id = ? AND date = ? AND status = 'present'",
+      parameters: [schoolId, today]
+    ).map((results) => (results.first['count'] as num?)?.toDouble() ?? 0.0);
+  }
+
+  /// 3. Get Recent Transactions
+  Stream<List<Map<String, dynamic>>> watchRecentPayments(String schoolId) {
+    return _db.db.watch(
+      'SELECT * FROM payments WHERE school_id = ? ORDER BY date_paid DESC LIMIT 5',
+      parameters: [schoolId]
+    );
+  }
+}
+// ==========================================
+// FILE: ./repositories/broadcast_repository.dart
+// ==========================================
+
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../models/broadcast_model.dart';
+
+class BroadcastRepository {
+  final SupabaseClient _supabase = Supabase.instance.client;
+
+  /// STREAM 1: Real-time School Broadcasts (Online-Only)
+  /// Note: Supabase stream filters are limited to 'eq'. 
+  /// Exclusion logic for 'hq_internal' is handled in the map.
+  Stream<List<Broadcast>> watchSchoolBroadcasts(String schoolId) {
+    return _supabase
+        .from('broadcasts')
+        .stream(primaryKey: ['id'])
+        .eq('school_id', schoolId)
+        .order('created_at')
+        .map((rows) => rows
+            .map((row) => Broadcast.fromRow(row))
+            .where((b) => b.targetRole != 'hq_internal')
+            .toList());
+  }
+
+  /// STREAM 2: Real-time Internal HQ Broadcasts (Online-Only)
+  Stream<List<Broadcast>> watchInternalHQBroadcasts() {
+    return _supabase
+        .from('broadcasts')
+        .stream(primaryKey: ['id'])
+        .eq('target_role', 'hq_internal')
+        .order('created_at')
+        .map((rows) => rows.map((row) => Broadcast.fromRow(row)).toList());
+  }
+
+  /// Post Update (Direct to Supabase)
+  Future<void> postBroadcast({
+    required Map<String, dynamic> data,
+  }) async {
+    try {
+      await _supabase.from('broadcasts').insert(data);
+    } catch (e) {
+      throw Exception('Greyway.Co Realtime Failure: $e');
+    }
+  }
+}
+// ==========================================
+// FILE: ./repositories/announcements_repository.dart
+// ==========================================
+
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
+import '../services/database_service.dart';
+import '../models/announcement_model.dart';
+
+final announcementsRepositoryProvider = Provider((ref) => AnnouncementsRepository());
+
+class AnnouncementsRepository {
+  final _db = DatabaseService();
+
+  /// Watch local notifications - The heartbeat of the Rainbow UI
+  /// Listens for real-time changes in the 'notifications' table.
+  Stream<List<Announcement>> watchAnnouncements(String schoolId) {
+    return _db.db.watch(
+      'SELECT * FROM notifications WHERE school_id = ? ORDER BY created_at DESC',
+      parameters: [schoolId],
+    ).map((rows) => rows.map((row) => Announcement.fromRow(row)).toList());
+  }
+
+  /// Create Announcement with CEO-Grade Security (Explicit user_id)
+  /// Ensures RLS is satisfied by injecting both school_id and user_id.
+  Future<void> createAnnouncement({
+    required String schoolId,
+    required String userId, 
+    required String title,
+    required String body,
+    required AnnouncementCategory category,
+  }) async {
+    try {
+      final newAnnouncement = Announcement(
+        id: const Uuid().v4(),
+        schoolId: schoolId,
+        title: title,
+        body: body,
+        time: DateTime.now(),
+        category: category,
+        isRead: false,
+      );
+
+      final data = newAnnouncement.toMap();
+
+      // --- THE FORTRESS FIX ---
+      // Manually injecting the User ID and School ID to satisfy Postgres RLS Constraints
+      data['user_id'] = userId;
+      data['school_id'] = schoolId;
+
+      await _db.insert('notifications', data);
+    } catch (e) {
+      throw Exception('Fees Up Security: Failed to create announcement. Details: $e');
+    }
+  }
+
+  /// Mark all as read - Clean up the Rainbow UI state
+  /// Updates all unread notifications for a specific school.
+  Future<void> markAllAsRead(String schoolId) async {
+    try {
+      await _db.db.execute(
+        'UPDATE notifications SET is_read = 1 WHERE school_id = ? AND is_read = 0',
+        [schoolId],
+      );
+    } catch (e) {
+      throw Exception('Fees Up Logic Error: Failed to mark all notifications as read: $e');
+    }
+  }
+
+  /// Single Action: Mark specific notification as read
+  /// Explicitly added to handle individual item toggles in the UI.
+  Future<void> markOneAsRead(String id) async {
+    try {
+      await _db.db.execute(
+        'UPDATE notifications SET is_read = 1 WHERE id = ?',
+        [id],
+      );
+    } catch (e) {
+      throw Exception('Fees Up Logic Error: Failed to mark notification $id as read: $e');
+    }
+  }
+
+  /// Delete specific notification (Utility)
+  /// Permanently removes a notification from the local and remote Fortress.
+  Future<void> deleteNotification(String id) async {
+    try {
+      await _db.db.execute('DELETE FROM notifications WHERE id = ?', [id]);
+    } catch (e) {
+      throw Exception('Fees Up Security: Unauthorized or failed deletion of $id: $e');
+    }
+  }
+}
+// ==========================================
+// FILE: ./repositories/users_repository.dart
+// ==========================================
+
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+class UsersRepository {
+  final SupabaseClient _client = Supabase.instance.client;
+
+  Future<List<Map<String, dynamic>>> getSchoolUsers(String schoolId) async {
+    final response = await _client.rpc('get_school_users', params: {
+      'target_school_id': schoolId,
+    });
+    return List<Map<String, dynamic>>.from(response as List);
+  }
+
+  Future<void> addUserByEmail({
+    required String email,
+    required String schoolId,
+    required String role,
+  }) async {
+    final result = await _client.rpc('link_user_to_school', params: {
+      'target_email': email,
+      'target_school_id': schoolId,
+      'assign_role': role,
+    });
+
+    if (result != 'success') {
+      throw result; // Throw the specific error message from SQL (e.g. "User not found")
+    }
+  }
+
+  Future<void> toggleStatus({
+    required String userId,
+    required String schoolId,
+    required bool ban,
+  }) async {
+    await _client.rpc('toggle_user_access', params: {
+      'target_user_id': userId,
+      'target_school_id': schoolId,
+      'should_ban': ban,
+    });
+  }
+}
+// ==========================================
+// FILE: ./repositories/auth_repository.dart
+// ==========================================
+
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:uuid/uuid.dart';
+import '../services/database_service.dart';
+
+class AuthRepository {
+  final GoTrueClient _auth;
+  final DatabaseService _db;
+
+  AuthRepository({GoTrueClient? auth, DatabaseService? db}) 
+      : _auth = auth ?? Supabase.instance.client.auth,
+        _db = db ?? DatabaseService();
+
+  User? get currentUser => _auth.currentUser;
+  
+  Stream<AuthState> get authStateChanges => _auth.onAuthStateChange;
+
+  /// Sign In with Friendly Errors
+  Future<AuthResponse> signIn({required String email, required String password}) async {
+    try {
+      return await _auth.signInWithPassword(email: email, password: password);
+    } on AuthException catch (e) {
+      throw _getHumanReadableError(e.message);
+    } on PostgrestException catch (e) {
+      throw _getHumanReadableError(e.message);
+    } catch (_) {
+      throw 'Unable to login. Please check your internet connection.';
+    }
+  }
+
+  /// Sign Out
+  Future<void> signOut() async {
+    try {
+      await _auth.signOut();
+    } catch (e) {
+      // Fail silently on logout errors, just clear local state if needed
+    }
+  }
+
+  /// Setup School with Friendly Errors
+  Future<void> signUpWithSchool({
+    required String fullName,
+    required String email,
+    required String password,
+    required String schoolName,
+  }) async {
+    try {
+      // 1. Create Auth User
+      final response = await _auth.signUp(
+        email: email,
+        password: password,
+        data: {'full_name': fullName},
+      );
+
+      final user = response.user;
+      if (user == null) throw 'Sign up failed. Please try again.';
+
+      // 2. Generate IDs
+      final schoolId = const Uuid().v4();
+      final now = DateTime.now().toIso8601String();
+      
+      // 3. Write Data Locally (Atomic Transaction)
+      // We wrap this in writeTransaction to ensure PowerSync uploads both 
+      // the school and the profile in the SAME batch. This prevents the 
+      // "Foreign Key Violation" error on the backend.
+      await _db.db.writeTransaction((tx) async {
+        // A. Create School
+        await tx.execute(
+          'INSERT INTO schools (id, name, subscription_tier, max_students, is_suspended, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+          [schoolId, schoolName, 'free', 5, 0, now]
+        );
+
+        // B. Create User Profile
+        await tx.execute(
+          'INSERT OR REPLACE INTO user_profiles (id, email, full_name, role, school_id, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+          [
+            user.id,
+            email,
+            fullName,
+            'school_admin',
+            schoolId,
+            now,
+          ]
+        );
+      });
+
+    } on AuthException catch (e) {
+      throw _getHumanReadableError(e.message);
+    } on PostgrestException catch (e) {
+      throw _getHumanReadableError(e.message);
+    } catch (e) {
+      // Check for common connection errors
+      if (e.toString().contains('SocketException') || e.toString().contains('Network')) {
+        throw 'Connection failed. Please check your internet.';
+      }
+      throw 'Something went wrong. Please try again.';
+    }
+  }
+
+  /// TRANSLATOR: Technical -> Human
+  String _getHumanReadableError(String technicalMessage) {
+    final msg = technicalMessage.toLowerCase();
+
+    if (msg.contains('invalid login credentials')) {
+      return 'Incorrect email or password.';
+    }
+    if (msg.contains('user already registered') || msg.contains('already exists')) {
+      return 'An account with this email already exists.';
+    }
+    if (msg.contains('password should be at least')) {
+      return 'Password is too short. It must be at least 6 characters.';
+    }
+    if (msg.contains('valid email')) {
+      return 'Please enter a valid email address.';
+    }
+    if (msg.contains('network') || msg.contains('connection')) {
+      return 'Network error. Please check your connection.';
+    }
+    
+    // Fallback: If it's a server error we don't recognize, imply it's temporary
+    return 'A server error occurred. Please try again later.';
+  }
+}
+// ==========================================
+// FILE: ./repositories/reports_repository.dart
+// ==========================================
+
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+class ReportsRepository {
+  final SupabaseClient _client = Supabase.instance.client;
+
+  // 1. Fetch Financial Data
+  Future<Map<String, dynamic>> fetchFinancialSummary({
+    required String schoolId,
+    required DateTime start,
+    required DateTime end,
+  }) async {
+    final response = await _client.rpc('get_financial_summary', params: {
+      'target_school_id': schoolId,
+      'start_date': start.toIso8601String(),
+      'end_date': end.toIso8601String(),
+    });
+    return response as Map<String, dynamic>;
+  }
+
+  // 2. Fetch Outstanding Balances
+  Future<List<Map<String, dynamic>>> fetchOutstandingBalances({
+    required String schoolId,
+    String grade = 'All Grades',
+  }) async {
+    final response = await _client.rpc('get_outstanding_balances', params: {
+      'target_school_id': schoolId,
+      'grade_filter': grade,
+    });
+    return List<Map<String, dynamic>>.from(response);
+  }
+
+  // 3. Fetch Enrollment Stats
+  Future<Map<String, dynamic>> fetchEnrollmentTrends({
+    required String schoolId,
+  }) async {
+    final response = await _client.rpc('get_enrollment_trends', params: {
+      'target_school_id': schoolId,
+    });
+    return response as Map<String, dynamic>;
+  }
+}
+// ==========================================
+// FILE: ./repositories/expense_repository.dart
+// ==========================================
+
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
+import 'package:fees_up/data/services/database_service.dart'; // Adjust path
+import 'package:fees_up/data/models/finance_models.dart'; // Adjust path
+
+final expenseRepositoryProvider = Provider((ref) => ExpenseRepository());
+
+class ExpenseRepository {
+  final _db = DatabaseService();
+
+  /// Watch expenses for the specific school (Live Stream)
+  Stream<List<Expense>> watchRecentExpenses(String schoolId) {
+    return _db.db.watch(
+      'SELECT * FROM expenses WHERE school_id = ? ORDER BY incurred_at DESC LIMIT 20',
+      parameters: [schoolId],
+    ).map((rows) => rows.map((row) => Expense.fromRow(row)).toList());
+  }
+
+  /// Insert a new expense locally (PowerSync syncs it up)
+  Future<void> createExpense({
+    required String schoolId,
+    required String title,
+    required double amount,
+    required DateTime incurredAt,
+    String? category,
+    String? recipient,
+    String? notes,
+    String? paymentMethod,
+  }) async {
+    // Since schema lacks 'payment_method', we append it to description
+    String finalDescription = notes ?? "";
+    if (paymentMethod != null && paymentMethod.isNotEmpty) {
+      finalDescription += "\n[Method: $paymentMethod]";
+    }
+
+    final newExpense = Expense(
+      id: const Uuid().v4(), // Generate ID client-side
+      schoolId: schoolId,
+      title: title,
+      amount: amount,
+      incurredAt: incurredAt,
+      category: category,
+      recipient: recipient,
+      description: finalDescription.trim().isEmpty ? null : finalDescription.trim(),
+    );
+
+    await _db.insert('expenses', newExpense.toMap());
+  }
+}
+// ==========================================
+// FILE: ./services/database_service.dart
+// ==========================================
+
+import 'dart:io';
+import 'package:flutter/foundation.dart';
+import 'package:path/path.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:powersync/powersync.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+import 'schema.dart';
+import 'supabase_connector.dart';
+
+class DatabaseService {
+  static final DatabaseService _instance = DatabaseService._internal();
+  factory DatabaseService() => _instance;
+  DatabaseService._internal();
+
+  late PowerSyncDatabase _db;
+  bool _isInitialized = false;
+  late String _dbPath; // Store path locally since PS doesn't expose it
+
+  PowerSyncDatabase get db => _db;
+
+  Future<void> initialize() async {
+    if (_isInitialized) return;
+
+    final dir = await getApplicationSupportDirectory();
+    _dbPath = join(dir.path, 'greyway_feesup.db');
+
+    _db = PowerSyncDatabase(
+      schema: appSchema,
+      path: _dbPath,
+    );
+
+    await _db.initialize();
+
+    final connector = SupabaseConnector(Supabase.instance.client);
+    _db.connect(connector: connector);
+
+    _isInitialized = true;
+    if (kDebugMode) {
+      print("✅ Database Service Initialized & Connected");
+    }
+  }
+
+  /// THE NUCLEAR OPTION
+  /// Wipes local SQLite and disconnects.
+  Future<void> factoryReset() async {
+    try {
+      await _db.close();
+      final file = File(_dbPath);
+      if (await file.exists()) {
+        await file.delete();
+      }
+      _isInitialized = false;
+      debugPrint("✅ Local database wiped completely.");
+    } catch (e) {
+      debugPrint("❌ Error during factory reset: $e");
+    }
+  }
+
+  bool get isConnected => _db.currentStatus.connected;
+
+  Stream<List<Map<String, dynamic>>> watchAll(String table) {
+    return _db.watch('SELECT * FROM $table ORDER BY created_at DESC');
+  }
+
+  /// Required by Student and Payment Dialogs
+  Stream<List<Map<String, dynamic>>> watchStudents(String schoolId) {
+    return _db.watch(
+      'SELECT * FROM students WHERE school_id = ? ORDER BY full_name ASC',
+      parameters: [schoolId],
+    );
+  }
+
+  /// Runs a raw SQL SELECT query and returns the list of results once.
+  /// Useful for one-off fetches like getting the last invoice number.
+  Future<List<Map<String, dynamic>>> select(String sql, [List<Object?>? arguments]) async {
+    return await _db.getAll(sql, arguments ?? []);
+  }
+
+  Future<Map<String, dynamic>?> getById(String table, String id) async {
+    final results = await _db.getAll('SELECT * FROM $table WHERE id = ?', [id]);
+    return results.isNotEmpty ? results.first : null;
+  }
+
+  Future<Map<String, dynamic>?> tryGet(String sql, [List<Object?>? arguments]) async {
+    final results = await _db.getAll(sql, arguments ?? []);
+    return results.isNotEmpty ? results.first : null;
+  }
+
+  Future<void> insert(String table, Map<String, dynamic> data) async {
+    final keys = data.keys.toList();
+    final values = data.values.toList();
+    final placeholders = List.filled(keys.length, '?').join(', ');
+    final columns = keys.join(', ');
+    final sql = 'INSERT INTO $table ($columns) VALUES ($placeholders)';
+    await _db.execute(sql, values);
+  }
+
+  Future<void> update(String table, String id, Map<String, dynamic> data) async {
+    if (data.isEmpty) return;
+    final updates = <String>[];
+    final values = <dynamic>[];
+    data.forEach((key, value) {
+      updates.add('$key = ?');
+      values.add(value);
+    });
+    values.add(id);
+    final sql = 'UPDATE $table SET ${updates.join(', ')} WHERE id = ?';
+    await _db.execute(sql, values);
+  }
+
+  Future<void> delete(String table, String id) async {
+    await _db.execute('DELETE FROM $table WHERE id = ?', [id]);
+  }
+
+  Future<Map<String, dynamic>?> getUserProfile(String userId) async {
+    return await getById('user_profiles', userId);
+  }
+}
+// ==========================================
+// FILE: ./services/supabase_connector.dart
+// ==========================================
+
+import 'package:flutter/material.dart';
+import 'package:powersync/powersync.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+class SupabaseConnector extends PowerSyncBackendConnector {
+  final SupabaseClient db;
+
+  SupabaseConnector(this.db);
+
+  @override
+  Future<PowerSyncCredentials?> fetchCredentials() async {
+    final session = db.auth.currentSession;
+    if (session == null) return null;
+
+    const endpoint = String.fromEnvironment('POWERSYNC_ENDPOINT_URL');
+    if (endpoint.isEmpty) {
+      throw Exception('POWERSYNC_ENDPOINT_URL not set in --dart-define');
+    }
+
+    return PowerSyncCredentials(
+      endpoint: endpoint,
+      token: session.accessToken,
+      userId: session.user.id,
+    );
+  }
+
+  @override
+  Future<void> uploadData(PowerSyncDatabase database) async {
+    final transaction = await database.getNextCrudTransaction();
+    if (transaction == null) return;
+
+    try {
+      for (var op in transaction.crud) {
+        final table = op.table;
+        final id = op.id;
+        final data = op.opData;
+
+        // "Create or Update" Logic
+        if (op.op == UpdateType.put) {
+          // .upsert is the safest bet: it handles both new and existing records.
+          // onConflict: 'id' ensures we don't get duplicate key errors.
+          await db.from(table).upsert(
+            {...data!, 'id': id},
+            onConflict: 'id',
+            ignoreDuplicates: false,
+          );
+        } else if (op.op == UpdateType.patch) {
+          await db.from(table).update(data!).eq('id', id);
+        } else if (op.op == UpdateType.delete) {
+          await db.from(table).delete().eq('id', id);
+        }
+      }
+      
+      // Clear the queue once finished
+      await transaction.complete();
+      
+    } on PostgrestException catch (e) {
+      // 42501 = RLS Violation.
+      // 23503 = Foreign Key Violation (Key is not present in table).
+      // If we don't .complete() here, this one row blocks the WHOLE app sync loop.
+      if (e.code == '42501' || e.code == '23503') {
+        debugPrint('❌ Sync Error ${e.code} on $transaction: ${e.message}. Skipping to unblock queue.');
+        await transaction.complete(); 
+      } else {
+        // For network or server 500 errors, we rethrow so PowerSync retries later.
+        rethrow;
+      }
+    } catch (e) {
+      debugPrint('Sync Upload Error: $e');
+      rethrow;
+    }
+  }
+}
+// ==========================================
+// FILE: ./services/encryption_service.dart
+// ==========================================
+
+import 'package:encrypt/encrypt.dart' as enc;
+
+class EncryptionService {
+  // 1. Fetch from Environment (passed via Makefile)
+  // Fallback provided just in case dev env is missing keys.
+  static const _envPassword = String.fromEnvironment(
+    'UFT_PASSWORD', 
+    defaultValue: 'FeesUpDefaultDevKey32CharsLong!!' 
+  );
+
+  // 2. Ensure Key is exactly 32 chars for AES-256
+  static final _keyString = _envPassword.padRight(32, '#').substring(0, 32);
+
+  static final _key = enc.Key.fromUtf8(_keyString);
+  static final _iv = enc.IV.fromLength(16);
+  static final _encrypter = enc.Encrypter(enc.AES(_key));
+
+  static String encrypt(String plainText) {
+    return _encrypter.encrypt(plainText, iv: _iv).base64;
+  }
+
+  static String decrypt(String encryptedBase64) {
+    try {
+      return _encrypter.decrypt(enc.Encrypted.fromBase64(encryptedBase64), iv: _iv);
+    } catch (e) {
+      return "[]";
+    }
+  }
+}
+// ==========================================
+// FILE: ./services/broadcast_service.dart
+// ==========================================
+
+import 'dart:async';
+import 'dart:convert';
+import 'package:fees_up/data/services/encryption_service.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../models/broadcast_model.dart';
+
+final broadcastServiceProvider = Provider((ref) => BroadcastService());
+
+class BroadcastService {
+  final _supabase = Supabase.instance.client;
+  static const _storageKey = 'cached_broadcasts_encrypted';
+
+  /// 1. ONLINE STREAM (Supabase Realtime)
+  /// Listens to the live Websocket feed.
+  Stream<List<Broadcast>> streamBroadcasts(String schoolId) {
+    return _supabase
+        .from('broadcasts')
+        .stream(primaryKey: ['id'])
+        .order('created_at', ascending: false)
+        .map((maps) {
+          final list = maps.map((e) => Broadcast.fromRow(e)).toList();
+          
+          // SIDE EFFECT: Encrypt & Cache immediately
+          _cacheBroadcasts(list);
+          
+          return list;
+        });
+  }
+
+  /// 2. OFFLINE LOAD (Encrypted Local Storage)
+  Future<List<Broadcast>> loadCachedBroadcasts() async {
+    final prefs = await SharedPreferences.getInstance();
+    final encryptedData = prefs.getString(_storageKey);
+
+    if (encryptedData == null) return [];
+
+    try {
+      // Decrypt
+      final jsonStr = EncryptionService.decrypt(encryptedData);
+      final List<dynamic> decoded = jsonDecode(jsonStr);
+      
+      final broadcasts = decoded.map((e) => Broadcast.fromRow(e)).toList();
+
+      // Filter: Auto-expire messages older than 7 days
+      return broadcasts.where((b) {
+        return DateTime.now().difference(b.createdAt).inDays < 7;
+      }).toList();
+
+    } catch (e) {
+      // If data is corrupt, clear it
+      await prefs.remove(_storageKey);
+      return [];
+    }
+  }
+
+  /// Helper: Encrypt -> Save
+  Future<void> _cacheBroadcasts(List<Broadcast> list) async {
+    final prefs = await SharedPreferences.getInstance();
+    
+    // Only cache the newest 50 to keep it fast
+    final subset = list.take(50).toList();
+    
+    // Convert to JSON
+    final jsonStr = jsonEncode(subset.map((b) => b.toMap()).toList());
+    
+    // Encrypt
+    final encryptedStr = EncryptionService.encrypt(jsonStr);
+    
+    // Save
+    await prefs.setString(_storageKey, encryptedStr);
+  }
+
+  /// 3. SENDING (Admin Only)
+  /// Sends directly via REST API (bypassing PowerSync)
+  Future<void> sendBroadcast({
+    required String schoolId,
+    required String authorId,
+    required String title,
+    required String body,
+    String priority = 'normal',
+    String targetRole = 'all',
+  }) async {
+    await _supabase.from('broadcasts').insert({
+      'school_id': schoolId,
+      'author_id': authorId,
+      'title': title,
+      'body': body,
+      'priority': priority,
+      'target_role': targetRole,
+      'is_system_message': false,
+    });
+  }
+}
+// ==========================================
+// FILE: ./services/schema.dart
+// ==========================================
+
+import 'package:powersync/powersync.dart';
+
+/// The Local SQLite Schema matching the Supabase Postgres Schema
+/// based on the Fees Up Rules.
+const Schema appSchema = Schema([
+  
+  // ============================================================
+  // CORE SCHOOL DATA
+  // ============================================================
+  Table('schools', [
+    Column.text('name'),
+    Column.text('subscription_tier'),
+    Column.integer('max_students'),
+    Column.integer('is_suspended'), 
+    Column.text('created_at'),
+  ]),
+
+  Table('user_profiles', [
+    Column.text('email'),
+    Column.text('full_name'),
+    Column.text('role'),
+    Column.text('school_id'),
+    Column.integer('is_banned'),
+    Column.text('avatar_url'),
+    Column.text('created_at'),
+  ]),
+
+  Table('notifications', [
+    Column.text('user_id'),
+    Column.text('school_id'),
+    Column.text('title'),
+    Column.text('body'),
+    Column.text('type'),
+    Column.integer('is_read'),
+    Column.text('created_at'),
+  ]),
+
+  // ============================================================
+  // PEOPLE (Students, Teachers, Access)
+  // ============================================================
+  Table('students', [
+    Column.text('school_id'),
+    Column.text('student_id'), 
+    Column.text('full_name'),
+    Column.text('grade'),
+    Column.text('parent_contact'),
+    Column.text('registration_date'),
+    Column.text('billing_type'),
+    Column.real('default_fee'),
+    Column.integer('is_active'),
+    Column.text('admin_uid'),
+    Column.real('owed_total'),
+    Column.real('paid_total'),
+    Column.text('subjects'),
+    Column.text('billing_date'),
+    Column.text('last_synced_at'),
+    Column.text('term_id'),
+    Column.text('date_of_birth'),
+    Column.text('gender'),
+    Column.text('address'),
+    Column.text('emergency_contact_name'),
+    Column.text('medical_notes'),
+    Column.text('enrollment_date'),
+    Column.integer('photo_consent'),
+    Column.text('updated_at'),
+    Column.text('created_at'),
+  ]),
+
+  Table('teachers', [
+    Column.text('school_id'),
+    Column.text('full_name'),
+    Column.text('admin_uid'),
+    Column.text('created_at'),
+    Column.text('updated_at'),
+  ]),
+
+  Table('teacher_access_tokens', [
+    Column.text('school_id'),
+    Column.text('teacher_id'),
+    Column.text('granted_by_teacher_id'),
+    Column.text('access_code'),
+    Column.text('permission_type'),
+    Column.integer('is_used'),
+    Column.text('used_at'),
+    Column.text('expires_at'),
+    Column.text('created_at'),
+  ]),
+
+  // ============================================================
+  // ACADEMICS (Classes, Enrollment, Terms)
+  // ============================================================
+  Table('classes', [
+    Column.text('school_id'),
+    Column.text('name'),
+    Column.text('teacher_id'),
+    Column.text('room_number'),
+    Column.text('subject_code'),
+    Column.text('admin_uid'),
+    Column.text('created_at'),
+  ]),
+
+  Table('enrollments', [
+    Column.text('school_id'),
+    Column.text('student_id'),
+    Column.text('class_id'),
+    Column.text('enrolled_at'),
+    Column.text('created_at'),
+  ]),
+
+  Table('school_years', [
+    Column.text('school_id'),
+    Column.text('year_label'),
+    Column.text('start_date'),
+    Column.text('end_date'),
+    Column.text('description'),
+    Column.integer('active'),
+    Column.text('created_at'),
+  ]),
+
+  Table('school_year_months', [
+    Column.text('school_year_id'),
+    Column.text('school_id'),
+    Column.text('name'),
+    Column.integer('month_index'),
+    Column.text('start_date'),
+    Column.text('end_date'),
+    Column.integer('is_billable'),
+    Column.text('created_at'),
+  ]),
+
+  Table('school_terms', [
+    Column.text('school_id'),
+    Column.text('name'),
+    Column.text('start_date'),
+    Column.text('end_date'),
+    Column.integer('academic_year'),
+    Column.text('created_at'),
+  ]),
+
+  // ============================================================
+  // ATTENDANCE
+  // ============================================================
+  Table('attendance', [
+    Column.text('school_id'),
+    Column.text('student_id'),
+    Column.text('class_id'),
+    Column.text('date'),
+    Column.text('status'),
+    Column.text('remarks'),
+    Column.text('recorded_by'),
+    Column.text('created_at'),
+  ]),
+
+  Table('attendance_sessions', [
+    Column.text('school_id'),
+    Column.text('class_id'),
+    Column.text('teacher_id'),
+    Column.text('student_admin_id'),
+    Column.text('access_token_id'),
+    Column.text('session_date'),
+    Column.integer('is_confirmed_by_teacher'),
+    Column.text('confirmed_at'),
+    Column.text('created_at'),
+  ]),
+
+  // ============================================================
+  // FINANCE (Billing, Payments, Expenses)
+  // ============================================================
+  Table('billing_configs', [
+    Column.text('school_id'),
+    Column.text('currency_code'),
+    Column.real('late_fee_percentage'),
+    Column.text('invoice_footer_note'),
+    Column.integer('allow_partial_payments'),
+    Column.real('default_fee'),
+    Column.text('updated_at'),
+  ]),
+
+  Table('bills', [
+    Column.text('school_id'),
+    Column.text('student_id'),
+    Column.text('title'),
+    
+    // --- NEW COLUMNS FOR INVOICING ---
+    Column.text('invoice_number'), // e.g. "INV-00231"
+    Column.text('status'),         // e.g. "draft", "sent", "paid", "overdue"
+    Column.text('pdf_url'),        // Link to Supabase Storage bucket
+    // ---------------------------------
+
+    Column.real('total_amount'),
+    Column.integer('is_paid'), // Keep for backward compatibility/quick checks
+    Column.text('bill_type'),
+    Column.text('billing_cycle_end'),
+    Column.text('billing_cycle_start'),
+    Column.real('paid_amount'), // Cache for performance
+    Column.text('term_id'),
+    Column.text('month_year'),
+    Column.text('due_date'),
+    Column.text('cycle_interval'),
+    Column.integer('is_closed'),
+    Column.real('credited_amount'),
+    Column.text('school_year_id'),
+    Column.integer('month_index'),
+    Column.text('updated_at'),
+    Column.text('created_at'),
+  ]),
+
+  Table('bill_items', [
+    Column.text('bill_id'),
+    Column.text('school_id'),
+    Column.text('description'),
+    Column.real('amount'),
+    Column.integer('quantity'),
+    Column.text('created_at'),
+  ]),
+
+  Table('payments', [
+    Column.text('school_id'),
+    Column.text('student_id'),
+    Column.real('amount'),
+    Column.text('date_paid'),
+    Column.text('category'),
+    Column.text('payer_name'),
+    Column.text('bill_id'),
+    Column.text('method'),
+    Column.text('admin_uid'),
+    Column.text('created_at'),
+  ]),
+
+  Table('payment_allocations', [
+    Column.text('payment_id'),
+    Column.text('bill_id'),
+    Column.text('school_id'),
+    Column.real('amount'),
+    Column.text('created_at'),
+  ]),
+
+  Table('credits', [
+    Column.text('credit_id'),
+    Column.text('school_id'),
+    Column.text('student_id'),
+    Column.text('bill_id'),
+    Column.real('amount'),
+    Column.text('reason'),
+    Column.text('admin_uid'),
+    Column.text('created_at'),
+  ]),
+
+  Table('expenses', [
+    Column.text('school_id'),
+    Column.text('title'),
+    Column.real('amount'),
+    Column.text('category'),
+    Column.text('incurred_at'),
+    Column.text('description'),
+    Column.text('recipient'),
+    Column.text('created_at'),
+  ]),
+
+  // ============================================================
+  // FUNDRAISER & AUDIT
+  // ============================================================
+  Table('campaigns', [
+    Column.text('school_id'),
+    Column.text('class_id'),
+    Column.text('created_by_id'),
+    Column.text('teacher_id'),
+    Column.text('name'),
+    Column.text('description'),
+    Column.text('campaign_type'),
+    Column.text('status'),
+    Column.real('goal_amount'),
+    Column.text('created_at'),
+  ]),
+
+  Table('campaign_donations', [
+    Column.text('campaign_id'),
+    Column.text('school_id'),
+    Column.text('donor_name'),
+    Column.real('amount'),
+    Column.text('payment_method'),
+    Column.text('date_received'),
+    Column.text('notes'),
+    Column.text('student_id'),
+    Column.text('collected_by'),
+    Column.text('approved_by'),
+    Column.real('expected_cash'),
+    Column.real('actual_cash'),
+    Column.real('variance'),
+    Column.text('updated_at'),
+    Column.text('created_at'),
+  ]),
+
+  Table('campaign_expenses', [
+    Column.text('campaign_id'),
+    Column.text('school_id'),
+    Column.text('category'),
+    Column.real('amount'),
+    Column.text('incurred_by'),
+    Column.text('approved_by'),
+    Column.text('notes'),
+    Column.text('created_at'),
+  ]),
+
+  Table('campaign_funds', [
+    Column.text('campaign_id'),
+    Column.text('school_id'),
+    Column.text('fund_name'),
+    Column.integer('restricted'),
+    Column.real('balance'),
+    Column.text('updated_at'),
+  ]),
+
+  Table('banking_register', [
+    Column.text('campaign_id'),
+    Column.text('student_id'),
+    Column.real('amount'),
+    Column.text('direction'), 
+    Column.text('recorded_by'),
+    Column.text('approved_by'),
+    Column.text('reference'),
+    Column.text('school_id'),
+    Column.text('created_at'),
+  ]),
+
+  // ============================================================
+  // ARCHIVES
+  // ============================================================
+  Table('student_archives', [
+    Column.text('school_id'),
+    Column.text('full_name'),
+    Column.text('reason'),
+    Column.text('archived_at'),
+    Column.text('original_data'),
+    Column.text('created_at'),
+  ]),
+]);
+// ==========================================
+// FILE: ./services/school_service.dart
+// ==========================================
+
+import 'dart:async';
+import 'package:flutter/material.dart';
+import 'package:uuid/uuid.dart';
+import 'database_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+class SchoolService {
+  final DatabaseService _db;
+  final _supabase = Supabase.instance.client;
+
+  SchoolService(this._db);
+
+  /// -----------------------------------------------------------------------
+  /// REFRESH HELPER (Required by school_provider.dart)
+  /// -----------------------------------------------------------------------
+  Future<Map<String, dynamic>?> getSchoolForUser(String userId, {bool waitForSync = true}) async {
+    Future<Map<String, dynamic>?> fetch() async {
+      final profile = await _db.tryGet('SELECT school_id FROM user_profiles WHERE id = ?', [userId]);
+      if (profile == null || profile['school_id'] == null) return null;
+      
+      return await _db.tryGet('SELECT * FROM schools WHERE id = ?', [profile['school_id']]);
+    }
+
+    final result = await fetch();
+    if (result != null) return result;
+    if (!waitForSync) return null;
+
+    for (int i = 0; i < 10; i++) {
+      await Future.delayed(const Duration(seconds: 1));
+      final retryResult = await fetch();
+      if (retryResult != null) return retryResult;
+    }
+    return null;
+  }
+
+  /// -----------------------------------------------------------------------
+  /// CREATION HELPER
+  /// -----------------------------------------------------------------------
+  Future<String?> createSchool({
+    required String adminId,
+    required String schoolName,
+    String tier = 'free',
+  }) async {
+    final schoolId = const Uuid().v4();
+    final now = DateTime.now().toIso8601String();
+
+    try {
+      await _db.db.writeTransaction((tx) async {
+        await tx.execute('''
+          INSERT INTO schools (id, name, subscription_tier, max_students, is_suspended, created_at)
+          VALUES (?, ?, ?, ?, ?, ?)
+        ''', [schoolId, schoolName, tier, 100, 0, now]);
+
+        await tx.execute('''
+          UPDATE user_profiles SET school_id = ?, role = 'admin' WHERE id = ?
+        ''', [schoolId, adminId]);
+
+        await tx.execute('''
+          INSERT INTO billing_configs (id, school_id, currency_code, late_fee_percentage, updated_at)
+          VALUES (?, ?, ?, ?, ?)
+        ''', [const Uuid().v4(), schoolId, 'USD', 0.0, now]);
+      });
+
+      return schoolId;
+    } catch (e) {
+      rethrow; 
+    }
+  }
+
+  Future<void> createSchoolWithDiagnostics(
+    BuildContext context, {
+    required String adminId,
+    required String schoolName,
+  }) async {
+    try {
+      await createSchool(adminId: adminId, schoolName: schoolName);
+    } catch (e) {
+      try {
+        final response = await _supabase.rpc('debug_user_access', params: {
+          'target_user_id': adminId,
+        });
+
+        final recommendation = response['recommendation'] ?? 'UNKNOWN_ERROR';
+        
+        if (context.mounted) {
+          showProperChannelDialog(context, recommendation);
+        }
+      } catch (rpcError) {
+        throw Exception("System is currently unreachable.");
+      }
+    }
+  }
+
+  /// -----------------------------------------------------------------------
+  /// FORCE LOGOUT AND RE-AUTHENTICATE
+  /// -----------------------------------------------------------------------
+  Future<void> _forceLogoutAndReauth() async {
+    await _db.factoryReset(); // Uses the new internal factoryReset
+    await _supabase.auth.signOut();
+  }
+
+  void showProperChannelDialog(BuildContext context, String recommendation) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF121212),
+        title: const Text("System Alignment Required", style: TextStyle(color: Colors.blue)),
+        content: Text(
+          "Diagnostic Result: $recommendation\n\nTo resolve this, the app must restart your session.",
+          style: const TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              await _forceLogoutAndReauth();
+            },
+            child: const Text("RESET & RE-AUTHENTICATE", style: TextStyle(color: Colors.blue)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+// ==========================================
+// FILE: ./models/core_models.dart
+// ==========================================
+
+class School {
+  final String id;
+  final String name;
+  final String subscriptionTier; // 'free', 'basic', 'pro'
+  final int maxStudents;
+  final bool isSuspended;
+  final DateTime createdAt;
+
+  School({
+    required this.id,
+    required this.name,
+    this.subscriptionTier = 'free',
+    this.maxStudents = 50,
+    this.isSuspended = false,
+    required this.createdAt,
+  });
+
+  factory School.fromRow(Map<String, dynamic> row) {
+    return School(
+      id: row['id'] as String,
+      name: row['name'] as String,
+      subscriptionTier: row['subscription_tier'] ?? 'free',
+      maxStudents: (row['max_students'] as num?)?.toInt() ?? 50,
+      isSuspended: (row['is_suspended'] == 1),
+      createdAt: DateTime.parse(row['created_at']),
+    );
+  }
+}
+
+class UserProfile {
+  final String id;
+  final String email;
+  final String fullName;
+  final String role; // 'super_admin', 'school_admin', 'teacher', 'student'
+  final String? schoolId;
+  final bool isBanned;
+  final String? avatarUrl;
+
+  UserProfile({
+    required this.id,
+    required this.email,
+    required this.fullName,
+    this.role = 'teacher',
+    this.schoolId,
+    this.isBanned = false,
+    this.avatarUrl,
+  });
+
+  factory UserProfile.fromRow(Map<String, dynamic> row) {
+    return UserProfile(
+      id: row['id'] as String,
+      email: row['email'] as String,
+      fullName: row['full_name'] as String,
+      role: row['role'] ?? 'teacher',
+      schoolId: row['school_id'] as String?,
+      isBanned: (row['is_banned'] == 1),
+      avatarUrl: row['avatar_url'] as String?,
+    );
+  }
+}
+
+class BillingConfig {
+  final String id;
+  final String? schoolId;
+  final String currencyCode;
+  final double lateFeePercentage;
+  final String? invoiceFooterNote;
+  final bool allowPartialPayments;
+  final double defaultFee;
+
+  BillingConfig({
+    required this.id,
+    this.schoolId,
+    this.currencyCode = 'USD',
+    this.lateFeePercentage = 0.0,
+    this.invoiceFooterNote,
+    this.allowPartialPayments = true,
+    this.defaultFee = 100.00,
+  });
+
+  factory BillingConfig.fromRow(Map<String, dynamic> row) {
+    return BillingConfig(
+      id: row['id'] as String,
+      schoolId: row['school_id'] as String?,
+      currencyCode: row['currency_code'] ?? 'USD',
+      lateFeePercentage: (row['late_fee_percentage'] as num?)?.toDouble() ?? 0.0,
+      invoiceFooterNote: row['invoice_footer_note'] as String?,
+      allowPartialPayments: (row['allow_partial_payments'] == 1),
+      defaultFee: (row['default_fee'] as num?)?.toDouble() ?? 100.00,
+    );
+  }
+}
+
+class NotificationModel {
+  final String id;
+  final String userId;
+  final String? schoolId;
+  final String title;
+  final String body;
+  final String type; // 'info', 'warning', etc.
+  final bool isRead;
+  final DateTime createdAt;
+
+  NotificationModel({
+    required this.id,
+    required this.userId,
+    this.schoolId,
+    required this.title,
+    required this.body,
+    this.type = 'info',
+    this.isRead = false,
+    required this.createdAt,
+  });
+
+  factory NotificationModel.fromRow(Map<String, dynamic> row) {
+    return NotificationModel(
+      id: row['id'] as String,
+      userId: row['user_id'] as String,
+      schoolId: row['school_id'] as String?,
+      title: row['title'] as String,
+      body: row['body'] as String,
+      type: row['type'] ?? 'info',
+      isRead: (row['is_read'] == 1),
+      createdAt: DateTime.parse(row['created_at']),
+    );
+  }
+}
+// ==========================================
+// FILE: ./models/academic_models.dart
+// ==========================================
+
+class ClassModel {
+  final String id;
+  final String schoolId;
+  final String name;
+  final String? teacherId;
+  final String? roomNumber;
+  final String? subjectCode;
+
+  ClassModel({
+    required this.id,
+    required this.schoolId,
+    required this.name,
+    this.teacherId,
+    this.roomNumber,
+    this.subjectCode,
+  });
+
+  factory ClassModel.fromRow(Map<String, dynamic> row) {
+    return ClassModel(
+      id: row['id'] as String,
+      schoolId: row['school_id'] as String,
+      name: row['name'] as String,
+      teacherId: row['teacher_id'] as String?,
+      roomNumber: row['room_number'] as String?,
+      subjectCode: row['subject_code'] as String?,
+    );
+  }
+}
+
+class Enrollment {
+  final String id;
+  final String schoolId;
+  final String studentId;
+  final String classId;
+  final DateTime enrolledAt;
+
+  Enrollment({
+    required this.id,
+    required this.schoolId,
+    required this.studentId,
+    required this.classId,
+    required this.enrolledAt,
+  });
+
+  factory Enrollment.fromRow(Map<String, dynamic> row) {
+    return Enrollment(
+      id: row['id'] as String,
+      schoolId: row['school_id'] as String,
+      studentId: row['student_id'] as String,
+      classId: row['class_id'] as String,
+      enrolledAt: DateTime.tryParse(row['enrolled_at'] ?? '') ?? DateTime.now(),
+    );
+  }
+}
+
+class SchoolYear {
+  final String id;
+  final String schoolId;
+  final String yearLabel; // e.g., "2025"
+  final DateTime startDate;
+  final DateTime endDate;
+  final bool active;
+
+  SchoolYear({
+    required this.id,
+    required this.schoolId,
+    required this.yearLabel,
+    required this.startDate,
+    required this.endDate,
+    this.active = false,
+  });
+
+  factory SchoolYear.fromRow(Map<String, dynamic> row) {
+    return SchoolYear(
+      id: row['id'] as String,
+      schoolId: row['school_id'] as String,
+      yearLabel: row['year_label'] as String,
+      startDate: DateTime.parse(row['start_date']),
+      endDate: DateTime.parse(row['end_date']),
+      active: (row['active'] == 1),
+    );
+  }
+}
+
+class SchoolYearMonth {
+  final String id;
+  final String schoolYearId;
+  final String name; // "January"
+  final int monthIndex; // 1
+  final DateTime startDate;
+  final DateTime endDate;
+  final bool isBillable;
+
+  SchoolYearMonth({
+    required this.id,
+    required this.schoolYearId,
+    required this.name,
+    required this.monthIndex,
+    required this.startDate,
+    required this.endDate,
+    this.isBillable = true,
+  });
+
+  factory SchoolYearMonth.fromRow(Map<String, dynamic> row) {
+    return SchoolYearMonth(
+      id: row['id'] as String,
+      schoolYearId: row['school_year_id'] as String,
+      name: row['name'] as String,
+      monthIndex: (row['month_index'] as num).toInt(),
+      startDate: DateTime.parse(row['start_date']),
+      endDate: DateTime.parse(row['end_date']),
+      isBillable: (row['is_billable'] == 1),
+    );
+  }
+}
+
+class SchoolTerm {
+  final String id;
+  final String schoolId;
+  final String name; // "Term 1"
+  final DateTime startDate;
+  final DateTime endDate;
+  final int academicYear;
+
+  SchoolTerm({
+    required this.id,
+    required this.schoolId,
+    required this.name,
+    required this.startDate,
+    required this.endDate,
+    required this.academicYear,
+  });
+
+  factory SchoolTerm.fromRow(Map<String, dynamic> row) {
+    return SchoolTerm(
+      id: row['id'] as String,
+      schoolId: row['school_id'] as String,
+      name: row['name'] as String,
+      startDate: DateTime.parse(row['start_date']),
+      endDate: DateTime.parse(row['end_date']),
+      academicYear: (row['academic_year'] as num).toInt(),
+    );
+  }
+}
+// ==========================================
+// FILE: ./models/all_models.dart
+// ==========================================
+
+/// Greyway.Co - Batch Tech 
+/// Master Models Export - "The Fortress Architecture"
+library;
+
+export 'academic_models.dart';
+export 'announcement_model.dart';
+export 'attendance_models.dart';
+export 'broadcast_model.dart';
+export 'core_models.dart';
+export 'finance_details_model.dart';
+export 'finance_models.dart';
+export 'fundraiser_models.dart';
+export 'staff_model.dart';
+export 'student_model.dart';
+export 'subjects.dart';
+export 'system_models.dart' hide Expense;
+// ==========================================
+// FILE: ./models/announcement_model.dart
+// ==========================================
+
+import 'package:flutter/material.dart';
+import '../../core/constants/app_colors.dart';
+
+enum AnnouncementCategory {
+  // Original
+  financial,
+  academic,
+  urgent,
+  system,
+  
+  // The "Rainbow" Types
+  success,        // Green
+  failure,        // Red
+  warning,        // Amber
+  info,           // Blue
+  security,       // Purple
+}
+
+class Announcement {
+  final String id;
+  final String schoolId;
+  final String title;
+  final String body;
+  final DateTime time;
+  final AnnouncementCategory category;
+  final bool isRead;
+  final String? userId; // For personal notifications
+
+  Announcement({
+    required this.id,
+    required this.schoolId,
+    required this.title,
+    required this.body,
+    required this.time,
+    required this.category,
+    required this.isRead,
+    this.userId,
+  });
+
+  // --- FACTORY: THE CRASH FIX ---
+  factory Announcement.fromRow(Map<String, dynamic> row) {
+    // 1. Safe Boolean Parsing (Handles 1, 0, true, false, and null)
+    final rawRead = row['is_read'];
+    bool isReadSafe = false;
+    if (rawRead is bool) {
+      isReadSafe = rawRead;
+    } else if (rawRead is int) {
+      isReadSafe = rawRead == 1;
+    }
+
+    // 2. Safe Date Parsing
+    DateTime parsedTime = DateTime.now();
+    if (row['created_at'] != null) {
+      parsedTime = DateTime.tryParse(row['created_at'].toString())?.toLocal() ?? DateTime.now();
+    }
+
+    return Announcement(
+      id: row['id']?.toString() ?? '',
+      schoolId: row['school_id']?.toString() ?? '',
+      userId: row['user_id']?.toString(),
+      title: row['title']?.toString() ?? 'No Title',
+      body: row['body']?.toString() ?? '',
+      time: parsedTime,
+      isRead: isReadSafe,
+      category: _parseCategory(row['type']?.toString() ?? 'info'),
+    );
+  }
+
+  static AnnouncementCategory _parseCategory(String type) {
+    switch (type.toLowerCase()) {
+      case 'financial': return AnnouncementCategory.financial;
+      case 'academic': return AnnouncementCategory.academic;
+      case 'urgent': return AnnouncementCategory.urgent;
+      case 'system': return AnnouncementCategory.system;
+      case 'success': return AnnouncementCategory.success;
+      case 'failure': 
+      case 'error': return AnnouncementCategory.failure;
+      case 'warning': return AnnouncementCategory.warning;
+      case 'security': return AnnouncementCategory.security;
+      default: return AnnouncementCategory.info;
+    }
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'school_id': schoolId,
+      'user_id': userId,
+      'title': title,
+      'body': body,
+      'type': category.name, 
+      'is_read': isRead ? 1 : 0, // Store as Int for SQLite compatibility
+      'created_at': time.toIso8601String(),
+    };
+  }
+
+  // --- VISUAL GETTERS ---
+
+  Color get color {
+    switch (category) {
+      case AnnouncementCategory.urgent:
+      case AnnouncementCategory.failure:
+        return AppColors.errorRed;
+      
+      case AnnouncementCategory.warning:
+        return Colors.amber;
+      
+      case AnnouncementCategory.success:
+        return AppColors.successGreen;
+      
+      case AnnouncementCategory.financial:
+        return const Color(0xFF00BFA5); // Teal
+      
+      case AnnouncementCategory.security:
+        return const Color(0xFF9333EA); // Purple
+        
+      case AnnouncementCategory.system:
+      case AnnouncementCategory.info:
+      default:
+        return AppColors.primaryBlue;
+    }
+  }
+
+  IconData get icon {
+    switch (category) {
+      case AnnouncementCategory.urgent: return Icons.notification_important_rounded;
+      case AnnouncementCategory.failure: return Icons.error_outline_rounded;
+      case AnnouncementCategory.warning: return Icons.warning_amber_rounded;
+      case AnnouncementCategory.success: return Icons.check_circle_outline_rounded;
+      case AnnouncementCategory.financial: return Icons.attach_money_rounded;
+      case AnnouncementCategory.security: return Icons.security_rounded;
+      case AnnouncementCategory.academic: return Icons.school_outlined;
+      case AnnouncementCategory.system: return Icons.dns_outlined;
+      default: return Icons.info_outline_rounded;
+    }
+  }
+
+  String get badgeLabel {
+    return category.name.toUpperCase();
+  }
+}
+// ==========================================
+// FILE: ./models/attendance_models.dart
+// ==========================================
+
+class Attendance {
+  final String id;
+  final String schoolId;
+  final String studentId;
+  final String? classId;
+  final DateTime date;
+  final String status; // 'present', 'absent', 'late', 'excused'
+  final String? remarks;
+  final String? recordedBy;
+
+  Attendance({
+    required this.id,
+    required this.schoolId,
+    required this.studentId,
+    this.classId,
+    required this.date,
+    this.status = 'present',
+    this.remarks,
+    this.recordedBy,
+  });
+
+  factory Attendance.fromRow(Map<String, dynamic> row) {
+    return Attendance(
+      id: row['id'] as String,
+      schoolId: row['school_id'] as String,
+      studentId: row['student_id'] as String,
+      classId: row['class_id'] as String?,
+      date: DateTime.parse(row['date']),
+      status: row['status'] ?? 'present',
+      remarks: row['remarks'] as String?,
+      recordedBy: row['recorded_by'] as String?,
+    );
+  }
+}
+
+class AttendanceSession {
+  final String id;
+  final String schoolId;
+  final String classId;
+  final String teacherId;
+  final DateTime sessionDate;
+  final bool isConfirmedByTeacher;
+  final DateTime? confirmedAt;
+
+  AttendanceSession({
+    required this.id,
+    required this.schoolId,
+    required this.classId,
+    required this.teacherId,
+    required this.sessionDate,
+    this.isConfirmedByTeacher = false,
+    this.confirmedAt,
+  });
+
+  factory AttendanceSession.fromRow(Map<String, dynamic> row) {
+    return AttendanceSession(
+      id: row['id'] as String,
+      schoolId: row['school_id'] as String,
+      classId: row['class_id'] as String,
+      teacherId: row['teacher_id'] as String,
+      sessionDate: DateTime.parse(row['session_date']),
+      isConfirmedByTeacher: (row['is_confirmed_by_teacher'] == 1),
+      confirmedAt: row['confirmed_at'] != null 
+          ? DateTime.tryParse(row['confirmed_at']) 
+          : null,
+    );
+  }
+}
+// ==========================================
+// FILE: ./models/finance_models.dart
+// ==========================================
+
+// ==========================================
+// BILL MODEL
+// ==========================================
+class Bill {
+  final String id;
+  final String schoolId;
+  final String studentId;
+  final String title;
+  final double totalAmount;
+  final double paidAmount;
+  final bool isPaid;
+  final DateTime? dueDate;
+  final String billType; // 'monthly', 'adhoc'
+  final bool isClosed;
+  final String? termId;
+
+  Bill({
+    required this.id,
+    required this.schoolId,
+    required this.studentId,
+    required this.title,
+    required this.totalAmount,
+    this.paidAmount = 0.0,
+    this.isPaid = false,
+    this.dueDate,
+    this.billType = 'monthly',
+    this.isClosed = false,
+    this.termId,
+  });
+
+  factory Bill.fromRow(Map<String, dynamic> row) {
+    return Bill(
+      id: row['id'] as String,
+      schoolId: row['school_id'] as String,
+      studentId: row['student_id'] as String,
+      title: row['title'] as String,
+      totalAmount: (row['total_amount'] as num?)?.toDouble() ?? 0.0,
+      paidAmount: (row['paid_amount'] as num?)?.toDouble() ?? 0.0,
+      isPaid: (row['is_paid'] == 1),
+      dueDate: row['due_date'] != null ? DateTime.tryParse(row['due_date']) : null,
+      billType: row['bill_type'] ?? 'monthly',
+      isClosed: (row['is_closed'] == 1),
+      termId: row['term_id'] as String?,
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'school_id': schoolId,
+      'student_id': studentId,
+      'title': title,
+      'total_amount': totalAmount,
+      'paid_amount': paidAmount,
+      'is_paid': isPaid ? 1 : 0,
+      'due_date': dueDate?.toIso8601String(),
+      'bill_type': billType,
+      'is_closed': isClosed ? 1 : 0,
+      'term_id': termId,
+    };
+  }
+}
+
+// ==========================================
+// PAYMENT MODEL
+// ==========================================
+class Payment {
+  final String id;
+  final String schoolId;
+  final String studentId;
+  final double amount;
+  final DateTime datePaid;
+  final String method; // 'cash', 'ecocash', etc.
+  final String? payerName;
+  final String? billId;
+
+  Payment({
+    required this.id,
+    required this.schoolId,
+    required this.studentId,
+    required this.amount,
+    required this.datePaid,
+    this.method = 'cash',
+    this.payerName,
+    this.billId,
+  });
+
+  factory Payment.fromRow(Map<String, dynamic> row) {
+    return Payment(
+      id: row['id'] as String,
+      schoolId: row['school_id'] as String,
+      studentId: row['student_id'] as String,
+      amount: (row['amount'] as num?)?.toDouble() ?? 0.0,
+      datePaid: row['date_paid'] != null 
+          ? DateTime.tryParse(row['date_paid']) ?? DateTime.now()
+          : DateTime.now(),
+      method: row['method'] ?? 'cash',
+      payerName: row['payer_name'] as String?,
+      billId: row['bill_id'] as String?,
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'school_id': schoolId,
+      'student_id': studentId,
+      'amount': amount,
+      'date_paid': datePaid.toIso8601String(),
+      'method': method,
+      'payer_name': payerName,
+      'bill_id': billId,
+    };
+  }
+}
+
+class Expense {
+  final String id;
+  final String schoolId;
+  final String title;
+  final double amount;
+  final String? category;
+  final DateTime incurredAt;
+  final String? description; // Maps to 'description' column
+  final String? recipient;
+
+  Expense({
+    required this.id,
+    required this.schoolId,
+    required this.title,
+    required this.amount,
+    this.category,
+    required this.incurredAt,
+    this.description,
+    this.recipient,
+  });
+
+  factory Expense.fromRow(Map<String, dynamic> row) {
+    return Expense(
+      id: row['id'] as String,
+      schoolId: row['school_id'] as String,
+      title: row['title'] as String,
+      amount: (row['amount'] as num).toDouble(),
+      category: row['category'] as String?,
+      incurredAt: DateTime.tryParse(row['incurred_at'] ?? '') ?? DateTime.now(),
+      description: row['description'] as String?,
+      recipient: row['recipient'] as String?,
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'school_id': schoolId,
+      'title': title,
+      'amount': amount,
+      'category': category,
+      'incurred_at': incurredAt.toIso8601String(),
+      'description': description,
+      'recipient': recipient,
+      // 'created_at' is usually handled by Supabase defaults, 
+      // but for PowerSync offline-first, we often include it.
+      'created_at': DateTime.now().toIso8601String(), 
+    };
+  }
+}
+// ==========================================
+// FILE: ./models/subjects.dart
+// ==========================================
+
+// File: lib/models/subjects.dart
+
+class ZimsecSubject {
+  static const Map<int, String> _codeMap = {
+    // --- FORM 1 - 4 (O-LEVEL) CORE ---
+    // These are the "Must-Haves" for almost every student.
+    4005: 'English Language',
+    4004: 'Mathematics',
+    4003: 'Combined Science', // Replaces Integrated Science
+    4006: 'Heritage Studies',
+    4007: 'Shona',
+    4068: 'Ndebele',
+    4001: 'Agriculture',
+
+    // --- FORM 1 - 4 (O-LEVEL) POPULAR ELECTIVES ---
+    // Commercials & Arts
+    4049: 'Commerce',
+    4037: 'Geography',
+    4044: 'History',
+    4047: 'Family & Religious Studies', // F.R.S (formerly Divinity/R.E)
+    4048: 'Business Enterprise Skills',
+    4051: 'Principles of Accounting',
+
+    // Sciences & Tech
+    4029: 'Computer Science',
+    4025: 'Biology',
+    4023: 'Physics',
+    4024:
+        'Chemistry', // Often listed as 5070/5071 in older systems, but 4024 in new curriculum maps
+    4059: 'Wood Technology and Design',
+
+    // --- FORM 5 - 6 (A-LEVEL) ---
+    // Commercials
+    6001: 'Accounting (A-Level)',
+    6025: 'Business Studies',
+    6073: 'Economics',
+
+    // Arts / Humanities
+    6022: 'Geography (A-Level)',
+    6006: 'History (A-Level)',
+    6003: 'Divinity',
+    6009: 'Literature in English',
+    6081: 'Heritage Studies (A-Level)',
+
+    // Sciences
+    6042: 'Pure Mathematics',
+    6030: 'Biology (A-Level)',
+    6031: 'Chemistry (A-Level)',
+    6032: 'Physics (A-Level)',
+    6046: 'Statistics',
+    6008: 'Computer Science (A-Level)',
+  };
+
+  // This is the getter your Registration Page is looking for:
+  static List<String> get allNames => _codeMap.values.toList();
+
+  static String nameFromCode(int code) => _codeMap[code] ?? 'Unknown';
+}
+
+class EnrolledSubject {
+  final String subjectName;
+  final String studentId;
+
+  EnrolledSubject({required this.subjectName, required this.studentId});
+
+  Map<String, dynamic> toJson() => {
+    'subjectName': subjectName,
+    'studentId': studentId,
+  };
+
+  factory EnrolledSubject.fromJson(Map<String, dynamic> json) {
+    return EnrolledSubject(
+      subjectName: json['subjectName'],
+      studentId: json['studentId'],
+    );
+  }
+}
+// ==========================================
+// FILE: ./models/student_model.dart
+// ==========================================
+
+class Student {
+  final String id;
+  final String schoolId;
+  final String fullName;
+  final String? studentId; // Manual ID (e.g., "STD-001")
+  final String? grade;
+  final String? parentContact;
+  final DateTime? registrationDate;
+  final String billingType; // 'monthly', 'termly'
+  final double defaultFee;
+  final bool isActive;
+  final double owedTotal;
+  final double paidTotal;
+  final String? termId;
+  final DateTime? dateOfBirth;
+  final String? gender;
+  final String? address;
+  final String? emergencyContactName;
+  final String? medicalNotes;
+  final bool photoConsent;
+
+  Student({
+    required this.id,
+    required this.schoolId,
+    required this.fullName,
+    this.studentId,
+    this.grade,
+    this.parentContact,
+    this.registrationDate,
+    this.billingType = 'monthly',
+    this.defaultFee = 0.0,
+    this.isActive = true,
+    this.owedTotal = 0.0,
+    this.paidTotal = 0.0,
+    this.termId,
+    this.dateOfBirth,
+    this.gender,
+    this.address,
+    this.emergencyContactName,
+    this.medicalNotes,
+    this.photoConsent = false,
+  });
+
+  // Factory to create a Student from a PowerSync/SQLite Row
+  factory Student.fromRow(Map<String, dynamic> row) {
+    return Student(
+      id: row['id'] as String,
+      schoolId: row['school_id'] as String,
+      fullName: row['full_name'] as String,
+      studentId: row['student_id'] as String?,
+      grade: row['grade'] as String?,
+      parentContact: row['parent_contact'] as String?,
+      registrationDate: row['registration_date'] != null 
+          ? DateTime.tryParse(row['registration_date']) 
+          : null,
+      billingType: row['billing_type'] ?? 'monthly',
+      defaultFee: (row['default_fee'] as num?)?.toDouble() ?? 0.0,
+      isActive: (row['is_active'] == 1), // SQLite stores bools as 0/1
+      owedTotal: (row['owed_total'] as num?)?.toDouble() ?? 0.0,
+      paidTotal: (row['paid_total'] as num?)?.toDouble() ?? 0.0,
+      termId: row['term_id'] as String?,
+      dateOfBirth: row['date_of_birth'] != null 
+          ? DateTime.tryParse(row['date_of_birth']) 
+          : null,
+      gender: row['gender'] as String?,
+      address: row['address'] as String?,
+      emergencyContactName: row['emergency_contact_name'] as String?,
+      medicalNotes: row['medical_notes'] as String?,
+      photoConsent: (row['photo_consent'] == 1),
+    );
+  }
+
+  // Convert to Map for saving to Database
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'school_id': schoolId,
+      'full_name': fullName,
+      'student_id': studentId,
+      'grade': grade,
+      'parent_contact': parentContact,
+      'registration_date': registrationDate?.toIso8601String(),
+      'billing_type': billingType,
+      'default_fee': defaultFee,
+      'is_active': isActive ? 1 : 0,
+      'owed_total': owedTotal,
+      'paid_total': paidTotal,
+      'term_id': termId,
+      'date_of_birth': dateOfBirth?.toIso8601String(),
+      'gender': gender,
+      'address': address,
+      'emergency_contact_name': emergencyContactName,
+      'medical_notes': medicalNotes,
+      'photo_consent': photoConsent ? 1 : 0,
+    };
+  }
+}
+// ==========================================
+// FILE: ./models/fundraiser_models.dart
+// ==========================================
+
+class Campaign {
+  final String id;
+  final String schoolId;
+  final String createdById;
+  final String name;
+  final String? description;
+  final String type; // Added to match Schema 'campaign_type'
+  final String status; 
+  final double goalAmount;
+  final DateTime createdAt; // Useful for sorting
+
+  Campaign({
+    required this.id,
+    required this.schoolId,
+    required this.createdById,
+    required this.name,
+    this.description,
+    this.type = 'General',
+    this.status = 'active',
+    this.goalAmount = 0.0,
+    required this.createdAt,
+  });
+
+  factory Campaign.fromRow(Map<String, dynamic> row) {
+    return Campaign(
+      id: row['id'] as String,
+      schoolId: row['school_id'] as String,
+      createdById: row['created_by_id'] ?? '',
+      name: row['name'] as String,
+      description: row['description'] as String?,
+      type: row['campaign_type'] ?? 'General',
+      status: row['status'] ?? 'active',
+      goalAmount: (row['goal_amount'] as num?)?.toDouble() ?? 0.0,
+      createdAt: DateTime.tryParse(row['created_at'] ?? '') ?? DateTime.now(),
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'school_id': schoolId,
+      'created_by_id': createdById,
+      'name': name,
+      'description': description,
+      'campaign_type': type,
+      'status': status,
+      'goal_amount': goalAmount,
+      'created_at': createdAt.toIso8601String(),
+    };
+  }
+}
+
+class CampaignDonation {
+  final String id;
+  final String campaignId;
+  final String? donorName;
+  final double amount;
+  final String? paymentMethod;
+  final DateTime dateReceived;
+  final double expectedCash;
+  final double actualCash;
+  final double variance;
+
+  CampaignDonation({
+    required this.id,
+    required this.campaignId,
+    this.donorName,
+    this.amount = 0.0,
+    this.paymentMethod,
+    required this.dateReceived,
+    this.expectedCash = 0.0,
+    this.actualCash = 0.0,
+    this.variance = 0.0,
+  });
+
+  factory CampaignDonation.fromRow(Map<String, dynamic> row) {
+    return CampaignDonation(
+      id: row['id'] as String,
+      campaignId: row['campaign_id'] as String,
+      donorName: row['donor_name'] as String?,
+      amount: (row['amount'] as num?)?.toDouble() ?? 0.0,
+      paymentMethod: row['payment_method'] as String?,
+      dateReceived: DateTime.tryParse(row['date_received'] ?? '') ?? DateTime.now(),
+      expectedCash: (row['expected_cash'] as num?)?.toDouble() ?? 0.0,
+      actualCash: (row['actual_cash'] as num?)?.toDouble() ?? 0.0,
+      variance: (row['variance'] as num?)?.toDouble() ?? 0.0,
+    );
+  }
+}
+
+class CampaignExpense {
+  final String id;
+  final String campaignId;
+  final String? category;
+  final double amount;
+  final String? incurredBy;
+
+  CampaignExpense({
+    required this.id,
+    required this.campaignId,
+    this.category,
+    required this.amount,
+    this.incurredBy,
+  });
+
+  factory CampaignExpense.fromRow(Map<String, dynamic> row) {
+    return CampaignExpense(
+      id: row['id'] as String,
+      campaignId: row['campaign_id'] as String,
+      category: row['category'] as String?,
+      amount: (row['amount'] as num?)?.toDouble() ?? 0.0,
+      incurredBy: row['incurred_by'] as String?,
+    );
+  }
+}
+
+class BankingRegister {
+  final String id;
+  final String? campaignId;
+  final double amount;
+  final String direction; // 'in' or 'out'
+  final String? reference;
+  final String schoolId;
+
+  BankingRegister({
+    required this.id,
+    this.campaignId,
+    required this.amount,
+    required this.direction,
+    this.reference,
+    required this.schoolId,
+  });
+
+  factory BankingRegister.fromRow(Map<String, dynamic> row) {
+    return BankingRegister(
+      id: row['id'] as String,
+      campaignId: row['campaign_id'] as String?,
+      amount: (row['amount'] as num?)?.toDouble() ?? 0.0,
+      direction: row['direction'] as String,
+      reference: row['reference'] as String?,
+      schoolId: row['school_id'] as String,
+    );
+  }
+}
+// ==========================================
+// FILE: ./models/staff_model.dart
+// ==========================================
+
+// ==========================================
+// TEACHER MODEL
+// ==========================================
+class Teacher {
+  final String id;
+  final String schoolId;
+  final String fullName;
+  final String? adminUid; // Links to user_profiles if they have logged in
+  final DateTime createdAt;
+
+  Teacher({
+    required this.id,
+    required this.schoolId,
+    required this.fullName,
+    this.adminUid,
+    required this.createdAt,
+  });
+
+  factory Teacher.fromRow(Map<String, dynamic> row) {
+    return Teacher(
+      id: row['id'] as String,
+      schoolId: row['school_id'] as String,
+      fullName: row['full_name'] as String,
+      adminUid: row['admin_uid'] as String?,
+      createdAt: row['created_at'] != null 
+          ? DateTime.tryParse(row['created_at']) ?? DateTime.now() 
+          : DateTime.now(),
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'school_id': schoolId,
+      'full_name': fullName,
+      'admin_uid': adminUid,
+      'created_at': createdAt.toIso8601String(),
+    };
+  }
+}
+
+// ==========================================
+// TEACHER ACCESS TOKEN MODEL
+// ==========================================
+class TeacherAccessToken {
+  final String id;
+  final String schoolId;
+  final String teacherId;
+  final String grantedByTeacherId;
+  final String accessCode;
+  final String permissionType; // 'attendance', 'campaigns', 'both'
+  final bool isUsed;
+  final DateTime? usedAt;
+  final DateTime expiresAt;
+
+  TeacherAccessToken({
+    required this.id,
+    required this.schoolId,
+    required this.teacherId,
+    required this.grantedByTeacherId,
+    required this.accessCode,
+    required this.permissionType,
+    this.isUsed = false,
+    this.usedAt,
+    required this.expiresAt,
+  });
+
+  bool get isExpired => DateTime.now().isAfter(expiresAt);
+
+  factory TeacherAccessToken.fromRow(Map<String, dynamic> row) {
+    return TeacherAccessToken(
+      id: row['id'] as String,
+      schoolId: row['school_id'] as String,
+      teacherId: row['teacher_id'] as String,
+      grantedByTeacherId: row['granted_by_teacher_id'] as String,
+      accessCode: row['access_code'] as String,
+      permissionType: row['permission_type'] ?? 'attendance',
+      isUsed: (row['is_used'] == 1), // SQLite boolean handling
+      usedAt: row['used_at'] != null 
+          ? DateTime.tryParse(row['used_at']) 
+          : null,
+      expiresAt: row['expires_at'] != null 
+          ? DateTime.tryParse(row['expires_at']) ?? DateTime.now()
+          : DateTime.now(),
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'school_id': schoolId,
+      'teacher_id': teacherId,
+      'granted_by_teacher_id': grantedByTeacherId,
+      'access_code': accessCode,
+      'permission_type': permissionType,
+      'is_used': isUsed ? 1 : 0,
+      'used_at': usedAt?.toIso8601String(),
+      'expires_at': expiresAt.toIso8601String(),
+    };
+  }
+}
+// ==========================================
+// FILE: ./models/broadcast_model.dart
+// ==========================================
+
+import 'package:fees_up/core/constants/app_colors.dart';
+import 'package:flutter/material.dart';
+
+class Broadcast {
+  final String id;
+  final String? schoolId; // Null = Global Greyway.Co Broadcast
+  final String authorId;
+  final bool isSystemMessage;
+  final String targetRole; // 'all', 'teacher', 'hq_internal'
+  final String title;
+  final String body;
+  final String priority;
+  final DateTime createdAt;
+
+  Broadcast({
+    required this.id,
+    this.schoolId,
+    required this.authorId,
+    this.isSystemMessage = false,
+    required this.targetRole,
+    required this.title,
+    required this.body,
+    required this.priority,
+    required this.createdAt,
+  });
+
+  factory Broadcast.fromRow(Map<String, dynamic> row) {
+    return Broadcast(
+      id: row['id'] as String,
+      schoolId: row['school_id'] as String?,
+      authorId: row['author_id'] as String,
+      isSystemMessage: (row['is_system_message'] == 1),
+      targetRole: row['target_role'] ?? 'all',
+      title: row['title'] as String,
+      body: row['body'] as String,
+      priority: row['priority'] ?? 'normal',
+      createdAt: DateTime.tryParse(row['created_at'] ?? '') ?? DateTime.now(),
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'school_id': schoolId,
+      'author_id': authorId,
+      'is_system_message': isSystemMessage ? 1 : 0,
+      'target_role': targetRole,
+      'title': title,
+      'body': body,
+      'priority': priority,
+      'created_at': createdAt.toIso8601String(),
+    };
+  }
+
+  // --- CE0 UI HELPERS ---
+  
+  bool get isInternalHQ => targetRole == 'hq_internal';
+
+  Color get badgeColor {
+    if (isInternalHQ) return AppColors.accentPurpleDark; // Security Purple
+    if (isSystemMessage) return  AppColors.primaryBlue; // System Blue
+    if (priority == 'critical') return AppColors.errorRed; // Failure Red
+    return AppColors.successGreen; // General Green
+  }
+
+  String get authorLabel {
+    if (isInternalHQ) return "Greyway HQ";
+    if (isSystemMessage) return "Fees Up System";
+    return "School Admin";
+  }
+
+  IconData get icon {
+    if (isInternalHQ) return Icons.security;
+    if (isSystemMessage) return Icons.settings_suggest;
+    if (priority == 'critical') return Icons.report_problem;
+    return Icons.campaign;
+  }
+}
+// ==========================================
+// FILE: ./models/finance_details_model.dart
+// ==========================================
+
+// ==========================================
+// BILL ITEM MODEL (Line items inside a bill)
+// ==========================================
+class BillItem {
+  final String id;
+  final String billId;
+  final String schoolId;
+  final String description;
+  final double amount;
+  final int quantity;
+
+  BillItem({
+    required this.id,
+    required this.billId,
+    required this.schoolId,
+    required this.description,
+    required this.amount,
+    this.quantity = 1,
+  });
+
+  // Calculate total for this line item
+  double get total => amount * quantity;
+
+  factory BillItem.fromRow(Map<String, dynamic> row) {
+    return BillItem(
+      id: row['id'] as String,
+      billId: row['bill_id'] as String,
+      schoolId: row['school_id'] as String,
+      description: row['description'] as String,
+      amount: (row['amount'] as num?)?.toDouble() ?? 0.0,
+      quantity: (row['quantity'] as num?)?.toInt() ?? 1,
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'bill_id': billId,
+      'school_id': schoolId,
+      'description': description,
+      'amount': amount,
+      'quantity': quantity,
+    };
+  }
+}
+
+// ==========================================
+// PAYMENT ALLOCATION MODEL (Splitting one payment across bills)
+// ==========================================
+class PaymentAllocation {
+  final String id;
+  final String paymentId;
+  final String billId;
+  final String schoolId;
+  final double amount;
+
+  PaymentAllocation({
+    required this.id,
+    required this.paymentId,
+    required this.billId,
+    required this.schoolId,
+    required this.amount,
+  });
+
+  factory PaymentAllocation.fromRow(Map<String, dynamic> row) {
+    return PaymentAllocation(
+      id: row['id'] as String,
+      paymentId: row['payment_id'] as String,
+      billId: row['bill_id'] as String,
+      schoolId: row['school_id'] as String,
+      amount: (row['amount'] as num?)?.toDouble() ?? 0.0,
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'payment_id': paymentId,
+      'bill_id': billId,
+      'school_id': schoolId,
+      'amount': amount,
+    };
+  }
+}
+
+// ==========================================
+// CREDIT MODEL (Discounts or overpayments)
+// ==========================================
+class Credit {
+  final String id;
+  final String schoolId;
+  final String studentId;
+  final String? billId; // If applied to a specific bill
+  final double amount;
+  final String? reason;
+  final String? creditId; // Manual reference ID
+
+  Credit({
+    required this.id,
+    required this.schoolId,
+    required this.studentId,
+    required this.amount,
+    this.billId,
+    this.reason,
+    this.creditId,
+  });
+
+  factory Credit.fromRow(Map<String, dynamic> row) {
+    return Credit(
+      id: row['id'] as String,
+      schoolId: row['school_id'] as String,
+      studentId: row['student_id'] as String,
+      amount: (row['amount'] as num?)?.toDouble() ?? 0.0,
+      billId: row['bill_id'] as String?,
+      reason: row['reason'] as String?,
+      creditId: row['credit_id'] as String?,
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'school_id': schoolId,
+      'student_id': studentId,
+      'amount': amount,
+      'bill_id': billId,
+      'reason': reason,
+      'credit_id': creditId,
+    };
+  }
+}
+// ==========================================
+// FILE: ./models/system_models.dart
+// ==========================================
+
+import 'dart:convert'; // Required for JSON decoding
+
+class StudentArchive {
+  final String id;
+  final String schoolId;
+  final String? fullName;
+  final String? reason;
+  final DateTime archivedAt;
+  final Map<String, dynamic>? originalData; // Stored as JSONB in SQL
+
+  StudentArchive({
+    required this.id,
+    required this.schoolId,
+    this.fullName,
+    this.reason,
+    required this.archivedAt,
+    this.originalData,
+  });
+
+  factory StudentArchive.fromRow(Map<String, dynamic> row) {
+    return StudentArchive(
+      id: row['id'] as String,
+      schoolId: row['school_id'] as String,
+      fullName: row['full_name'] as String?,
+      reason: row['reason'] as String?,
+      archivedAt: DateTime.tryParse(row['archived_at'] ?? '') ?? DateTime.now(),
+      // Handle potential JSON string from SQLite
+      originalData: row['original_data'] != null
+          ? (row['original_data'] is String 
+              ? jsonDecode(row['original_data']) 
+              : row['original_data'])
+          : null,
+    );
+  }
+}
+
+class Expense {
+  final String id;
+  final String schoolId;
+  final String title;
+  final double amount;
+  final String? category;
+  final DateTime incurredAt;
+  final String? description;
+  final String? recipient;
+  final String? paymentMethod;
+
+  Expense({
+    required this.id,
+    required this.schoolId,
+    required this.title,
+    required this.amount,
+    this.category,
+    required this.incurredAt,
+    this.description,
+    this.recipient,
+    this.paymentMethod,
+  });
+
+  factory Expense.fromRow(Map<String, dynamic> row) {
+    return Expense(
+      id: row['id'] as String,
+      schoolId: row['school_id'] as String,
+      title: row['title'] as String,
+      amount: (row['amount'] as num).toDouble(),
+      category: row['category'] as String?,
+      incurredAt: DateTime.tryParse(row['incurred_at'] ?? '') ?? DateTime.now(),
+      description: row['description'] as String?,
+      recipient: row['recipient'] as String?,
+      paymentMethod: row['payment_method'] as String?,
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'school_id': schoolId,
+      'title': title,
+      'amount': amount,
+      'category': category,
+      'incurred_at': incurredAt.toIso8601String(),
+      'description': description,
+      'recipient': recipient,
+      'payment_method': paymentMethod,
+    };
+  }
+}
+// ==========================================
+// FILE: ./providers/report_builder_provider.dart
+// ==========================================
+
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
+
+// --- STATE MODEL ---
+class ReportBuilderState {
+  final String category;
+  final DateTimeRange dateRange;
+  final String gradeFilter;
+  final String exportFormat; // 'PDF' or 'Excel/CSV'
+
+  ReportBuilderState({
+    required this.category,
+    required this.dateRange,
+    required this.gradeFilter,
+    required this.exportFormat,
+  });
+
+  ReportBuilderState copyWith({
+    String? category,
+    DateTimeRange? dateRange,
+    String? gradeFilter,
+    String? exportFormat,
+  }) {
+    return ReportBuilderState(
+      category: category ?? this.category,
+      dateRange: dateRange ?? this.dateRange,
+      gradeFilter: gradeFilter ?? this.gradeFilter,
+      exportFormat: exportFormat ?? this.exportFormat,
+    );
+  }
+}
+
+// --- NOTIFIER ---
+class ReportBuilderNotifier extends StateNotifier<ReportBuilderState> {
+  ReportBuilderNotifier() : super(ReportBuilderState(
+    category: 'Tuition & Fee Collection',
+    dateRange: DateTimeRange(
+      start: DateTime.now().subtract(const Duration(days: 30)), 
+      end: DateTime.now()
+    ),
+    gradeFilter: 'All Grades',
+    exportFormat: 'PDF',
+  ));
+
+  void setCategory(String value) => state = state.copyWith(category: value);
+  void setDateRange(DateTimeRange value) => state = state.copyWith(dateRange: value);
+  void setGradeFilter(String value) => state = state.copyWith(gradeFilter: value);
+  void setExportFormat(String value) => state = state.copyWith(exportFormat: value);
+}
+
+// --- PROVIDER ---
+final reportBuilderProvider = StateNotifierProvider<ReportBuilderNotifier, ReportBuilderState>((ref) {
+  return ReportBuilderNotifier();
+});
+
+// --- HELPER TO GET SUMMARY TEXT ---
+// Used in the right-side summary panel of your UI
+final reportSummaryProvider = Provider.autoDispose<Map<String, String>>((ref) {
+  final state = ref.watch(reportBuilderProvider);
+  final dateFormat = DateFormat('MMM d, yyyy');
+
+  return {
+    'Type': state.category,
+    'Period': "${dateFormat.format(state.dateRange.start)} - ${dateFormat.format(state.dateRange.end)}",
+    'Scope': state.gradeFilter,
+    'Format': state.exportFormat == 'PDF' ? 'PDF Document' : 'Excel / CSV',
+  };
+});
+// ==========================================
+// FILE: ./providers/campaign_provider.dart
+// ==========================================
+
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
+import '../services/database_service.dart';
+import '../models/fundraiser_models.dart';
+import 'auth_provider.dart'; 
+
+// 1. WATCH: Listen for ANY active campaign for this school
+final activeCampaignProvider = StreamProvider.family<Campaign?, String>((ref, schoolId) {
+  final db = DatabaseService();
+  // We limit to 1 because the UI logic assumes sequential campaigns for safety
+  return db.db.watch(
+    "SELECT * FROM campaigns WHERE school_id = ? AND status = 'active' ORDER BY created_at DESC LIMIT 1",
+    parameters: [schoolId],
+  ).map((rows) {
+    if (rows.isEmpty) return null;
+    return Campaign.fromRow(rows.first);
+  });
+});
+
+// 2. CONTROLLER: Handle Create & Close actions
+final campaignControllerProvider = StateNotifierProvider<CampaignController, AsyncValue<void>>((ref) {
+  return CampaignController(ref);
+});
+
+class CampaignController extends StateNotifier<AsyncValue<void>> {
+  final Ref _ref;
+  CampaignController(this._ref) : super(const AsyncData(null));
+
+  Future<bool> createCampaign({
+    required String schoolId,
+    required String name,
+    required String type,
+    required double goal,
+    required String description,
+  }) async {
+    state = const AsyncLoading();
+    try {
+      final user = _ref.read(currentUserProvider);
+      final id = const Uuid().v4();
+      
+      final newCampaign = Campaign(
+        id: id,
+        schoolId: schoolId,
+        createdById: user?.id ?? 'unknown',
+        name: name,
+        type: type,
+        goalAmount: goal,
+        description: description,
+        status: 'active',
+        createdAt: DateTime.now(),
+      );
+
+      await DatabaseService().insert('campaigns', newCampaign.toMap());
+
+      state = const AsyncData(null);
+      return true;
+    } catch (e, st) {
+      state = AsyncError(e, st);
+      return false;
+    }
+  }
+
+  Future<bool> closeCampaign(String campaignId) async {
+    state = const AsyncLoading();
+    try {
+      await DatabaseService().update('campaigns', campaignId, {
+        'status': 'closed',
+      });
+      state = const AsyncData(null);
+      return true;
+    } catch (e, st) {
+      state = AsyncError(e, st);
+      return false;
+    }
+  }
+}
+// ==========================================
+// FILE: ./providers/notifications_provider.dart
+// ==========================================
+
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../models/announcement_model.dart';
+import '../repositories/announcements_repository.dart';
+import 'school_provider.dart';
+
+/// 1. DATA STREAM
+/// The "Single Source of Truth" for the Rainbow Notification system.
+/// Listens to PowerSync for any changes in the notifications table.
+final notificationsProvider = StreamProvider<List<Announcement>>((ref) {
+  final schoolId = ref.watch(activeSchoolIdProvider);
+  if (schoolId == null) return const Stream.empty();
+
+  final repository = ref.watch(announcementsRepositoryProvider);
+  return repository.watchAnnouncements(schoolId);
+});
+
+/// 2. LOGIC CONTROLLER
+/// Handles user interactions for the notification system.
+final notificationLogicProvider = Provider((ref) => NotificationLogic(ref));
+
+class NotificationLogic {
+  final Ref _ref;
+  NotificationLogic(this._ref);
+
+  /// Bulk Action: Clears the "Unread" status for everything in the school.
+  Future<void> markAllRead() async {
+    final schoolId = _ref.read(activeSchoolIdProvider);
+    if (schoolId != null) {
+      await _ref.read(announcementsRepositoryProvider).markAllAsRead(schoolId);
+    }
+  }
+
+  /// Single Action: Mark one specific item as read.
+  /// Seals the logic gap by calling the explicit repository method.
+  Future<void> markAsRead(String notificationId) async {
+    final repository = _ref.read(announcementsRepositoryProvider);
+    await repository.markOneAsRead(notificationId);
+  }
+
+  /// Single Action: Delete a notification (Cleanup rights).
+  /// Ensures the "Fortress" table stays clean of old logs.
+  Future<void> delete(String notificationId) async {
+    final repository = _ref.read(announcementsRepositoryProvider);
+    await repository.deleteNotification(notificationId);
+  }
+}
+// ==========================================
+// FILE: ./providers/dashboard_provider.dart
+// ==========================================
+
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../repositories/dashboard_repository.dart';
+import '../services/database_service.dart';
+import 'auth_provider.dart';
+import 'school_provider.dart'; // ✅ Imported
+
+final dashboardRepositoryProvider = Provider<DashboardRepository>((ref) {
+  return DashboardRepository(DatabaseService());
+});
+
+// A simple class to hold our dashboard data snapshot
+class DashboardData {
+  final String schoolId;
+  final String schoolName;
+  final String userName;
+  final int studentCount;
+  final double outstandingBalance;
+  final List<Map<String, dynamic>> recentPayments;
+
+  DashboardData({
+    required this.schoolId,
+    required this.schoolName,
+    required this.userName,
+    required this.studentCount,
+    required this.outstandingBalance,
+    required this.recentPayments,
+  });
+}
+final dashboardDataProvider = StreamProvider<DashboardData>((ref) async* {
+  final user = ref.watch(currentUserProvider);
+  if (user == null) throw 'User not logged in';
+
+  // 1. Get the school data (caches after first successful fetch)
+  final school = await ref.watch(currentSchoolProvider.future);
+  
+  if (school == null) {
+    yield DashboardData(
+      schoolId: '',
+      schoolName: 'Loading...',
+      userName: '',
+      studentCount: 0,
+      outstandingBalance: 0,
+      recentPayments: [],
+    );
+    return;
+  }
+
+  final schoolId = school['id'];
+  final schoolName = school['name'];
+  final dbService = DatabaseService();
+
+  // 2. Listen for ANY changes in the relevant tables
+  // This keeps the Batch Tech dashboard live and reactive
+  await for (final _ in dbService.db.onChange(['students', 'bills', 'payments', 'user_profiles'])) {
+    
+    // Fetch profile and stats in parallel for better performance
+    final results = await Future.wait([
+      dbService.getUserProfile(user.id),
+      dbService.db.get('SELECT count(*) as c FROM students WHERE school_id = ?', [schoolId]),
+      dbService.db.get('SELECT sum(total_amount - paid_amount) as t FROM bills WHERE school_id = ?', [schoolId]),
+      dbService.db.getAll('SELECT * FROM payments WHERE school_id = ? ORDER BY date_paid DESC LIMIT 5', [schoolId]),
+    ]);
+
+    final profile = results[0] as Map<String, dynamic>?;
+    final students = results[1] as Map<String, dynamic>;
+    final bills = results[2] as Map<String, dynamic>;
+    final payments = results[3] as List<Map<String, dynamic>>;
+
+    yield DashboardData(
+      schoolId: schoolId,
+      schoolName: schoolName,
+      userName: profile?['full_name'] ?? 'Admin',
+      studentCount: (students['c'] as int),
+      outstandingBalance: (bills['t'] as num?)?.toDouble() ?? 0.0,
+      recentPayments: payments,
+    );
+  }
+});
+// ==========================================
+// FILE: ./providers/expense_provider.dart
+// ==========================================
+
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:fees_up/data/models/finance_models.dart';
+import 'package:fees_up/data/repositories/expense_repository.dart';
+import 'package:fees_up/data/providers/school_provider.dart'; // Assuming you have this for currentSchoolId
+
+// 1. STREAM: Live list of expenses
+final recentExpensesProvider = StreamProvider.autoDispose<List<Expense>>((ref) {
+  // Replace with your actual provider for getting the active school ID
+  // e.g. ref.watch(currentSchoolIdProvider);
+  // For safety, I'll return an empty stream if ID is missing.
+  final schoolId = ref.watch(activeSchoolIdProvider); 
+  
+  if (schoolId == null) return const Stream.empty();
+
+  final repo = ref.read(expenseRepositoryProvider);
+  return repo.watchRecentExpenses(schoolId);
+});
+
+// 2. CONTROLLER: Handles the Save Action
+class ExpenseController extends StateNotifier<AsyncValue<void>> {
+  final Ref ref;
+
+  ExpenseController(this.ref) : super(const AsyncData(null));
+
+  Future<bool> saveExpense({
+    required String title,
+    required double amount,
+    required DateTime date,
+    String? category,
+    String? recipient,
+    String? notes,
+    String? paymentMethod,
+  }) async {
+    state = const AsyncLoading();
+    try {
+      final schoolId = ref.read(activeSchoolIdProvider);
+      if (schoolId == null) throw Exception("No active school found.");
+
+      final repo = ref.read(expenseRepositoryProvider);
+      
+      await repo.createExpense(
+        schoolId: schoolId,
+        title: title,
+        amount: amount,
+        incurredAt: date,
+        category: category,
+        recipient: recipient,
+        notes: notes,
+        paymentMethod: paymentMethod,
+      );
+
+      state = const AsyncData(null);
+      return true;
+    } catch (e, stack) {
+      state = AsyncError(e, stack);
+      return false;
+    }
+  }
+}
+
+final expenseControllerProvider = StateNotifierProvider<ExpenseController, AsyncValue<void>>((ref) {
+  return ExpenseController(ref);
+});
+// ==========================================
+// FILE: ./providers/fundraising_provider.dart
+// ==========================================
+
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../services/database_service.dart';
+import 'dashboard_provider.dart';
+
+class FundraisingData {
+  final String campaignName;
+  final double goalAmount;
+  final double raisedAmount;
+  final double percentage;
+
+  FundraisingData({
+    required this.campaignName,
+    required this.goalAmount,
+    required this.raisedAmount,
+    required this.percentage,
+  });
+}
+
+final fundraisingProvider = FutureProvider<FundraisingData?>((ref) async {
+  final dashboardData = await ref.watch(dashboardDataProvider.future);
+  final schoolId = dashboardData.schoolId;
+  final db = DatabaseService().db;
+
+  // 1. Get the ACTIVE campaign for this school
+  // We explicitly look for status = 'active'
+  final campaigns = await db.getAll(
+    "SELECT * FROM campaigns WHERE school_id = ? AND status = 'active' ORDER BY created_at DESC LIMIT 1",
+    [schoolId],
+  );
+
+  if (campaigns.isEmpty) return null; // No active campaign found
+
+  final campaign = campaigns.first;
+  final campaignId = campaign['id'];
+  final goal = (campaign['goal_amount'] as num?)?.toDouble() ?? 100.0; 
+  final name = campaign['name'] ?? 'Campaign';
+
+  // 2. Sum donations for this specific campaign ID
+  final donations = await db.getAll(
+    "SELECT sum(amount) as total FROM campaign_donations WHERE campaign_id = ?",
+    [campaignId],
+  );
+
+  final raised = (donations.first['total'] as num?)?.toDouble() ?? 0.0;
+
+  // 3. Calculate Percentage (Safe division)
+  double percent = 0.0;
+  if (goal > 0) {
+    percent = (raised / goal) * 100;
+  }
+  
+  // Cap percentage visual at 100% (optional, but looks better on progress bars)
+  // For the text value, we keep the real percentage.
+  
+  return FundraisingData(
+    campaignName: name,
+    goalAmount: goal,
+    raisedAmount: raised,
+    percentage: percent,
+  );
+});
+// ==========================================
+// FILE: ./providers/revenue_provider.dart
+// ==========================================
+
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
+import '../services/database_service.dart';
+import 'dashboard_provider.dart';
+
+// --- FILTER ENUM ---
+enum RevenueFilter { thisWeek, lastWeek }
+
+final revenueFilterProvider = StateProvider<RevenueFilter>((ref) => RevenueFilter.thisWeek);
+
+class WeeklyRevenueData {
+  final double totalWeekRevenue;
+  final Map<int, double> dailyTotals; // Key: Weekday (1=Mon ... 7=Sun)
+
+  WeeklyRevenueData({required this.totalWeekRevenue, required this.dailyTotals});
+}
+
+final weeklyRevenueProvider = FutureProvider<WeeklyRevenueData>((ref) async {
+  final dashboardData = await ref.watch(dashboardDataProvider.future);
+  final schoolId = dashboardData.schoolId;
+  final filter = ref.watch(revenueFilterProvider);
+
+  // 1. Calculate Date Range
+  final now = DateTime.now();
+  final currentWeekStart = now.subtract(Duration(days: now.weekday - 1)); // This Monday
+  
+  DateTime startOfWeek;
+  DateTime endOfWeek;
+
+  if (filter == RevenueFilter.thisWeek) {
+    startOfWeek = DateTime(currentWeekStart.year, currentWeekStart.month, currentWeekStart.day);
+    endOfWeek = startOfWeek.add(const Duration(days: 6, hours: 23, minutes: 59));
+  } else {
+    // Last Week
+    startOfWeek = currentWeekStart.subtract(const Duration(days: 7));
+    endOfWeek = startOfWeek.add(const Duration(days: 6, hours: 23, minutes: 59));
+  }
+
+  final startStr = DateFormat('yyyy-MM-dd').format(startOfWeek);
+  final endStr = DateFormat('yyyy-MM-dd').format(endOfWeek);
+
+  // 2. Query Database
+  final db = DatabaseService().db;
+  final results = await db.getAll(
+    'SELECT amount, date_paid FROM payments WHERE school_id = ? AND date_paid >= ? AND date_paid <= ?',
+    [schoolId, startStr, endStr],
+  );
+
+  // 3. Group by Day
+  double total = 0.0;
+  final Map<int, double> dailyMap = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0};
+
+  for (var row in results) {
+    final amount = (row['amount'] as num).toDouble();
+    final dateStr = row['date_paid'] as String;
+    final date = DateTime.parse(dateStr);
+    
+    // Ensure we map correctly even if the date parsing varies slightly
+    dailyMap[date.weekday] = (dailyMap[date.weekday] ?? 0) + amount;
+    total += amount;
+  }
+
+  return WeeklyRevenueData(totalWeekRevenue: total, dailyTotals: dailyMap);
+});
+// ==========================================
+// FILE: ./providers/auth_provider.dart
+// ==========================================
+
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../repositories/auth_repository.dart';
+
+// 1. The Repository Provider (This is what was missing)
+final authRepositoryProvider = Provider<AuthRepository>((ref) {
+  return AuthRepository();
+});
+
+// 2. Auth State Stream (Listens to Login/Logout events)
+final authStateProvider = StreamProvider<AuthState>((ref) {
+  final repo = ref.watch(authRepositoryProvider);
+  return repo.authStateChanges;
+});
+
+// 3. Current User Helper
+final currentUserProvider = Provider<User?>((ref) {
+  final authState = ref.watch(authStateProvider);
+  return authState.value?.session?.user;
+});
+// ==========================================
+// FILE: ./providers/school_provider.dart
+// ==========================================
+
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:fees_up/data/services/database_service.dart';
+import 'package:fees_up/data/services/school_service.dart';
+import 'package:fees_up/data/providers/auth_provider.dart';
+
+// 1. The Service Provider
+final schoolServiceProvider = Provider<SchoolService>((ref) {
+  return SchoolService(DatabaseService());
+});
+
+// 2. A Helper Provider to get the current school Map immediately
+//    CRITICAL LOGIC: This uses 'getSchoolForUser' which performs the lookup:
+//    Auth ID -> User Profile -> School ID -> School Record
+final currentSchoolProvider = FutureProvider<Map<String, dynamic>?>((ref) async {
+  final user = ref.watch(currentUserProvider);
+  if (user == null) return null;
+
+  final service = ref.watch(schoolServiceProvider);
+  
+  // We pass the USER ID (Auth ID) here. 
+  // The service internally finds the profile linked to this user, 
+  // extracts the 'school_id', and returns the School row.
+  return await service.getSchoolForUser(user.id, waitForSync: true);
+});
+
+// 3. The ID Selector (REQUIRED by Expense, Student, and Billing features)
+//    This extracts the actual 'school_id' from the school record we just fetched.
+final activeSchoolIdProvider = Provider<String?>((ref) {
+  final schoolAsync = ref.watch(currentSchoolProvider);
+  
+  // The 'id' inside this map is the SCHOOL ID (from the schools table), 
+  // NOT the User ID.
+  return schoolAsync.value?['id'] as String?;
+});
+// ==========================================
+// FILE: ./providers/broadcast_provider.dart
+// ==========================================
+
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
+import '../models/broadcast_model.dart';
+import '../repositories/broadcast_repository.dart';
+import 'school_provider.dart';
+import 'auth_provider.dart';
+
+final broadcastRepositoryProvider = Provider((ref) => BroadcastRepository());
+
+/// Unified Provider Names for UI Integration
+final schoolBroadcastProvider = StreamProvider.autoDispose<List<Broadcast>>((ref) {
+  final schoolId = ref.watch(activeSchoolIdProvider);
+  if (schoolId == null) return Stream.value([]);
+  return ref.watch(broadcastRepositoryProvider).watchSchoolBroadcasts(schoolId);
+});
+
+final internalHQBroadcastProvider = StreamProvider.autoDispose<List<Broadcast>>((ref) {
+  return ref.watch(broadcastRepositoryProvider).watchInternalHQBroadcasts();
+});
+
+final broadcastLogicProvider = Provider((ref) => BroadcastLogic(ref));
+
+class BroadcastLogic {
+  final Ref _ref;
+  BroadcastLogic(this._ref);
+
+  Future<void> post({
+    required String title,
+    required String body,
+    String priority = 'normal',
+    bool isInternalHQ = false,
+  }) async {
+    final user = _ref.read(currentUserProvider);
+    final schoolId = _ref.read(activeSchoolIdProvider);
+
+    if (user == null) throw Exception("Auth Required");
+
+    final Map<String, dynamic> data = {
+      'id': const Uuid().v4(),
+      'school_id': isInternalHQ ? null : schoolId,
+      'author_id': user.id,
+      'is_system_message': isInternalHQ ? 1 : 0,
+      'target_role': isInternalHQ ? 'hq_internal' : 'all',
+      'title': title,
+      'body': body,
+      'priority': priority,
+      'created_at': DateTime.now().toIso8601String(),
+    };
+
+    await _ref.read(broadcastRepositoryProvider).postBroadcast(data: data);
+  }
+}
+// ==========================================
+// FILE: ./providers/users_provider.dart
+// ==========================================
+
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'dashboard_provider.dart';
+import '../repositories/users_repository.dart';
+
+final usersRepositoryProvider = Provider((ref) => UsersRepository());
+
+// Live list of users for the current school
+final schoolUsersProvider = FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
+  final dashboard = await ref.watch(dashboardDataProvider.future);
+  final repo = ref.watch(usersRepositoryProvider);
+  
+  if (dashboard.schoolId.isEmpty) return [];
+  
+  return repo.getSchoolUsers(dashboard.schoolId);
+});
+// ==========================================
+// FILE: ./providers/settings_provider.dart
+// ==========================================
+
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../services/database_service.dart';
+import 'dashboard_provider.dart';
+
+// --- MODELS ---
+class GlobalSettings {
+  final String themeMode;
+  final bool twoFactor;
+  final int sessionTimeout;
+  // ... add others
+  GlobalSettings({required this.themeMode, required this.twoFactor, required this.sessionTimeout});
+}
+
+class SchoolPreferences {
+  final bool notifyPayment;
+  final bool notifyOverdue;
+  final String landingPage;
+  // ... add others
+  SchoolPreferences({required this.notifyPayment, required this.notifyOverdue, required this.landingPage});
+}
+
+// --- PROVIDERS ---
+
+// 1. Fetch Global Settings (User-centric)
+final globalSettingsProvider = FutureProvider<GlobalSettings>((ref) async {
+  // ignore: unused_local_variable
+  final db = DatabaseService();
+  // In production, fetch from Supabase. For UI demo, returning mock default.
+  return GlobalSettings(themeMode: 'dark', twoFactor: true, sessionTimeout: 15);
+});
+
+// 2. Fetch School Context Settings (School-centric)
+final schoolPreferencesProvider = FutureProvider<SchoolPreferences>((ref) async {
+  final dashboard = await ref.watch(dashboardDataProvider.future);
+  if (dashboard.schoolId.isEmpty) {
+    return SchoolPreferences(notifyPayment: true, notifyOverdue: true, landingPage: 'overview');
+  }
+  
+  // Logic: Fetch FROM user_school_preferences WHERE school_id = dashboard.schoolId
+  return SchoolPreferences(notifyPayment: true, notifyOverdue: false, landingPage: 'transactions');
+});

@@ -32,6 +32,7 @@ class _InvoiceDialogState extends ConsumerState<InvoiceDialog> {
   String? _selectedStudentId;
   DateTime _dueDate = DateTime.now().add(const Duration(days: 7));
   String _generatedInvoiceNum = "Loading...";
+  String _invoiceStatus = 'draft'; // ✅ NEW: Draft status support
   bool _isLoading = false;
 
   @override
@@ -95,13 +96,14 @@ class _InvoiceDialogState extends ConsumerState<InvoiceDialog> {
       final amount = double.tryParse(_amountController.text.trim()) ?? 0.0;
       final now = DateTime.now();
 
+      // ✅ CORRECT: No schema hacks - database supports null values for adhoc bills
       final billData = {
         'id': newId,
         'school_id': widget.schoolId,
         'student_id': _selectedStudentId,
         'title': _titleController.text.trim(),
         'invoice_number': _generatedInvoiceNum, 
-        'status': 'sent', 
+        'status': _invoiceStatus, // ✅ NEW: Respects draft/sent status
         'total_amount': amount,
         'paid_amount': 0.0,
         'is_paid': 0, 
@@ -111,12 +113,9 @@ class _InvoiceDialogState extends ConsumerState<InvoiceDialog> {
         'created_at': now.toIso8601String(),
         'updated_at': now.toIso8601String(),
         'month_year': DateFormat('yyyy-MM').format(now),
-        // Important for Schema Compliance:
-        // We set these to null or specific values if required by the 'check' constraints
-        // Since 'bill_type' is 'adhoc', the check constraint logic needs to be respected.
-        // If your constraint requires ONE of (school_year_id OR month_index OR term_id),
-        // we must set one. 'term_id' = 'adhoc' satisfies "term_id is not null".
-        'term_id': 'adhoc-manual', 
+        // ✅ FIXED: Removed artificial 'term_id': 'adhoc-manual' hack
+        // Database schema properly handles null values for school_year_id, month_index, term_id
+        // These fields are intentionally left null for adhoc bills
       };
 
       await _dbService.insert('bills', billData);
@@ -240,6 +239,16 @@ class _InvoiceDialogState extends ConsumerState<InvoiceDialog> {
                                       children: [
                                         _buildLabel("Due Date"),
                                         _buildDatePicker(context),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        _buildLabel("Invoice Status"),
+                                        _buildStatusDropdown(),
                                       ],
                                     ),
                                   ),
@@ -567,9 +576,70 @@ class _InvoiceDialogState extends ConsumerState<InvoiceDialog> {
   Color _getStatusColor(String status) {
     switch(status.toLowerCase()) {
       case 'paid': return AppColors.successGreen;
+      case 'draft': return AppColors.textGrey;
       case 'overdue': return AppColors.errorRed;
       case 'sent': return AppColors.primaryBlueLight;
       default: return AppColors.textGrey;
     }
+  }
+
+  /// ✅ NEW: Status dropdown for draft/sent selection
+  Widget _buildStatusDropdown() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceGrey,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.surfaceLightGrey),
+      ),
+      child: DropdownButton<String>(
+        value: _invoiceStatus,
+        isExpanded: true,
+        underline: const SizedBox(),
+        dropdownColor: AppColors.surfaceGrey,
+        style: const TextStyle(color: AppColors.textWhite),
+        items: [
+          DropdownMenuItem(
+            value: 'draft',
+            child: Row(
+              children: [
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration: const BoxDecoration(
+                    color: AppColors.textGrey,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const Text('Draft', style: TextStyle(color: AppColors.textWhite)),
+              ],
+            ),
+          ),
+          DropdownMenuItem(
+            value: 'sent',
+            child: Row(
+              children: [
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration: const BoxDecoration(
+                    color: AppColors.primaryBlueLight,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const Text('Sent', style: TextStyle(color: AppColors.textWhite)),
+              ],
+            ),
+          ),
+        ],
+        onChanged: (value) {
+          if (value != null) {
+            setState(() => _invoiceStatus = value);
+          }
+        },
+      ),
+    );
   }
 }

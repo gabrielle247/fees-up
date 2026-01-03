@@ -132,7 +132,7 @@ class RolePermissionsView extends StatelessWidget {
             ],
           ),
         ),
-        Icon(Icons.check_circle, color: AppColors.successGreen, size: 20),
+        const Icon(Icons.check_circle, color: AppColors.successGreen, size: 20),
       ],
     );
   }

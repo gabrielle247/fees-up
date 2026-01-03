@@ -403,7 +403,7 @@ class _NotificationGroupTile extends StatelessWidget {
           child: Switch(
             value: val,
             onChanged: onChange,
-            activeColor: Colors.white,
+            activeThumbColor: Colors.white,
             activeTrackColor: AppColors.primaryBlue,
             inactiveThumbColor: AppColors.textWhite,
             inactiveTrackColor: AppColors.backgroundBlack,
@@ -449,7 +449,7 @@ class _DeliveryChannelTile extends StatelessWidget {
         Switch(
           value: value,
           onChanged: isDisabled ? null : onChanged,
-          activeColor: Colors.white,
+          activeThumbColor: Colors.white,
           activeTrackColor: AppColors.primaryBlue,
           inactiveThumbColor: AppColors.textWhite38,
           inactiveTrackColor: AppColors.backgroundBlack,

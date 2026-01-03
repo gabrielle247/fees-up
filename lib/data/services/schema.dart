@@ -260,6 +260,13 @@ const Schema appSchema = Schema([
   // ============================================================
   // FUNDRAISER & AUDIT
   // ============================================================
+  // NOTE: billing_suspension_periods, billing_audit_log, and
+  // billing_extensions are INTENTIONALLY EXCLUDED from PowerSync schema.
+  // These tables contain critical financial state that must remain
+  // server-side only with single-source-of-truth enforcement.
+  // Access via Supabase Realtime (online-only) or RPC functions only.
+  // See: SECURE_BILLING_ENGINE_ARCHITECTURE.md
+  // ============================================================
   Table('campaigns', [
     Column.text('school_id'),
     Column.text('class_id'),

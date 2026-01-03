@@ -101,7 +101,7 @@ class _AddUserDialogState extends ConsumerState<AddUserDialog> {
               const SizedBox(height: 16),
               Container(
                 padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(color: AppColors.errorRed.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+                decoration: BoxDecoration(color: AppColors.errorRed.withAlpha(26), borderRadius: BorderRadius.circular(8)),
                 child: Row(children: [
                   const Icon(Icons.error, color: AppColors.errorRed, size: 20),
                   const SizedBox(width: 8),

@@ -41,7 +41,9 @@ class Expense {
   final double amount;
   final String? category;
   final DateTime incurredAt;
+  final String? description;
   final String? recipient;
+  final String? paymentMethod;
 
   Expense({
     required this.id,
@@ -50,7 +52,9 @@ class Expense {
     required this.amount,
     this.category,
     required this.incurredAt,
+    this.description,
     this.recipient,
+    this.paymentMethod,
   });
 
   factory Expense.fromRow(Map<String, dynamic> row) {
@@ -58,10 +62,26 @@ class Expense {
       id: row['id'] as String,
       schoolId: row['school_id'] as String,
       title: row['title'] as String,
-      amount: (row['amount'] as num?)?.toDouble() ?? 0.0,
+      amount: (row['amount'] as num).toDouble(),
       category: row['category'] as String?,
       incurredAt: DateTime.tryParse(row['incurred_at'] ?? '') ?? DateTime.now(),
+      description: row['description'] as String?,
       recipient: row['recipient'] as String?,
+      paymentMethod: row['payment_method'] as String?,
     );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'school_id': schoolId,
+      'title': title,
+      'amount': amount,
+      'category': category,
+      'incurred_at': incurredAt.toIso8601String(),
+      'description': description,
+      'recipient': recipient,
+      'payment_method': paymentMethod,
+    };
   }
 }

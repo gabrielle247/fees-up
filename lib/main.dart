@@ -1,3 +1,7 @@
+// ------------------------------------------
+// NOTE: Refactor this logic later
+// ------------------------------------------
+
 import 'dart:io'; // Needed for Platform
 import 'package:flutter/foundation.dart'; // Needed for kIsWeb
 import 'package:flutter/material.dart';

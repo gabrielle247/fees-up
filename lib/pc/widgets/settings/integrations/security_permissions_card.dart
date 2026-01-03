@@ -49,7 +49,7 @@ class _SecurityPermissionsCardState extends State<SecurityPermissionsCard> {
               Switch(
                 value: _whitelist, 
                 onChanged: (v) => setState(() => _whitelist = v),
-                activeColor: AppColors.primaryBlue,
+                activeThumbColor: AppColors.primaryBlue,
               ),
             ],
           ),

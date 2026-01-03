@@ -175,9 +175,9 @@ class _TokenRow extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: typeColor.withOpacity(0.15),
+                    color: typeColor.withAlpha(38),
                     borderRadius: BorderRadius.circular(4),
-                    border: Border.all(color: typeColor.withOpacity(0.3)),
+                    border: Border.all(color: typeColor.withAlpha(77)),
                   ),
                   child: Text(type, style: TextStyle(color: typeColor, fontSize: 10, fontWeight: FontWeight.bold)),
                 ),

@@ -13,7 +13,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 // --- LAYOUT & SHARED ---
-import '../../shared/layout/responsive_layout.dart';
+import '../../../shared/layout/responsive_layout.dart';
 
 // --- MOBILE SCREENS ---
 import '../../mobile/screens/mobile_home_screen.dart';

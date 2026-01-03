@@ -1,0 +1,428 @@
+# Batch One - Targeted Analysis Dump
+# Generated: Sat 03 Jan 2026 14:15:23 CAT
+# Tool: save-dart-targeted
+# Mode: Security
+# Files: lib/data/providers/financial_reports_provider.dart
+
+# File: lib/data/providers/financial_reports_provider.dart
+# ==========================================
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+/// Financial Reports Provider
+/// Connects to deployed RPC functions for real-time financial data
+final financialReportsProvider = Provider((ref) {
+  return FinancialReportsService(Supabase.instance.client);
+});
+
+/// Invoice Statistics Provider
+final invoiceStatsProvider =
+    FutureProvider.family<Map<String, dynamic>, InvoiceStatsParams>(
+        (ref, params) async {
+  final service = ref.watch(financialReportsProvider);
+  return await service.getInvoiceStatistics(
+    schoolId: params.schoolId,
+    startDate: params.startDate,
+    endDate: params.endDate,
+  );
+});
+
+/// Transaction Summary Provider
+final transactionSummaryProvider =
+    FutureProvider.family<Map<String, dynamic>, TransactionSummaryParams>(
+        (ref, params) async {
+  final service = ref.watch(financialReportsProvider);
+  return await service.getTransactionSummary(
+    schoolId: params.schoolId,
+    startDate: params.startDate,
+    endDate: params.endDate,
+  );
+});
+
+/// Outstanding Bills Provider
+final outstandingBillsProvider =
+    FutureProvider.family<List<Map<String, dynamic>>, String>(
+        (ref, studentId) async {
+  final service = ref.watch(financialReportsProvider);
+  return await service.getOutstandingBills(studentId);
+});
+
+/// Payment Allocation History Provider
+final paymentAllocationHistoryProvider =
+    FutureProvider.family<List<Map<String, dynamic>>, AllocationHistoryParams>(
+        (ref, params) async {
+  final service = ref.watch(financialReportsProvider);
+  return await service.getPaymentAllocationHistory(
+    studentId: params.studentId,
+    limit: params.limit,
+  );
+});
+
+// Parameter Classes
+class InvoiceStatsParams {
+  final String schoolId;
+  final DateTime? startDate;
+  final DateTime? endDate;
+
+  InvoiceStatsParams({
+    required this.schoolId,
+    this.startDate,
+    this.endDate,
+  });
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is InvoiceStatsParams &&
+          runtimeType == other.runtimeType &&
+          schoolId == other.schoolId &&
+          startDate == other.startDate &&
+          endDate == other.endDate;
+
+  @override
+  int get hashCode => Object.hash(schoolId, startDate, endDate);
+}
+
+class TransactionSummaryParams {
+  final String schoolId;
+  final DateTime? startDate;
+  final DateTime? endDate;
+
+  TransactionSummaryParams({
+    required this.schoolId,
+    this.startDate,
+    this.endDate,
+  });
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is TransactionSummaryParams &&
+          runtimeType == other.runtimeType &&
+          schoolId == other.schoolId &&
+          startDate == other.startDate &&
+          endDate == other.endDate;
+
+  @override
+  int get hashCode => Object.hash(schoolId, startDate, endDate);
+}
+
+class AllocationHistoryParams {
+  final String studentId;
+  final int limit;
+
+  AllocationHistoryParams({
+    required this.studentId,
+    this.limit = 50,
+  });
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AllocationHistoryParams &&
+          runtimeType == other.runtimeType &&
+          studentId == other.studentId &&
+          limit == other.limit;
+
+  @override
+  int get hashCode => Object.hash(studentId, limit);
+}
+
+/// Financial Reports Service
+/// Uses deployed Supabase RPC functions
+class FinancialReportsService {
+  final SupabaseClient _supabase;
+
+  FinancialReportsService(this._supabase);
+
+  /// Get invoice statistics using deployed RPC function
+  Future<Map<String, dynamic>> getInvoiceStatistics({
+    required String schoolId,
+    DateTime? startDate,
+    DateTime? endDate,
+  }) async {
+    try {
+      final result = await _supabase.rpc(
+        'get_invoice_statistics',
+        params: {
+          'p_school_id': schoolId,
+          if (startDate != null)
+            'p_start_date': startDate.toIso8601String().split('T')[0],
+          if (endDate != null)
+            'p_end_date': endDate.toIso8601String().split('T')[0],
+        },
+      );
+
+      return result as Map<String, dynamic>;
+    } catch (e) {
+      throw Exception('Failed to fetch invoice statistics: $e');
+    }
+  }
+
+  /// Get transaction summary using deployed RPC function
+  Future<Map<String, dynamic>> getTransactionSummary({
+    required String schoolId,
+    DateTime? startDate,
+    DateTime? endDate,
+  }) async {
+    try {
+      final result = await _supabase.rpc(
+        'get_transaction_summary',
+        params: {
+          'p_school_id': schoolId,
+          if (startDate != null)
+            'p_start_date': startDate.toIso8601String().split('T')[0],
+          if (endDate != null)
+            'p_end_date': endDate.toIso8601String().split('T')[0],
+        },
+      );
+
+      return result as Map<String, dynamic>;
+    } catch (e) {
+      throw Exception('Failed to fetch transaction summary: $e');
+    }
+  }
+
+  /// Get outstanding bills using deployed RPC function
+  Future<List<Map<String, dynamic>>> getOutstandingBills(
+      String studentId) async {
+    try {
+      final result = await _supabase.rpc(
+        'get_outstanding_bills_with_balance',
+        params: {
+          'p_student_id': studentId,
+        },
+      );
+
+      return List<Map<String, dynamic>>.from(result as List);
+    } catch (e) {
+      throw Exception('Failed to fetch outstanding bills: $e');
+    }
+  }
+
+  /// Get payment allocation history using deployed RPC function
+  Future<List<Map<String, dynamic>>> getPaymentAllocationHistory({
+    required String studentId,
+    int limit = 50,
+  }) async {
+    try {
+      final result = await _supabase.rpc(
+        'get_payment_allocation_history',
+        params: {
+          'p_student_id': studentId,
+          'p_limit': limit,
+        },
+      );
+
+      return List<Map<String, dynamic>>.from(result as List);
+    } catch (e) {
+      throw Exception('Failed to fetch payment history: $e');
+    }
+  }
+
+  /// Get bill payment summary using deployed RPC function
+  Future<Map<String, dynamic>> getBillPaymentSummary(String billId) async {
+    try {
+      final result = await _supabase.rpc(
+        'get_bill_payment_summary',
+        params: {
+          'p_bill_id': billId,
+        },
+      );
+
+      return result as Map<String, dynamic>;
+    } catch (e) {
+      throw Exception('Failed to fetch bill payment summary: $e');
+    }
+  }
+
+  /// Generate next invoice number using deployed RPC function
+  Future<String> generateNextInvoiceNumber(String schoolId) async {
+    try {
+      final result = await _supabase.rpc(
+        'generate_next_invoice_number',
+        params: {
+          'p_school_id': schoolId,
+        },
+      );
+
+      return result as String;
+    } catch (e) {
+      throw Exception('Failed to generate invoice number: $e');
+    }
+  }
+}
+
+# ==========================================
+
+## Security Analysis for: lib/data/providers/financial_reports_provider.dart
+
+187-      );
+188-
+189:      return List<Map<String, dynamic>>.from(result as List);
+190-    } catch (e) {
+191-      throw Exception('Failed to fetch outstanding bills: $e');
+--
+207-      );
+208-
+209:      return List<Map<String, dynamic>>.from(result as List);
+210-    } catch (e) {
+211-      throw Exception('Failed to fetch payment history: $e');
+
+73-
+74-  @override
+75:  int get hashCode => Object.hash(schoolId, startDate, endDate);
+76-}
+77-
+--
+97-
+98-  @override
+99:  int get hashCode => Object.hash(schoolId, startDate, endDate);
+100-}
+101-
+--
+118-
+119-  @override
+120:  int get hashCode => Object.hash(studentId, limit);
+121-}
+122-
+
+11-final invoiceStatsProvider =
+12-    FutureProvider.family<Map<String, dynamic>, InvoiceStatsParams>(
+13:        (ref, params) async {
+14-  final service = ref.watch(financialReportsProvider);
+15-  return await service.getInvoiceStatistics(
+--
+23-final transactionSummaryProvider =
+24-    FutureProvider.family<Map<String, dynamic>, TransactionSummaryParams>(
+25:        (ref, params) async {
+26-  final service = ref.watch(financialReportsProvider);
+27-  return await service.getTransactionSummary(
+--
+35-final outstandingBillsProvider =
+36-    FutureProvider.family<List<Map<String, dynamic>>, String>(
+37:        (ref, studentId) async {
+38-  final service = ref.watch(financialReportsProvider);
+39-  return await service.getOutstandingBills(studentId);
+--
+43-final paymentAllocationHistoryProvider =
+44-    FutureProvider.family<List<Map<String, dynamic>>, AllocationHistoryParams>(
+45:        (ref, params) async {
+46-  final service = ref.watch(financialReportsProvider);
+47-  return await service.getPaymentAllocationHistory(
+--
+133-    DateTime? startDate,
+134-    DateTime? endDate,
+135:  }) async {
+136-    try {
+137-      final result = await _supabase.rpc(
+--
+157-    DateTime? startDate,
+158-    DateTime? endDate,
+159:  }) async {
+160-    try {
+161-      final result = await _supabase.rpc(
+--
+178-  /// Get outstanding bills using deployed RPC function
+179-  Future<List<Map<String, dynamic>>> getOutstandingBills(
+180:      String studentId) async {
+181-    try {
+182-      final result = await _supabase.rpc(
+--
+197-    required String studentId,
+198-    int limit = 50,
+199:  }) async {
+200-    try {
+201-      final result = await _supabase.rpc(
+--
+214-
+215-  /// Get bill payment summary using deployed RPC function
+216:  Future<Map<String, dynamic>> getBillPaymentSummary(String billId) async {
+217-    try {
+218-      final result = await _supabase.rpc(
+--
+230-
+231-  /// Generate next invoice number using deployed RPC function
+232:  Future<String> generateNextInvoiceNumber(String schoolId) async {
+233-    try {
+234-      final result = await _supabase.rpc(
+
+134-    DateTime? endDate,
+135-  }) async {
+136:    try {
+137-      final result = await _supabase.rpc(
+138-        'get_invoice_statistics',
+--
+147-
+148-      return result as Map<String, dynamic>;
+149:    } catch (e) {
+150:      throw Exception('Failed to fetch invoice statistics: $e');
+151-    }
+152-  }
+--
+158-    DateTime? endDate,
+159-  }) async {
+160:    try {
+161-      final result = await _supabase.rpc(
+162-        'get_transaction_summary',
+--
+171-
+172-      return result as Map<String, dynamic>;
+173:    } catch (e) {
+174:      throw Exception('Failed to fetch transaction summary: $e');
+175-    }
+176-  }
+--
+179-  Future<List<Map<String, dynamic>>> getOutstandingBills(
+180-      String studentId) async {
+181:    try {
+182-      final result = await _supabase.rpc(
+183-        'get_outstanding_bills_with_balance',
+--
+188-
+189-      return List<Map<String, dynamic>>.from(result as List);
+190:    } catch (e) {
+191:      throw Exception('Failed to fetch outstanding bills: $e');
+192-    }
+193-  }
+--
+198-    int limit = 50,
+199-  }) async {
+200:    try {
+201-      final result = await _supabase.rpc(
+202-        'get_payment_allocation_history',
+--
+208-
+209-      return List<Map<String, dynamic>>.from(result as List);
+210:    } catch (e) {
+211:      throw Exception('Failed to fetch payment history: $e');
+212-    }
+213-  }
+--
+215-  /// Get bill payment summary using deployed RPC function
+216-  Future<Map<String, dynamic>> getBillPaymentSummary(String billId) async {
+217:    try {
+218-      final result = await _supabase.rpc(
+219-        'get_bill_payment_summary',
+--
+224-
+225-      return result as Map<String, dynamic>;
+226:    } catch (e) {
+227:      throw Exception('Failed to fetch bill payment summary: $e');
+228-    }
+229-  }
+--
+231-  /// Generate next invoice number using deployed RPC function
+232-  Future<String> generateNextInvoiceNumber(String schoolId) async {
+233:    try {
+234-      final result = await _supabase.rpc(
+235-        'generate_next_invoice_number',
+--
+240-
+241-      return result as String;
+242:    } catch (e) {
+243:      throw Exception('Failed to generate invoice number: $e');
+244-    }
+245-  }
+
+

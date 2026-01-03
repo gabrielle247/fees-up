@@ -13,12 +13,15 @@ class SchoolService {
   /// -----------------------------------------------------------------------
   /// REFRESH HELPER (Required by school_provider.dart)
   /// -----------------------------------------------------------------------
-  Future<Map<String, dynamic>?> getSchoolForUser(String userId, {bool waitForSync = true}) async {
+  Future<Map<String, dynamic>?> getSchoolForUser(String userId,
+      {bool waitForSync = true}) async {
     Future<Map<String, dynamic>?> fetch() async {
-      final profile = await _db.tryGet('SELECT school_id FROM user_profiles WHERE id = ?', [userId]);
+      final profile = await _db
+          .tryGet('SELECT school_id FROM user_profiles WHERE id = ?', [userId]);
       if (profile == null || profile['school_id'] == null) return null;
-      
-      return await _db.tryGet('SELECT * FROM schools WHERE id = ?', [profile['school_id']]);
+
+      return await _db
+          .tryGet('SELECT * FROM schools WHERE id = ?', [profile['school_id']]);
     }
 
     final result = await fetch();
@@ -52,7 +55,7 @@ class SchoolService {
         ''', [schoolId, schoolName, tier, 100, 0, now]);
 
         await tx.execute('''
-          UPDATE user_profiles SET school_id = ?, role = 'admin' WHERE id = ?
+          UPDATE user_profiles SET school_id = ?, role = 'school_admin' WHERE id = ?
         ''', [schoolId, adminId]);
 
         await tx.execute('''
@@ -63,7 +66,7 @@ class SchoolService {
 
       return schoolId;
     } catch (e) {
-      rethrow; 
+      rethrow;
     }
   }
 
@@ -81,7 +84,7 @@ class SchoolService {
         });
 
         final recommendation = response['recommendation'] ?? 'UNKNOWN_ERROR';
-        
+
         if (context.mounted) {
           showProperChannelDialog(context, recommendation);
         }
@@ -105,7 +108,8 @@ class SchoolService {
       barrierDismissible: false,
       builder: (context) => AlertDialog(
         backgroundColor: const Color(0xFF121212),
-        title: const Text("System Alignment Required", style: TextStyle(color: Colors.blue)),
+        title: const Text("System Alignment Required",
+            style: TextStyle(color: Colors.blue)),
         content: Text(
           "Diagnostic Result: $recommendation\n\nTo resolve this, the app must restart your session.",
           style: const TextStyle(color: Colors.white70),
@@ -116,7 +120,8 @@ class SchoolService {
               Navigator.pop(context);
               await _forceLogoutAndReauth();
             },
-            child: const Text("RESET & RE-AUTHENTICATE", style: TextStyle(color: Colors.blue)),
+            child: const Text("RESET & RE-AUTHENTICATE",
+                style: TextStyle(color: Colors.blue)),
           ),
         ],
       ),

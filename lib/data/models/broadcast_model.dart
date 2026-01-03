@@ -1,12 +1,12 @@
+import 'package:fees_up/core/constants/app_colors.dart';
 import 'package:flutter/material.dart';
-import '../../core/constants/app_colors.dart';
 
 class Broadcast {
   final String id;
-  final String? schoolId; // Null = Global
+  final String? schoolId; // Null = Global Greyway.Co Broadcast
   final String authorId;
   final bool isSystemMessage;
-  final String targetRole;
+  final String targetRole; // 'all', 'teacher', 'hq_internal'
   final String title;
   final String body;
   final String priority;
@@ -52,22 +52,27 @@ class Broadcast {
     };
   }
 
-  // --- UI HELPERS ---
+  // --- CE0 UI HELPERS ---
   
+  bool get isInternalHQ => targetRole == 'hq_internal';
+
   Color get badgeColor {
-    if (isSystemMessage) return const Color(0xFF9333EA); // System Purple
-    if (priority == 'critical') return AppColors.errorRed;
-    return AppColors.primaryBlue;
+    if (isInternalHQ) return AppColors.accentPurpleDark; // Security Purple
+    if (isSystemMessage) return  AppColors.primaryBlue; // System Blue
+    if (priority == 'critical') return AppColors.errorRed; // Failure Red
+    return AppColors.successGreen; // General Green
   }
 
   String get authorLabel {
-    if (isSystemMessage) return "Fees Up HQ";
+    if (isInternalHQ) return "Greyway HQ";
+    if (isSystemMessage) return "Fees Up System";
     return "School Admin";
   }
 
   IconData get icon {
-    if (isSystemMessage) return Icons.verified;
-    if (priority == 'critical') return Icons.campaign;
-    return Icons.info_outline;
+    if (isInternalHQ) return Icons.security;
+    if (isSystemMessage) return Icons.settings_suggest;
+    if (priority == 'critical') return Icons.report_problem;
+    return Icons.campaign;
   }
 }

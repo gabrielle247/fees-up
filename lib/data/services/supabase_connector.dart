@@ -1,3 +1,18 @@
+/// -----------------------------------------------------------------
+/// GREYWAY.CO / BATCH TECH - CONFIDENTIAL
+/// -----------------------------------------------------------------
+/// Author:  Nyasha Gabriel
+/// Date:    2025-12-31
+/// Ref:     https://supabase.com/docs
+/// 
+/// This file defines a SupabaseConnector class that integrates
+/// Supabase with PowerSync for data synchronization.
+/// 
+/// It implements methods to fetch authentication credentials
+/// and upload data changes to the Supabase backend.
+/// 
+/// -----------------------------------------------------------------
+library supabase_connector;
 import 'package:flutter/material.dart';
 import 'package:powersync/powersync.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';

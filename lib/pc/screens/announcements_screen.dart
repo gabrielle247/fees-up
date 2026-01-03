@@ -1,3 +1,15 @@
+/// -----------------------------------------------------------------
+/// GREYWAY.CO / BATCH TECH - CONFIDENTIAL
+/// -----------------------------------------------------------------
+/// Author:  Nyasha Gabriel
+/// Date:    2025-12-31
+/// -----------------------------------------------------------------
+library;
+
+// ------------------------------------------
+// NOTE: I want to comment on top of file
+// ------------------------------------------
+
 import 'package:flutter/material.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../widgets/sidebar.dart';
@@ -9,22 +21,22 @@ class AnnouncementsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return const Scaffold(
       backgroundColor: AppColors.backgroundBlack,
       body: Row(
         children: [
-          const DashboardSidebar(),
+          DashboardSidebar(),
           Expanded(
             child: Column(
               children: [
-                const _BroadcastsHeader(),
-                const Divider(height: 1, color: AppColors.divider),
+                _BroadcastsHeader(),
+                Divider(height: 1, color: AppColors.divider),
                 
                 Expanded(
                   child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(32),
+                    padding: EdgeInsets.all(32),
                     child: Column(
-                      children: const [
+                      children: [
                         BroadcastKpiCards(),
                         SizedBox(height: 24),
                         BroadcastList(),
