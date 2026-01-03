@@ -42,8 +42,9 @@ class InvoicesScreen extends ConsumerWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // 1. Stats Row (Pass function to open dialog)
+                          // 1. Stats Row (Pass schoolId and function to open dialog)
                           InvoicesStats(
+                            schoolId: data.schoolId,
                             onCreateInvoice: () {
                               showDialog(
                                 context: context,

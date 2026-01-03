@@ -180,10 +180,10 @@ class ReportsScreen extends ConsumerWidget {
               ),
             ),
             loading: () => _buildLoadingCards(),
-            error: (err, stack) => _buildErrorCards(err.toString()),
+            error: (err, stack) => _buildErrorCards(err.toString(), ref, schoolId),
           ),
           loading: () => _buildLoadingCards(),
-          error: (err, stack) => _buildErrorCards(err.toString()),
+          error: (err, stack) => _buildErrorCards(err.toString(), ref, schoolId),
         ),
       ],
     );
@@ -216,7 +216,7 @@ class ReportsScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildErrorCards(String error) {
+  Widget _buildErrorCards(String error, WidgetRef ref, String schoolId) {
     return SizedBox(
       height: 220,
       child: Container(
@@ -232,22 +232,42 @@ class ReportsScreen extends ConsumerWidget {
               const Icon(Icons.error_outline,
                   color: AppColors.errorRed, size: 48),
               const SizedBox(height: 16),
-              Text(
+              const Text(
                 'Failed to load reports',
-                style: const TextStyle(
+                style: TextStyle(
                   color: AppColors.textWhite,
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
                 ),
               ),
               const SizedBox(height: 8),
-              Text(
-                error,
-                style: const TextStyle(
-                  color: AppColors.textGrey,
-                  fontSize: 12,
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 32),
+                child: Text(
+                  error,
+                  style: const TextStyle(
+                    color: AppColors.textGrey,
+                    fontSize: 12,
+                  ),
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton.icon(
+                onPressed: () {
+                  // Refresh all financial providers
+                  ref.invalidate(invoiceStatsProvider(InvoiceStatsParams(schoolId: schoolId)));
+                  ref.invalidate(transactionSummaryProvider(TransactionSummaryParams(schoolId: schoolId)));
+                },
+                icon: const Icon(Icons.refresh, size: 16),
+                label: const Text('Retry'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryBlue,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                ),
               ),
             ],
           ),
