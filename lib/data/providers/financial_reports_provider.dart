@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'dart:async';
 
 /// Financial Reports Provider
 /// Connects to deployed RPC functions for real-time financial data
@@ -7,47 +8,95 @@ final financialReportsProvider = Provider((ref) {
   return FinancialReportsService(Supabase.instance.client);
 });
 
-/// Invoice Statistics Provider
+/// Invoice Statistics Stream Provider - Updates periodically
 final invoiceStatsProvider =
-    FutureProvider.family<Map<String, dynamic>, InvoiceStatsParams>(
-        (ref, params) async {
+    StreamProvider.family<Map<String, dynamic>, InvoiceStatsParams>(
+        (ref, params) async* {
   final service = ref.watch(financialReportsProvider);
-  return await service.getInvoiceStatistics(
-    schoolId: params.schoolId,
-    startDate: params.startDate,
-    endDate: params.endDate,
-  );
+
+  // Periodic refresh every 30 seconds for real-time-like updates
+  final timer = Stream.periodic(const Duration(seconds: 30));
+
+  await for (final _ in timer) {
+    try {
+      final stats = await service.getInvoiceStatistics(
+        schoolId: params.schoolId,
+        startDate: params.startDate,
+        endDate: params.endDate,
+      );
+      yield stats;
+    } catch (e) {
+      // Continue with error state or previous value
+      continue;
+    }
+  }
 });
 
-/// Transaction Summary Provider
+/// Transaction Summary Stream Provider - Updates periodically
 final transactionSummaryProvider =
-    FutureProvider.family<Map<String, dynamic>, TransactionSummaryParams>(
-        (ref, params) async {
+    StreamProvider.family<Map<String, dynamic>, TransactionSummaryParams>(
+        (ref, params) async* {
   final service = ref.watch(financialReportsProvider);
-  return await service.getTransactionSummary(
-    schoolId: params.schoolId,
-    startDate: params.startDate,
-    endDate: params.endDate,
-  );
+
+  // Periodic refresh every 30 seconds for real-time-like updates
+  final timer = Stream.periodic(const Duration(seconds: 30));
+
+  await for (final _ in timer) {
+    try {
+      final summary = await service.getTransactionSummary(
+        schoolId: params.schoolId,
+        startDate: params.startDate,
+        endDate: params.endDate,
+      );
+      yield summary;
+    } catch (e) {
+      // Continue with error state or previous value
+      continue;
+    }
+  }
 });
 
-/// Outstanding Bills Provider
+/// Outstanding Bills Stream Provider - Updates periodically
 final outstandingBillsProvider =
-    FutureProvider.family<List<Map<String, dynamic>>, String>(
-        (ref, studentId) async {
+    StreamProvider.family<List<Map<String, dynamic>>, String>(
+        (ref, studentId) async* {
   final service = ref.watch(financialReportsProvider);
-  return await service.getOutstandingBills(studentId);
+
+  // Periodic refresh every 30 seconds for real-time-like updates
+  final timer = Stream.periodic(const Duration(seconds: 30));
+
+  await for (final _ in timer) {
+    try {
+      final bills = await service.getOutstandingBills(studentId);
+      yield bills;
+    } catch (e) {
+      // Continue with error state or previous value
+      continue;
+    }
+  }
 });
 
-/// Payment Allocation History Provider
+/// Payment Allocation History Stream Provider - Updates periodically
 final paymentAllocationHistoryProvider =
-    FutureProvider.family<List<Map<String, dynamic>>, AllocationHistoryParams>(
-        (ref, params) async {
+    StreamProvider.family<List<Map<String, dynamic>>, AllocationHistoryParams>(
+        (ref, params) async* {
   final service = ref.watch(financialReportsProvider);
-  return await service.getPaymentAllocationHistory(
-    studentId: params.studentId,
-    limit: params.limit,
-  );
+
+  // Periodic refresh every 30 seconds for real-time-like updates
+  final timer = Stream.periodic(const Duration(seconds: 30));
+
+  await for (final _ in timer) {
+    try {
+      final history = await service.getPaymentAllocationHistory(
+        studentId: params.studentId,
+        limit: params.limit,
+      );
+      yield history;
+    } catch (e) {
+      // Continue with error state or previous value
+      continue;
+    }
+  }
 });
 
 // Parameter Classes

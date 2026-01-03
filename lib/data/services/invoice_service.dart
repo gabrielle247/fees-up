@@ -2,12 +2,15 @@ import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../core/security/billing_guard.dart';
+
 /// 🔒 SECURE Invoice Service with RPC-only access pattern
 /// All invoice operations must respect billing suspension status
 class InvoiceService {
   final SupabaseClient supabase;
+  final BillingGuard _guard;
 
-  InvoiceService({required this.supabase});
+  InvoiceService({required this.supabase}) : _guard = BillingGuard(supabase);
 
   /// Generate next invoice number sequentially
   /// Format: INV-XXXXX (e.g., INV-00001)
@@ -51,44 +54,45 @@ class InvoiceService {
     required DateTime dueDate,
     required String status, // 'draft', 'sent', 'paid', 'overdue'
   }) async {
-    try {
-      final invoiceId = const Uuid().v4();
-      final invoiceNumber = await getNextInvoiceNumber(schoolId);
-      final now = DateTime.now();
+    return _guard.run(
+      schoolId: schoolId,
+      action: () async {
+        final invoiceId = const Uuid().v4();
+        final invoiceNumber = await getNextInvoiceNumber(schoolId);
+        final now = DateTime.now();
 
-      // ✅ CORRECT: No artificial term_id hack
-      // Bill_type 'adhoc' is sufficient - database schema supports null values
-      // for school_year_id, month_index, and term_id
-      final billData = {
-        'id': invoiceId,
-        'school_id': schoolId,
-        'student_id': studentId,
-        'invoice_number': invoiceNumber,
-        'title': title,
-        'total_amount': amount,
-        'paid_amount': 0.0,
-        'is_paid': 0,
-        'is_closed': 0,
-        'bill_type': 'adhoc',
-        'status': status, // 'draft', 'sent', 'paid', 'overdue'
-        'due_date': DateFormat('yyyy-MM-dd').format(dueDate),
-        'created_at': now.toIso8601String(),
-        'updated_at': now.toIso8601String(),
-        'month_year': DateFormat('yyyy-MM').format(now),
-        // ✅ CORRECT: No term_id, school_year_id, month_index required for adhoc
-        // Database schema allows nulls for these fields
-      };
+        // ✅ CORRECT: No artificial term_id hack
+        // Bill_type 'adhoc' is sufficient - database schema supports null values
+        // for school_year_id, month_index, and term_id
+        final billData = {
+          'id': invoiceId,
+          'school_id': schoolId,
+          'student_id': studentId,
+          'invoice_number': invoiceNumber,
+          'title': title,
+          'total_amount': amount,
+          'paid_amount': 0.0,
+          'is_paid': 0,
+          'is_closed': 0,
+          'bill_type': 'adhoc',
+          'status': status, // 'draft', 'sent', 'paid', 'overdue'
+          'due_date': DateFormat('yyyy-MM-dd').format(dueDate),
+          'created_at': now.toIso8601String(),
+          'updated_at': now.toIso8601String(),
+          'month_year': DateFormat('yyyy-MM').format(now),
+          // ✅ CORRECT: No term_id, school_year_id, month_index required for adhoc
+          // Database schema allows nulls for these fields
+        };
 
-      await supabase.from('bills').insert(billData);
+        await supabase.from('bills').insert(billData);
 
-      return {
-        'id': invoiceId,
-        'invoiceNumber': invoiceNumber,
-        'status': 'success',
-      };
-    } catch (e) {
-      rethrow;
-    }
+        return {
+          'id': invoiceId,
+          'invoiceNumber': invoiceNumber,
+          'status': 'success',
+        };
+      },
+    );
   }
 
   /// Update invoice status (draft → sent, sent → paid, etc.)
@@ -97,13 +101,10 @@ class InvoiceService {
     required String newStatus, // 'draft', 'sent', 'paid', 'overdue'
   }) async {
     try {
-      await supabase
-          .from('bills')
-          .update({
-            'status': newStatus,
-            'updated_at': DateTime.now().toIso8601String(),
-          })
-          .eq('id', invoiceId);
+      await supabase.from('bills').update({
+        'status': newStatus,
+        'updated_at': DateTime.now().toIso8601String(),
+      }).eq('id', invoiceId);
     } catch (e) {
       rethrow;
     }
@@ -133,21 +134,26 @@ class InvoiceService {
   }) async {
     try {
       // Build query without conditional reassignment
-      final query = supabase
-          .from('bills')
-          .select(
-              'id, school_id, student_id, invoice_number, title, total_amount, paid_amount, is_paid, status, due_date, bill_type, created_at');
+      final query = supabase.from('bills').select(
+          'id, school_id, student_id, invoice_number, title, total_amount, paid_amount, is_paid, status, due_date, bill_type, created_at');
 
       // Apply filters in chain
       var filtered = query.eq('school_id', schoolId).eq('bill_type', 'adhoc');
 
       // Apply optional filters inline without reassignment
       final response = await (status != null && studentId != null
-          ? filtered.eq('status', status).eq('student_id', studentId).order('created_at', ascending: false)
+          ? filtered
+              .eq('status', status)
+              .eq('student_id', studentId)
+              .order('created_at', ascending: false)
           : status != null
-              ? filtered.eq('status', status).order('created_at', ascending: false)
+              ? filtered
+                  .eq('status', status)
+                  .order('created_at', ascending: false)
               : studentId != null
-                  ? filtered.eq('student_id', studentId).order('created_at', ascending: false)
+                  ? filtered
+                      .eq('student_id', studentId)
+                      .order('created_at', ascending: false)
                   : filtered.order('created_at', ascending: false));
 
       return List<Map<String, dynamic>>.from(response);
@@ -207,13 +213,10 @@ class InvoiceService {
   /// Archive/close an invoice (mark as closed)
   Future<void> closeInvoice(String invoiceId) async {
     try {
-      await supabase
-          .from('bills')
-          .update({
-            'is_closed': 1,
-            'updated_at': DateTime.now().toIso8601String(),
-          })
-          .eq('id', invoiceId);
+      await supabase.from('bills').update({
+        'is_closed': 1,
+        'updated_at': DateTime.now().toIso8601String(),
+      }).eq('id', invoiceId);
     } catch (e) {
       rethrow;
     }
