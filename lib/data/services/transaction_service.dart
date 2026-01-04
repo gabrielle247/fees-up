@@ -2,13 +2,20 @@ import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../core/errors/billing_exceptions.dart';
+import 'device_authority_service.dart';
+import 'database_service.dart';
+
 /// 🔒 SECURE Transaction Processing Engine
 /// Handles payment allocation, partial payments, and refunds
 /// All operations support offline-first via PowerSync
+/// 🔒 Only the billing engine device can record payments and allocate them
 class TransactionService {
   final SupabaseClient supabase;
+  final DeviceAuthorityService _deviceAuthority;
 
-  TransactionService({required this.supabase});
+  TransactionService({required this.supabase})
+      : _deviceAuthority = DeviceAuthorityService();
 
   // ========== PAYMENT PROCESSING ==========
 
@@ -17,16 +24,28 @@ class TransactionService {
   /// - Full payment to single bill
   /// - Partial payment to single bill
   /// - Payment allocated across multiple bills
+  /// 🔒 Only billing engine device can record payments
   Future<String> recordPayment({
     required String schoolId,
     required String studentId,
     required double amount,
     required String method, // 'Cash', 'Bank Transfer', 'Mobile Money', 'Cheque'
-    required String category, // 'Tuition', 'Uniform', 'Levy', 'Transport', 'Donation'
+    required String
+        category, // 'Tuition', 'Uniform', 'Levy', 'Transport', 'Donation'
     required DateTime datePaid,
+    required String userId, // Required for RLS compliance
     String? payerName,
     String? description,
   }) async {
+    // ✅ Check device authority
+    final isBillingEngine =
+        await _deviceAuthority.isBillingEngineForSchool(schoolId);
+    if (!isBillingEngine) {
+      throw BillingEnginePermissionException(
+          'This device is not the billing engine for $schoolId. '
+          'Only the billing engine device can record payments.');
+    }
+
     try {
       final paymentId = const Uuid().v4();
       final now = DateTime.now();
@@ -42,11 +61,16 @@ class TransactionService {
         'date_paid': DateFormat('yyyy-MM-dd').format(datePaid),
         'payer_name': payerName,
         'description': description,
+        'user_id': userId, // ✅ Required for RLS compliance
+        'device_id': _deviceAuthority
+            .currentDeviceId, // ✅ Track which device recorded it
         'created_at': now.toIso8601String(),
         'updated_at': now.toIso8601String(),
       };
 
-      await supabase.from('payments').insert(paymentData);
+      // ✅ Use PowerSync for offline-first write
+      final db = DatabaseService();
+      await db.insert('payments', paymentData);
 
       // Trigger audit logging via server-side function (similar to billing suspension)
       try {
@@ -55,6 +79,8 @@ class TransactionService {
           'p_school_id': schoolId,
           'p_action': 'payment_recorded',
           'p_amount': amount,
+          'p_user_id': userId,
+          'p_device_id': _deviceAuthority.currentDeviceId,
         });
       } catch (e) {
         // Log call is non-critical
@@ -71,11 +97,22 @@ class TransactionService {
 
   /// ✅ NEW: Allocate payment to specific bills
   /// Enables partial payment tracking and bill-level payment status
+  /// 🔒 Only billing engine device can allocate payments
   Future<void> allocatePaymentToBill({
+    required String schoolId,
     required String paymentId,
     required String billId,
     required double allocatedAmount,
   }) async {
+    // ✅ Check device authority
+    final isBillingEngine =
+        await _deviceAuthority.isBillingEngineForSchool(schoolId);
+    if (!isBillingEngine) {
+      throw BillingEnginePermissionException(
+          'This device is not the billing engine for $schoolId. '
+          'Only the billing engine device can allocate payments.');
+    }
+
     try {
       final allocationId = const Uuid().v4();
 
@@ -84,11 +121,15 @@ class TransactionService {
         'id': allocationId,
         'payment_id': paymentId,
         'bill_id': billId,
+        'school_id': schoolId,
         'amount': allocatedAmount,
+        'device_id': _deviceAuthority.currentDeviceId,
         'created_at': DateTime.now().toIso8601String(),
       };
 
-      await supabase.from('payment_allocations').insert(allocationData);
+      // ✅ Use PowerSync for offline-first write
+      final db = DatabaseService();
+      await db.insert('payment_allocations', allocationData);
 
       // Update bill paid_amount
       await _updateBillPaidAmount(billId, allocatedAmount);
@@ -99,6 +140,7 @@ class TransactionService {
 
   /// Allocate a payment across multiple bills (partial payment support)
   Future<void> allocatePaymentToMultipleBills({
+    required String schoolId,
     required String paymentId,
     required List<MapEntry<String, double>> billAllocations,
     // billAllocations: List of MapEntry<billId, allocatedAmount>
@@ -106,6 +148,7 @@ class TransactionService {
     try {
       for (final allocation in billAllocations) {
         await allocatePaymentToBill(
+          schoolId: schoolId,
           paymentId: paymentId,
           billId: allocation.key,
           allocatedAmount: allocation.value,
@@ -136,10 +179,10 @@ class TransactionService {
   Future<List<Map<String, dynamic>>> getOutstandingBillsWithBalance(
       String studentId) async {
     try {
-      final response = await supabase.rpc('get_outstanding_bills_with_balance',
-          params: {
-            'p_student_id': studentId,
-          });
+      final response =
+          await supabase.rpc('get_outstanding_bills_with_balance', params: {
+        'p_student_id': studentId,
+      });
 
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
@@ -153,28 +196,34 @@ class TransactionService {
   /// Automatically tracks if bill is fully paid
   Future<void> _updateBillPaidAmount(String billId, double addedAmount) async {
     try {
-      // Get current bill state
-      final response = await supabase
-          .from('bills')
-          .select('paid_amount, total_amount, id')
-          .eq('id', billId)
-          .single();
+      final db = DatabaseService().db;
 
-      final currentPaid = (response['paid_amount'] as num).toDouble();
-      final totalAmount = (response['total_amount'] as num).toDouble();
+      // Get current bill state using PowerSync
+      final billData = await db.getAll(
+        'SELECT paid_amount, total_amount FROM bills WHERE id = ? LIMIT 1',
+        [billId],
+      );
+
+      if (billData.isEmpty) {
+        throw Exception('Bill not found: $billId');
+      }
+
+      final currentPaid = (billData[0]['paid_amount'] as num).toDouble();
+      final totalAmount = (billData[0]['total_amount'] as num).toDouble();
       final newPaidAmount = currentPaid + addedAmount;
       final isFullyPaid = newPaidAmount >= totalAmount;
 
-      // Update bill with new paid amount and status
-      await supabase
-          .from('bills')
-          .update({
-            'paid_amount': newPaidAmount,
-            'is_paid': isFullyPaid ? 1 : 0,
-            'status': isFullyPaid ? 'paid' : 'partial',
-            'updated_at': DateTime.now().toIso8601String(),
-          })
-          .eq('id', billId);
+      // Update bill with new paid amount and status using PowerSync
+      await db.execute(
+        'UPDATE bills SET paid_amount = ?, is_paid = ?, status = ?, updated_at = ? WHERE id = ?',
+        [
+          newPaidAmount,
+          isFullyPaid ? 1 : 0,
+          isFullyPaid ? 'paid' : 'partial',
+          DateTime.now().toIso8601String(),
+          billId,
+        ],
+      );
     } catch (e) {
       rethrow;
     }
@@ -216,6 +265,7 @@ class TransactionService {
 
   /// ✅ NEW: Process refund for overpayment
   /// Creates reverse payment entry and adjusts bill status
+  /// 🔒 Only billing engine device can process refunds
   Future<String> processRefund({
     required String originalPaymentId,
     required String studentId,
@@ -223,8 +273,18 @@ class TransactionService {
     required double refundAmount,
     required String reason,
     required String refundMethod, // 'Cash', 'Bank Transfer', etc.
+    required String userId, // Required for RLS compliance
     String? approvedBy,
   }) async {
+    // ✅ Check device authority
+    final isBillingEngine =
+        await _deviceAuthority.isBillingEngineForSchool(schoolId);
+    if (!isBillingEngine) {
+      throw BillingEnginePermissionException(
+          'This device is not the billing engine for $schoolId. '
+          'Only the billing engine device can process refunds.');
+    }
+
     try {
       final refundId = const Uuid().v4();
       final now = DateTime.now();
@@ -239,15 +299,20 @@ class TransactionService {
         'category': 'Refund',
         'date_paid': DateFormat('yyyy-MM-dd').format(now),
         'payer_name': 'School Refund',
-        'description': 'Refund for payment: $originalPaymentId. Reason: $reason',
+        'description':
+            'Refund for payment: $originalPaymentId. Reason: $reason',
         'original_payment_id': originalPaymentId,
         'refund_reason': reason,
         'approved_by': approvedBy,
+        'user_id': userId, // ✅ Required for RLS compliance
+        'device_id': _deviceAuthority.currentDeviceId,
         'created_at': now.toIso8601String(),
         'updated_at': now.toIso8601String(),
       };
 
-      await supabase.from('payments').insert(refundData);
+      // ✅ Use PowerSync for offline-first write
+      final db = DatabaseService();
+      await db.insert('payments', refundData);
 
       // Log refund action
       try {
@@ -258,6 +323,8 @@ class TransactionService {
           'p_amount': refundAmount,
           'p_reason': reason,
           'p_approved_by': approvedBy,
+          'p_user_id': userId,
+          'p_device_id': _deviceAuthority.currentDeviceId,
         });
       } catch (e) {
         debugPrintError('Refund audit log failed: $e');
@@ -292,34 +359,42 @@ class TransactionService {
   /// Internal: Reduce paid amount (for refunds)
   Future<void> _reduceBillPaidAmount(String billId, double deductAmount) async {
     try {
-      final response = await supabase
-          .from('bills')
-          .select('paid_amount, total_amount')
-          .eq('id', billId)
-          .single();
+      final db = DatabaseService().db;
 
-      final currentPaid = (response['paid_amount'] as num).toDouble();
-      final newPaidAmount = (currentPaid - deductAmount).clamp(0.0, double.infinity);
-      final totalAmount = (response['total_amount'] as num).toDouble();
+      // Get current bill state using PowerSync
+      final billData = await db.getAll(
+        'SELECT paid_amount, total_amount FROM bills WHERE id = ? LIMIT 1',
+        [billId],
+      );
+
+      if (billData.isEmpty) {
+        throw Exception('Bill not found: $billId');
+      }
+
+      final currentPaid = (billData[0]['paid_amount'] as num).toDouble();
+      final newPaidAmount =
+          (currentPaid - deductAmount).clamp(0.0, double.infinity);
+      final totalAmount = (billData[0]['total_amount'] as num).toDouble();
       final isFullyPaid = newPaidAmount >= totalAmount;
 
-      await supabase
-          .from('bills')
-          .update({
-            'paid_amount': newPaidAmount,
-            'is_paid': isFullyPaid ? 1 : 0,
-            'status': isFullyPaid ? 'paid' : (newPaidAmount > 0 ? 'partial' : 'sent'),
-            'updated_at': DateTime.now().toIso8601String(),
-          })
-          .eq('id', billId);
+      // Update using PowerSync
+      await db.execute(
+        'UPDATE bills SET paid_amount = ?, is_paid = ?, status = ?, updated_at = ? WHERE id = ?',
+        [
+          newPaidAmount,
+          isFullyPaid ? 1 : 0,
+          isFullyPaid ? 'paid' : (newPaidAmount > 0 ? 'partial' : 'sent'),
+          DateTime.now().toIso8601String(),
+          billId,
+        ],
+      );
     } catch (e) {
       rethrow;
     }
   }
 
   /// Get refund history for a student
-  Future<List<Map<String, dynamic>>> getRefundHistory(
-      String studentId) async {
+  Future<List<Map<String, dynamic>>> getRefundHistory(String studentId) async {
     try {
       final response = await supabase
           .from('payments')
@@ -344,10 +419,8 @@ class TransactionService {
     DateTime? endDate,
   }) async {
     try {
-      final query = supabase
-          .from('payments')
-          .select(
-              'id, amount, method, category, date_paid, payer_name, created_at');
+      final query = supabase.from('payments').select(
+          'id, amount, method, category, date_paid, payer_name, created_at');
 
       var filtered = query.eq('student_id', studentId).gt('amount', 0);
 
@@ -363,7 +436,8 @@ class TransactionService {
                   .order('date_paid', ascending: false)
               : endDate != null
                   ? filtered
-                      .lte('date_paid', DateFormat('yyyy-MM-dd').format(endDate))
+                      .lte(
+                          'date_paid', DateFormat('yyyy-MM-dd').format(endDate))
                       .order('date_paid', ascending: false)
                   : filtered.order('date_paid', ascending: false));
 
@@ -406,7 +480,8 @@ class TransactionService {
   }
 
   /// Get recent transactions for school (payments and expenses)
-  Future<List<Map<String, dynamic>>> getSchoolTransactions(String schoolId, {int limit = 50}) async {
+  Future<List<Map<String, dynamic>>> getSchoolTransactions(String schoolId,
+      {int limit = 50}) async {
     try {
       final response = await supabase
           .from('payments')

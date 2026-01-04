@@ -3,7 +3,6 @@ import 'package:powersync/powersync.dart';
 /// The Local SQLite Schema matching the Supabase Postgres Schema
 /// based on the Fees Up Rules.
 const Schema appSchema = Schema([
-  
   // ============================================================
   // CORE SCHOOL DATA
   // ============================================================
@@ -11,7 +10,7 @@ const Schema appSchema = Schema([
     Column.text('name'),
     Column.text('subscription_tier'),
     Column.integer('max_students'),
-    Column.integer('is_suspended'), 
+    Column.integer('is_suspended'),
     Column.text('created_at'),
   ]),
 
@@ -36,11 +35,20 @@ const Schema appSchema = Schema([
   ]),
 
   // ============================================================
+  // LOCAL SECURITY CONFIG (Pull Once Protocol)
+  // ============================================================
+  Table('local_security_config', [
+    Column.text('key'), // Unique key for the config value
+    Column.text('value'), // The cached security rule value
+    Column.text('updated_at'), // When it was last pulled from cloud
+  ]),
+
+  // ============================================================
   // PEOPLE (Students, Teachers, Access)
   // ============================================================
   Table('students', [
     Column.text('school_id'),
-    Column.text('student_id'), 
+    Column.text('student_id'),
     Column.text('full_name'),
     Column.text('grade'),
     Column.text('parent_contact'),
@@ -180,11 +188,11 @@ const Schema appSchema = Schema([
     Column.text('school_id'),
     Column.text('student_id'),
     Column.text('title'),
-    
+
     // --- NEW COLUMNS FOR INVOICING ---
     Column.text('invoice_number'), // e.g. "INV-00231"
-    Column.text('status'),         // e.g. "draft", "sent", "paid", "overdue"
-    Column.text('pdf_url'),        // Link to Supabase Storage bucket
+    Column.text('status'), // e.g. "draft", "sent", "paid", "overdue"
+    Column.text('pdf_url'), // Link to Supabase Storage bucket
     // ---------------------------------
 
     Column.real('total_amount'),
@@ -322,7 +330,7 @@ const Schema appSchema = Schema([
     Column.text('campaign_id'),
     Column.text('student_id'),
     Column.real('amount'),
-    Column.text('direction'), 
+    Column.text('direction'),
     Column.text('recorded_by'),
     Column.text('approved_by'),
     Column.text('reference'),

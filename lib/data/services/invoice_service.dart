@@ -3,14 +3,21 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../core/security/billing_guard.dart';
+import '../../core/errors/billing_exceptions.dart';
+import 'device_authority_service.dart';
+import 'database_service.dart';
 
 /// 🔒 SECURE Invoice Service with RPC-only access pattern
 /// All invoice operations must respect billing suspension status
+/// Only the billing engine device can create/modify invoices
 class InvoiceService {
   final SupabaseClient supabase;
   final BillingGuard _guard;
+  final DeviceAuthorityService _deviceAuthority;
 
-  InvoiceService({required this.supabase}) : _guard = BillingGuard(supabase);
+  InvoiceService({required this.supabase})
+      : _guard = BillingGuard(supabase),
+        _deviceAuthority = DeviceAuthorityService();
 
   /// Generate next invoice number sequentially
   /// Format: INV-XXXXX (e.g., INV-00001)
@@ -46,6 +53,7 @@ class InvoiceService {
   /// - No schema hacks (no 'term_id': 'adhoc-manual')
   /// - Supports draft status before sending
   /// - Properly tracks invoice with all metadata
+  /// - 🔒 Only billing engine device can create invoices
   Future<Map<String, dynamic>> createAdhocInvoice({
     required String schoolId,
     required String studentId,
@@ -53,10 +61,20 @@ class InvoiceService {
     required double amount,
     required DateTime dueDate,
     required String status, // 'draft', 'sent', 'paid', 'overdue'
+    required String userId, // Required for RLS compliance
   }) async {
     return _guard.run(
       schoolId: schoolId,
       action: () async {
+        // ✅ Check device authority
+        final isBillingEngine =
+            await _deviceAuthority.isBillingEngineForSchool(schoolId);
+        if (!isBillingEngine) {
+          throw BillingEnginePermissionException(
+              'This device is not the billing engine for $schoolId. '
+              'Only the billing engine device can create invoices.');
+        }
+
         final invoiceId = const Uuid().v4();
         final invoiceNumber = await getNextInvoiceNumber(schoolId);
         final now = DateTime.now();
@@ -80,11 +98,37 @@ class InvoiceService {
           'created_at': now.toIso8601String(),
           'updated_at': now.toIso8601String(),
           'month_year': DateFormat('yyyy-MM').format(now),
+          'user_id': userId, // ✅ Required for RLS compliance
+          'device_id': _deviceAuthority
+              .currentDeviceId, // ✅ Track which device created it
           // ✅ CORRECT: No term_id, school_year_id, month_index required for adhoc
           // Database schema allows nulls for these fields
         };
 
-        await supabase.from('bills').insert(billData);
+        // ✅ Use PowerSync for offline-first write
+        final db = DatabaseService().db;
+        await db.execute(
+          'INSERT INTO bills (id, school_id, student_id, invoice_number, title, total_amount, paid_amount, is_paid, is_closed, bill_type, status, due_date, created_at, updated_at, month_year, user_id, device_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          [
+            billData['id'],
+            billData['school_id'],
+            billData['student_id'],
+            billData['invoice_number'],
+            billData['title'],
+            billData['total_amount'],
+            billData['paid_amount'],
+            billData['is_paid'],
+            billData['is_closed'],
+            billData['bill_type'],
+            billData['status'],
+            billData['due_date'],
+            billData['created_at'],
+            billData['updated_at'],
+            billData['month_year'],
+            billData['user_id'],
+            billData['device_id'],
+          ],
+        );
 
         return {
           'id': invoiceId,
@@ -96,15 +140,28 @@ class InvoiceService {
   }
 
   /// Update invoice status (draft → sent, sent → paid, etc.)
+  /// 🔒 Only billing engine device can update invoices
   Future<void> updateInvoiceStatus({
+    required String schoolId,
     required String invoiceId,
     required String newStatus, // 'draft', 'sent', 'paid', 'overdue'
   }) async {
+    // ✅ Check device authority
+    final isBillingEngine =
+        await _deviceAuthority.isBillingEngineForSchool(schoolId);
+    if (!isBillingEngine) {
+      throw BillingEnginePermissionException(
+          'This device is not the billing engine for $schoolId. '
+          'Only the billing engine device can update invoices.');
+    }
+
     try {
-      await supabase.from('bills').update({
-        'status': newStatus,
-        'updated_at': DateTime.now().toIso8601String(),
-      }).eq('id', invoiceId);
+      final db = DatabaseService().db;
+      // ✅ Use PowerSync for offline-first update
+      await db.execute(
+        'UPDATE bills SET status = ?, updated_at = ? WHERE id = ?',
+        [newStatus, DateTime.now().toIso8601String(), invoiceId],
+      );
     } catch (e) {
       rethrow;
     }
@@ -211,12 +268,27 @@ class InvoiceService {
   }
 
   /// Archive/close an invoice (mark as closed)
-  Future<void> closeInvoice(String invoiceId) async {
+  /// 🔒 Only billing engine device can close invoices
+  Future<void> closeInvoice({
+    required String schoolId,
+    required String invoiceId,
+  }) async {
+    // ✅ Check device authority
+    final isBillingEngine =
+        await _deviceAuthority.isBillingEngineForSchool(schoolId);
+    if (!isBillingEngine) {
+      throw BillingEnginePermissionException(
+          'This device is not the billing engine for $schoolId. '
+          'Only the billing engine device can close invoices.');
+    }
+
     try {
-      await supabase.from('bills').update({
-        'is_closed': 1,
-        'updated_at': DateTime.now().toIso8601String(),
-      }).eq('id', invoiceId);
+      final db = DatabaseService().db;
+      // ✅ Use PowerSync for offline-first update
+      await db.execute(
+        'UPDATE bills SET is_closed = 1, updated_at = ? WHERE id = ?',
+        [DateTime.now().toIso8601String(), invoiceId],
+      );
     } catch (e) {
       rethrow;
     }

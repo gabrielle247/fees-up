@@ -21,7 +21,8 @@ final transactionServiceProvider = Provider<TransactionService>((ref) {
 });
 
 /// Financial Reports Service provider
-final financialReportsServiceProvider = Provider<FinancialReportsService>((ref) {
+final financialReportsServiceProvider =
+    Provider<FinancialReportsService>((ref) {
   final supabase = Supabase.instance.client;
   return FinancialReportsService(supabase: supabase);
 });
@@ -37,15 +38,16 @@ final nextInvoiceNumberProvider =
 
 /// Get all invoices for a school
 final schoolInvoicesProvider =
-    FutureProvider.family<List<Map<String, dynamic>>, String>((ref, schoolId) async {
+    FutureProvider.family<List<Map<String, dynamic>>, String>(
+        (ref, schoolId) async {
   final invoiceService = ref.watch(invoiceServiceProvider);
   return invoiceService.getInvoicesForSchool(schoolId: schoolId);
 });
 
 /// Get outstanding invoices for a student
-final studentOutstandingInvoicesProvider = FutureProvider.family<
-    List<Map<String, dynamic>>,
-    String>((ref, studentId) async {
+final studentOutstandingInvoicesProvider =
+    FutureProvider.family<List<Map<String, dynamic>>, String>(
+        (ref, studentId) async {
   final invoiceService = ref.watch(invoiceServiceProvider);
   return invoiceService.getOutstandingInvoices(studentId);
 });
@@ -74,32 +76,30 @@ final invoicesByDateRangeProvider = FutureProvider.family<
 // ========== PAYMENT & ALLOCATION PROVIDERS ==========
 
 /// Get outstanding bills with balance for a student
-final outstandingBillsProvider = FutureProvider.family<
-    List<Map<String, dynamic>>,
-    String>((ref, studentId) async {
+final outstandingBillsProvider =
+    FutureProvider.family<List<Map<String, dynamic>>, String>(
+        (ref, studentId) async {
   final transactionService = ref.watch(transactionServiceProvider);
   return transactionService.getOutstandingBillsWithBalance(studentId);
 });
 
 /// Get payment allocations for a payment
-final paymentAllocationsProvider = FutureProvider.family<
-    List<Map<String, dynamic>>,
-    String>((ref, paymentId) async {
+final paymentAllocationsProvider =
+    FutureProvider.family<List<Map<String, dynamic>>, String>(
+        (ref, paymentId) async {
   final transactionService = ref.watch(transactionServiceProvider);
   return transactionService.getPaymentAllocations(paymentId);
 });
 
 /// Get bill payment summary
-final billPaymentSummaryProvider = FutureProvider.family<
-    Map<String, dynamic>,
-    String>((ref, billId) async {
+final billPaymentSummaryProvider =
+    FutureProvider.family<Map<String, dynamic>, String>((ref, billId) async {
   final transactionService = ref.watch(transactionServiceProvider);
   return transactionService.getBillPaymentSummary(billId);
 });
 
 /// Get payment history for a student
-final paymentHistoryProvider = FutureProvider.family<
-    List<Map<String, dynamic>>,
+final paymentHistoryProvider = FutureProvider.family<List<Map<String, dynamic>>,
     ({String studentId, DateTime? startDate, DateTime? endDate})>(
   (ref, params) async {
     final transactionService = ref.watch(transactionServiceProvider);
@@ -112,9 +112,9 @@ final paymentHistoryProvider = FutureProvider.family<
 );
 
 /// Get refund history for a student
-final refundHistoryProvider = FutureProvider.family<
-    List<Map<String, dynamic>>,
-    String>((ref, studentId) async {
+final refundHistoryProvider =
+    FutureProvider.family<List<Map<String, dynamic>>, String>(
+        (ref, studentId) async {
   final transactionService = ref.watch(transactionServiceProvider);
   return transactionService.getRefundHistory(studentId);
 });
@@ -203,8 +203,7 @@ final comparePeriodsProvider = FutureProvider.family<
 );
 
 /// Forecast cash flow
-final cashFlowForecastProvider = FutureProvider.family<
-    Map<String, dynamic>,
+final cashFlowForecastProvider = FutureProvider.family<Map<String, dynamic>,
     ({String schoolId, int forecastDays})>(
   (ref, params) async {
     final reportsService = ref.watch(financialReportsServiceProvider);
@@ -296,10 +295,14 @@ class InvoiceCreationNotifier extends StateNotifier<InvoiceCreationState> {
     state = state.copyWith(isLoading: true, error: null);
 
     try {
-      if (state.studentId.isEmpty ||
-          state.title.isEmpty ||
-          state.amount <= 0) {
+      if (state.studentId.isEmpty || state.title.isEmpty || state.amount <= 0) {
         throw Exception('Please fill all required fields');
+      }
+
+      // Get current user ID from Supabase
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user == null) {
+        throw Exception('User not authenticated');
       }
 
       await invoiceService.createAdhocInvoice(
@@ -309,6 +312,7 @@ class InvoiceCreationNotifier extends StateNotifier<InvoiceCreationState> {
         amount: state.amount,
         dueDate: state.dueDate,
         status: state.invoiceStatus,
+        userId: user.id,
       );
 
       state = state.copyWith(isLoading: false);
@@ -340,14 +344,12 @@ final invoiceCreationProvider =
 // ========== REPORT STATE PROVIDERS ==========
 
 /// Selected date range for reports
-final reportDateRangeProvider =
-    StateProvider<DateTimeRange>((ref) {
+final reportDateRangeProvider = StateProvider<DateTimeRange>((ref) {
   return DateTimeRange.thisMonth();
 });
 
 /// Selected report category
-final reportCategoryProvider =
-    StateProvider<ReportCategory>((ref) {
+final reportCategoryProvider = StateProvider<ReportCategory>((ref) {
   return ReportCategory.tuitionCollection;
 });
 
@@ -385,9 +387,9 @@ final selectedSchoolIdProvider = StateProvider<String?>((ref) {
 });
 
 /// Get recent transactions for school
-final schoolTransactionsProvider = FutureProvider.family<
-    List<Map<String, dynamic>>,
-    String>((ref, schoolId) async {
+final schoolTransactionsProvider =
+    FutureProvider.family<List<Map<String, dynamic>>, String>(
+        (ref, schoolId) async {
   final transactionService = ref.watch(transactionServiceProvider);
   return transactionService.getSchoolTransactions(schoolId);
 });
@@ -395,8 +397,7 @@ final schoolTransactionsProvider = FutureProvider.family<
 /// Format currency for display
 final currencyFormatterProvider = Provider<String Function(double)>((ref) {
   return (amount) {
-    return NumberFormat.currency(symbol: '\$', decimalDigits: 2)
-        .format(amount);
+    return NumberFormat.currency(symbol: '\$', decimalDigits: 2).format(amount);
   };
 });
 

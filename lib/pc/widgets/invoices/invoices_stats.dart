@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/constants/app_colors.dart';
-import '../../../../data/providers/financial_reports_provider.dart';
+import '../../../../data/providers/invoices_provider.dart';
+import '../../../../data/providers/device_authority_provider.dart';
 
 class InvoicesStats extends ConsumerWidget {
   final String schoolId;
@@ -16,31 +17,24 @@ class InvoicesStats extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final invoiceStatsAsync = ref.watch(invoiceStatsProvider(InvoiceStatsParams(
-      schoolId: schoolId,
-    )));
+    final stats = ref.watch(invoiceStatsProvider(schoolId));
 
     return SizedBox(
       height: 140,
-      child: invoiceStatsAsync.when(
-        data: (stats) => _buildStatsRow(stats),
-        loading: () => _buildLoadingRow(),
-        error: (err, stack) => _buildErrorRow(ref, err.toString()),
-      ),
+      child: _buildStatsRow(stats, ref),
     );
   }
 
-  Widget _buildStatsRow(Map<String, dynamic> stats) {
+  Widget _buildStatsRow(InvoiceStats stats, WidgetRef ref) {
     final formatter = NumberFormat.simpleCurrency();
-    
-    final totalBilled = (stats['total_billed'] as num?)?.toDouble() ?? 0.0;
-    final totalCollected = (stats['total_collected'] as num?)?.toDouble() ?? 0.0;
-    final pendingAmount = totalBilled - totalCollected;
-    final overdueAmount = (stats['overdue_amount'] as num?)?.toDouble() ?? 0.0;
-    final totalInvoices = (stats['total_invoices'] as int?) ?? 0;
-    final paidCount = (stats['paid_count'] as int?) ?? 0;
-    final overdueCount = (stats['overdue_count'] as int?) ?? 0;
-    final collectionRate = (stats['collection_rate'] as num?)?.toDouble() ?? 0.0;
+
+    final totalBilled = stats.totalBilled;
+    final pendingAmount = stats.pendingAmount;
+    final overdueAmount = stats.overdueAmount;
+    final totalInvoices = stats.totalInvoices;
+    final paidCount = stats.paidCount;
+    final overdueCount = stats.overdueCount;
+    final collectionRate = stats.collectionRate;
 
     return Row(
       children: [
@@ -49,7 +43,8 @@ class InvoicesStats extends ConsumerWidget {
           child: _StatCard(
             title: "Total Invoiced",
             value: formatter.format(totalBilled),
-            subtext: "$totalInvoices invoices • ${collectionRate.toStringAsFixed(1)}% collected",
+            subtext:
+                "$totalInvoices invoices • ${collectionRate.toStringAsFixed(1)}% collected",
             subtextColor: AppColors.successGreen,
             icon: Icons.bar_chart,
             iconColor: AppColors.primaryBlue,
@@ -75,75 +70,26 @@ class InvoicesStats extends ConsumerWidget {
           child: _StatCard(
             title: "Overdue",
             value: formatter.format(overdueAmount),
-            subtext: overdueCount > 0 
+            subtext: overdueCount > 0
                 ? "Needs attention ($overdueCount students)"
                 : "All payments on track",
-            subtextColor: overdueCount > 0 ? AppColors.errorRed : AppColors.successGreen,
+            subtextColor:
+                overdueCount > 0 ? AppColors.errorRed : AppColors.successGreen,
             icon: Icons.warning_amber_rounded,
-            iconColor: overdueCount > 0 ? AppColors.errorRed : AppColors.successGreen,
+            iconColor:
+                overdueCount > 0 ? AppColors.errorRed : AppColors.successGreen,
           ),
         ),
         const SizedBox(width: 16),
 
         // 4. Create New Action Card
         Expanded(
-          child: _CreateInvoiceCard(onTap: onCreateInvoice),
+          child: _CreateInvoiceCard(
+            onTap: onCreateInvoice,
+            schoolId: schoolId,
+          ),
         ),
       ],
-    );
-  }
-
-  Widget _buildLoadingRow() {
-    return Row(
-      children: List.generate(4, (index) => Expanded(
-        child: Container(
-          margin: EdgeInsets.only(right: index < 3 ? 16 : 0),
-          decoration: BoxDecoration(
-            color: AppColors.surfaceGrey,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppColors.divider),
-          ),
-          child: const Center(
-            child: CircularProgressIndicator(
-              color: AppColors.primaryBlue,
-              strokeWidth: 2,
-            ),
-          ),
-        ),
-      )),
-    );
-  }
-
-  Widget _buildErrorRow(WidgetRef ref, String error) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.errorRed.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.errorRed.withValues(alpha: 0.3)),
-      ),
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.error_outline, color: AppColors.errorRed, size: 32),
-            const SizedBox(height: 8),
-            const Text(
-              'Failed to load invoice stats',
-              style: TextStyle(color: AppColors.textWhite, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            ElevatedButton.icon(
-              onPressed: () => ref.invalidate(invoiceStatsProvider(InvoiceStatsParams(schoolId: schoolId))),
-              icon: const Icon(Icons.refresh, size: 16),
-              label: const Text('Retry'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primaryBlue,
-                foregroundColor: Colors.white,
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
@@ -181,7 +127,9 @@ class _StatCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(title, style: const TextStyle(color: AppColors.textGrey, fontSize: 13)),
+              Text(title,
+                  style:
+                      const TextStyle(color: AppColors.textGrey, fontSize: 13)),
               Container(
                 padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
@@ -195,9 +143,17 @@ class _StatCard extends StatelessWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(value, style: const TextStyle(color: AppColors.textWhite, fontSize: 24, fontWeight: FontWeight.bold)),
+              Text(value,
+                  style: const TextStyle(
+                      color: AppColors.textWhite,
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold)),
               const SizedBox(height: 4),
-              Text(subtext, style: TextStyle(color: subtextColor, fontSize: 12, fontWeight: FontWeight.w500)),
+              Text(subtext,
+                  style: TextStyle(
+                      color: subtextColor,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500)),
             ],
           ),
         ],
@@ -206,38 +162,130 @@ class _StatCard extends StatelessWidget {
   }
 }
 
-class _CreateInvoiceCard extends StatelessWidget {
+class _CreateInvoiceCard extends ConsumerWidget {
   final VoidCallback onTap;
-  const _CreateInvoiceCard({required this.onTap});
+  final String schoolId;
+
+  const _CreateInvoiceCard({
+    required this.onTap,
+    required this.schoolId,
+  });
 
   @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        decoration: BoxDecoration(
-          color: AppColors.surfaceDarkGrey,
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isBillingEngineAsync = ref.watch(isBillingEngineProvider(schoolId));
+
+    return isBillingEngineAsync.when(
+      data: (isBillingEngine) {
+        if (!isBillingEngine) {
+          // Non-billing engine: Show read-only card
+          return Container(
+            decoration: BoxDecoration(
+              color: AppColors.surfaceDarkGrey.withAlpha(128),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.divider.withAlpha(128)),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: const BoxDecoration(
+                    color: AppColors.textWhite54,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.lock,
+                      color: AppColors.textWhite38, size: 24),
+                ),
+                const SizedBox(height: 12),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 8.0),
+                  child: Column(
+                    children: [
+                      Text(
+                        "Read-Only",
+                        style: TextStyle(
+                          color: AppColors.textWhite70,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12,
+                        ),
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        "Billing engine only",
+                        style: TextStyle(
+                          color: AppColors.textWhite38,
+                          fontSize: 11,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        // Billing engine: Show interactive create button
+        return InkWell(
+          onTap: onTap,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.divider, style: BorderStyle.solid), // Dashed effect requires custom painter, using solid for now to stay clean
+          child: Container(
+            decoration: BoxDecoration(
+              color: AppColors.surfaceDarkGrey,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                  color: AppColors.divider,
+                  style: BorderStyle
+                      .solid), // Dashed effect requires custom painter, using solid for now to stay clean
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryBlue.withAlpha(26),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.add,
+                      color: AppColors.primaryBlue, size: 24),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  "Create New Invoice",
+                  style: TextStyle(
+                      color: AppColors.textWhite, fontWeight: FontWeight.w600),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+      loading: () => Container(
+        decoration: BoxDecoration(
+          color: AppColors.surfaceGrey,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.divider),
         ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 48, height: 48,
-              decoration: BoxDecoration(
-                color: AppColors.primaryBlue.withAlpha(26),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.add, color: AppColors.primaryBlue, size: 24),
-            ),
-            const SizedBox(height: 12),
-            const Text(
-              "Create New Invoice",
-              style: TextStyle(color: AppColors.textWhite, fontWeight: FontWeight.w600),
-            ),
-          ],
+        child: const Center(
+          child: CircularProgressIndicator(
+            color: AppColors.primaryBlue,
+            strokeWidth: 2,
+          ),
+        ),
+      ),
+      error: (err, _) => Container(
+        decoration: BoxDecoration(
+          color: AppColors.errorRed.withAlpha(26),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.errorRed.withAlpha(77)),
+        ),
+        child: const Center(
+          child: Icon(Icons.error_outline, color: AppColors.errorRed),
         ),
       ),
     );

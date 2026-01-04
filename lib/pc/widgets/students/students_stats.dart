@@ -1,29 +1,41 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
-import '../../../../data/services/database_service.dart';
+import '../../../../data/providers/students_provider.dart';
 
-class StudentsStats extends StatelessWidget {
+class StudentsStats extends ConsumerWidget {
   final String schoolId;
   const StudentsStats({super.key, required this.schoolId});
 
   @override
-  Widget build(BuildContext context) {
-    // We reuse the watchStudents stream to calculate stats client-side
-    // This ensures consistency: if you add a student, the count updates instantly.
-    return StreamBuilder<List<Map<String, dynamic>>>(
-      stream: DatabaseService().watchStudents(schoolId),
-      builder: (context, snapshot) {
-        final students = snapshot.data ?? [];
-        
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Uses provider for real-time stats
+    final studentsAsync = ref.watch(studentsProvider(schoolId));
+
+    return studentsAsync.when(
+      loading: () => const SizedBox(
+        height: 140,
+        child: Center(
+            child: CircularProgressIndicator(color: AppColors.primaryBlue)),
+      ),
+      error: (error, stack) => SizedBox(
+        height: 140,
+        child: Center(
+            child: Text("Error: $error",
+                style: const TextStyle(color: AppColors.errorRed))),
+      ),
+      data: (students) {
         // 1. Calculate Stats
         final total = students.length;
-        final active = students.where((s) => (s['is_active'] as int?) == 1).length;
-        
+        final active =
+            students.where((s) => (s['is_active'] as int?) == 1).length;
+
         // Example logic: "New Enrollments" = students created this month
         final now = DateTime.now();
         final newEnrollments = students.where((s) {
           if (s['created_at'] == null) return false;
-          final created = DateTime.tryParse(s['created_at'].toString()) ?? DateTime(2000);
+          final created =
+              DateTime.tryParse(s['created_at'].toString()) ?? DateTime(2000);
           return created.month == now.month && created.year == now.year;
         }).length;
 
@@ -81,15 +93,18 @@ class StudentsStats extends StatelessWidget {
                 child: Container(
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: AppColors.surfaceGrey,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppColors.errorRed.withValues(alpha: 0.5)),
-                    gradient: LinearGradient(
-                      colors: [AppColors.surfaceGrey, AppColors.errorRed.withValues(alpha: 0.05)],
-                      begin: Alignment.centerLeft,
-                      end: Alignment.centerRight,
-                    )
-                  ),
+                      color: AppColors.surfaceGrey,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                          color: AppColors.errorRed.withValues(alpha: 0.5)),
+                      gradient: LinearGradient(
+                        colors: [
+                          AppColors.surfaceGrey,
+                          AppColors.errorRed.withValues(alpha: 0.05)
+                        ],
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                      )),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -97,16 +112,29 @@ class StudentsStats extends StatelessWidget {
                       const Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text("UNPAID FEES", style: TextStyle(color: AppColors.textGrey, fontSize: 11, fontWeight: FontWeight.bold)),
-                          Icon(Icons.warning_amber_rounded, color: AppColors.errorRed, size: 20),
+                          Text("UNPAID FEES",
+                              style: TextStyle(
+                                  color: AppColors.textGrey,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold)),
+                          Icon(Icons.warning_amber_rounded,
+                              color: AppColors.errorRed, size: 20),
                         ],
                       ),
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(unpaidCount.toString(), style: const TextStyle(color: AppColors.textWhite, fontSize: 28, fontWeight: FontWeight.bold)),
+                          Text(unpaidCount.toString(),
+                              style: const TextStyle(
+                                  color: AppColors.textWhite,
+                                  fontSize: 28,
+                                  fontWeight: FontWeight.bold)),
                           const SizedBox(height: 4),
-                          const Text("Action required", style: TextStyle(color: AppColors.errorRed, fontSize: 12, fontWeight: FontWeight.bold)),
+                          const Text("Action required",
+                              style: TextStyle(
+                                  color: AppColors.errorRed,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold)),
                         ],
                       ),
                     ],
@@ -158,7 +186,11 @@ class _StatCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(title.toUpperCase(), style: const TextStyle(color: AppColors.textGrey, fontSize: 11, fontWeight: FontWeight.bold)),
+              Text(title.toUpperCase(),
+                  style: const TextStyle(
+                      color: AppColors.textGrey,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold)),
               Container(
                 padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
@@ -172,7 +204,11 @@ class _StatCard extends StatelessWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(value, style: const TextStyle(color: AppColors.textWhite, fontSize: 24, fontWeight: FontWeight.bold)),
+              Text(value,
+                  style: const TextStyle(
+                      color: AppColors.textWhite,
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
               if (showProgress)
                 Column(
@@ -190,7 +226,10 @@ class _StatCard extends StatelessWidget {
                     const SizedBox(height: 6),
                   ],
                 ),
-              Text(subtext, style: TextStyle(color: subtextColor ?? AppColors.textWhite38, fontSize: 11)),
+              Text(subtext,
+                  style: TextStyle(
+                      color: subtextColor ?? AppColors.textWhite38,
+                      fontSize: 11)),
             ],
           ),
         ],

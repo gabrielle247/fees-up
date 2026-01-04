@@ -124,7 +124,7 @@ class _PaymentAllocationDialogState
       // Allocate payment to bills
       await _transactionService.allocatePaymentToMultipleBills(
         paymentId: widget.paymentId,
-        billAllocations: allocationsToProcess,
+        billAllocations: allocationsToProcess, schoolId: '',
       );
 
       if (mounted) {

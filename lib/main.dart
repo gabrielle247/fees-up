@@ -13,6 +13,8 @@ import 'package:window_manager/window_manager.dart'; // Make sure this is in pub
 import 'core/theme/app_theme.dart';
 import 'core/routes/app_router.dart';
 import 'data/services/database_service.dart';
+import 'data/services/device_authority_service.dart';
+import 'data/services/security_sync_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -78,8 +80,25 @@ void main() async {
       final dbService = DatabaseService();
       await dbService.initialize();
       debugPrint("✅ Database initialized with authenticated session");
+
+      // 5. Initialize Device Authority Service (Gets device ID)
+      final authService = DeviceAuthorityService();
+      await authService.initialize();
+      debugPrint("✅ Device Authority Service initialized");
+
+      // 6. 🔄 TRIGGER THE PULL ONCE (Background, non-blocking)
+      final schoolId = Supabase.instance.client.auth.currentUser
+          ?.userMetadata?['school_id'] as String?;
+      if (schoolId != null) {
+        // Fire and forget - runs in background
+        SecuritySyncService()
+            .pullSecurityRules(schoolId, authService.currentDeviceId);
+      } else {
+        debugPrint(
+            "⚠️ No school_id in auth metadata. Security rules will pull on next login.");
+      }
     } catch (e) {
-      debugPrint("❌ Database Init Failed: $e");
+      debugPrint("❌ Initialization Failed: $e");
     }
   } else {
     debugPrint("⚠️ No session found. Database will initialize after login.");

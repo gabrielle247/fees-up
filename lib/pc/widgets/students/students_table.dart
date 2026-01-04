@@ -1,21 +1,24 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/constants/app_colors.dart';
-import '../../../../data/services/database_service.dart';
+import '../../../../data/providers/students_provider.dart';
 
-class StudentsTable extends StatefulWidget {
+class StudentsTable extends ConsumerStatefulWidget {
   final String schoolId;
   const StudentsTable({super.key, required this.schoolId});
 
   @override
-  State<StudentsTable> createState() => _StudentsTableState();
+  ConsumerState<StudentsTable> createState() => _StudentsTableState();
 }
 
-class _StudentsTableState extends State<StudentsTable> {
+class _StudentsTableState extends ConsumerState<StudentsTable> {
   // We can add local filter state here later (e.g. selectedGrade)
-  
+
   @override
   Widget build(BuildContext context) {
+    final studentsAsync = ref.watch(studentsProvider(widget.schoolId));
+
     return Container(
       decoration: BoxDecoration(
         color: AppColors.surfaceGrey,
@@ -32,31 +35,36 @@ class _StudentsTableState extends State<StudentsTable> {
           _buildTableHeader(),
           const Divider(height: 1, color: AppColors.divider),
 
-          // --- 3. Real Data List ---
-          StreamBuilder<List<Map<String, dynamic>>>(
-            stream: DatabaseService().watchStudents(widget.schoolId),
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Padding(
-                  padding: EdgeInsets.all(40.0),
-                  child: Center(child: CircularProgressIndicator(color: AppColors.primaryBlue)),
-                );
-              }
-              
-              final students = snapshot.data ?? [];
-
+          // --- 3. Real Data List (Provider-Powered) ---
+          studentsAsync.when(
+            loading: () => const Padding(
+              padding: EdgeInsets.all(40.0),
+              child: Center(
+                  child:
+                      CircularProgressIndicator(color: AppColors.primaryBlue)),
+            ),
+            error: (error, stack) => Padding(
+              padding: const EdgeInsets.all(40.0),
+              child: Center(
+                  child: Text("Error: $error",
+                      style: const TextStyle(color: AppColors.errorRed))),
+            ),
+            data: (students) {
               if (students.isEmpty) {
                 return const Padding(
                   padding: EdgeInsets.all(40.0),
-                  child: Center(child: Text("No students found. Add one to get started.", style: TextStyle(color: AppColors.textGrey))),
+                  child: Center(
+                      child: Text("No students found. Add one to get started.",
+                          style: TextStyle(color: AppColors.textGrey))),
                 );
               }
 
               return ListView.separated(
                 shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(), // Scroll handled by parent
+                physics: const NeverScrollableScrollPhysics(),
                 itemCount: students.length,
-                separatorBuilder: (_, __) => const Divider(height: 1, color: AppColors.divider),
+                separatorBuilder: (_, __) =>
+                    const Divider(height: 1, color: AppColors.divider),
                 itemBuilder: (context, index) {
                   final s = students[index];
                   return _buildStudentRow(s);
@@ -84,11 +92,11 @@ class _StudentsTableState extends State<StudentsTable> {
           _buildDropdown("Status: Active"),
           const SizedBox(width: 12),
           _buildDropdown("Financial: All"),
-          
           const Spacer(),
           TextButton(
             onPressed: () {},
-            child: const Text("Clear Filters", style: TextStyle(color: AppColors.primaryBlue, fontSize: 13)),
+            child: const Text("Clear Filters",
+                style: TextStyle(color: AppColors.primaryBlue, fontSize: 13)),
           )
         ],
       ),
@@ -106,9 +114,11 @@ class _StudentsTableState extends State<StudentsTable> {
       ),
       child: Row(
         children: [
-          Text(label, style: const TextStyle(color: AppColors.textWhite, fontSize: 13)),
+          Text(label,
+              style: const TextStyle(color: AppColors.textWhite, fontSize: 13)),
           const SizedBox(width: 8),
-          const Icon(Icons.keyboard_arrow_down, color: AppColors.textWhite54, size: 16),
+          const Icon(Icons.keyboard_arrow_down,
+              color: AppColors.textWhite54, size: 16),
         ],
       ),
     );
@@ -136,7 +146,11 @@ class _StudentsTableState extends State<StudentsTable> {
       child: Text(
         text,
         textAlign: alignRight ? TextAlign.right : TextAlign.left,
-        style: const TextStyle(color: AppColors.textWhite38, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.8),
+        style: const TextStyle(
+            color: AppColors.textWhite38,
+            fontSize: 11,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 0.8),
       ),
     );
   }
@@ -149,7 +163,7 @@ class _StudentsTableState extends State<StudentsTable> {
     final contact = s['parent_contact'] ?? '';
     final isActive = (s['is_active'] as int?) == 1;
     final owed = (s['owed_total'] as num?)?.toDouble() ?? 0.0;
-    
+
     // Initials for Avatar
     final initials = name.isNotEmpty ? name.substring(0, 1).toUpperCase() : "?";
 
@@ -165,32 +179,49 @@ class _StudentsTableState extends State<StudentsTable> {
                 CircleAvatar(
                   radius: 16,
                   backgroundColor: AppColors.primaryBlue.withValues(alpha: 0.2),
-                  child: Text(initials, style: const TextStyle(color: AppColors.primaryBlue, fontWeight: FontWeight.bold, fontSize: 12)),
+                  child: Text(initials,
+                      style: const TextStyle(
+                          color: AppColors.primaryBlue,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12)),
                 ),
                 const SizedBox(width: 12),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(name, style: const TextStyle(color: AppColors.textWhite, fontWeight: FontWeight.w500, fontSize: 13)),
-                    Text("Class $grade", style: const TextStyle(color: AppColors.textWhite38, fontSize: 11)),
+                    Text(name,
+                        style: const TextStyle(
+                            color: AppColors.textWhite,
+                            fontWeight: FontWeight.w500,
+                            fontSize: 13)),
+                    Text("Class $grade",
+                        style: const TextStyle(
+                            color: AppColors.textWhite38, fontSize: 11)),
                   ],
                 ),
               ],
             ),
           ),
-          
+
           // 2. ID / Grade
           Expanded(
             flex: 2,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text("#$id", style: const TextStyle(color: AppColors.textWhite, fontSize: 13)),
+                Text("#$id",
+                    style: const TextStyle(
+                        color: AppColors.textWhite, fontSize: 13)),
                 Container(
                   margin: const EdgeInsets.only(top: 4),
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(color: AppColors.surfaceLightGrey, borderRadius: BorderRadius.circular(4)),
-                  child: Text("Grade $grade", style: const TextStyle(color: AppColors.textWhite70, fontSize: 10)),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                      color: AppColors.surfaceLightGrey,
+                      borderRadius: BorderRadius.circular(4)),
+                  child: Text("Grade $grade",
+                      style: const TextStyle(
+                          color: AppColors.textWhite70, fontSize: 10)),
                 ),
               ],
             ),
@@ -202,8 +233,12 @@ class _StudentsTableState extends State<StudentsTable> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(parentName, style: const TextStyle(color: AppColors.textWhite, fontSize: 13)),
-                Text(contact, style: const TextStyle(color: AppColors.textWhite38, fontSize: 11)),
+                Text(parentName,
+                    style: const TextStyle(
+                        color: AppColors.textWhite, fontSize: 13)),
+                Text(contact,
+                    style: const TextStyle(
+                        color: AppColors.textWhite38, fontSize: 11)),
               ],
             ),
           ),
@@ -214,14 +249,22 @@ class _StudentsTableState extends State<StudentsTable> {
             child: Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: isActive ? AppColors.successGreen.withValues(alpha: 0.15) : AppColors.surfaceLightGrey,
+                    color: isActive
+                        ? AppColors.successGreen.withValues(alpha: 0.15)
+                        : AppColors.surfaceLightGrey,
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
                     isActive ? "Active" : "Inactive",
-                    style: TextStyle(color: isActive ? AppColors.successGreen : AppColors.textGrey, fontSize: 11, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                        color: isActive
+                            ? AppColors.successGreen
+                            : AppColors.textGrey,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold),
                   ),
                 ),
               ],
@@ -234,13 +277,18 @@ class _StudentsTableState extends State<StudentsTable> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                Text(
-                  NumberFormat.simpleCurrency().format(owed), 
-                  style: const TextStyle(color: AppColors.textWhite, fontWeight: FontWeight.bold, fontSize: 13)
-                ),
+                Text(NumberFormat.simpleCurrency().format(owed),
+                    style: const TextStyle(
+                        color: AppColors.textWhite,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13)),
                 Text(
                   owed > 0 ? "Overdue" : "Paid",
-                  style: TextStyle(color: owed > 0 ? AppColors.errorRed : AppColors.successGreen, fontSize: 11),
+                  style: TextStyle(
+                      color: owed > 0
+                          ? AppColors.errorRed
+                          : AppColors.successGreen,
+                      fontSize: 11),
                 ),
               ],
             ),
@@ -252,7 +300,10 @@ class _StudentsTableState extends State<StudentsTable> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                IconButton(icon: const Icon(Icons.edit, size: 16, color: AppColors.textWhite54), onPressed: (){}),
+                IconButton(
+                    icon: const Icon(Icons.edit,
+                        size: 16, color: AppColors.textWhite54),
+                    onPressed: () {}),
               ],
             ),
           ),
@@ -267,7 +318,8 @@ class _StudentsTableState extends State<StudentsTable> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
-          const Text("Showing all results", style: TextStyle(color: AppColors.textWhite54, fontSize: 13)),
+          const Text("Showing all results",
+              style: TextStyle(color: AppColors.textWhite54, fontSize: 13)),
           const SizedBox(width: 24),
           _paginationBtn("Previous", false),
           const SizedBox(width: 8),
@@ -285,7 +337,10 @@ class _StudentsTableState extends State<StudentsTable> {
         borderRadius: BorderRadius.circular(4),
         border: Border.all(color: AppColors.divider),
       ),
-      child: Text(label, style: TextStyle(color: active ? Colors.white : AppColors.textWhite70, fontSize: 12)),
+      child: Text(label,
+          style: TextStyle(
+              color: active ? Colors.white : AppColors.textWhite70,
+              fontSize: 12)),
     );
   }
 }

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../data/providers/dashboard_provider.dart';
-import '../../../../data/providers/financial_providers.dart';
+import '../../../../data/providers/invoices_provider.dart';
 
 class InvoicesTable extends ConsumerWidget {
   const InvoicesTable({super.key});
@@ -10,18 +10,18 @@ class InvoicesTable extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final dashboardAsync = ref.watch(dashboardDataProvider);
-    
+
     if (dashboardAsync.isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
-    
+
     if (dashboardAsync.hasError) {
       return Center(child: Text('Error: ${dashboardAsync.error}'));
     }
-    
+
     final schoolId = dashboardAsync.value!.schoolId;
-    final invoicesAsync = ref.watch(schoolInvoicesProvider(schoolId));
-    
+    final invoicesAsync = ref.watch(invoicesProvider(schoolId));
+
     return Column(
       children: [
         // --- FILTER BAR ---
@@ -40,20 +40,36 @@ class InvoicesTable extends ConsumerWidget {
               // Header Row
               _buildTableHeader(),
               const Divider(height: 1, color: AppColors.divider),
-              
-              // Data Rows
-              if (invoicesAsync.isLoading)
-                const Padding(
+
+              // Data Rows (Provider-Powered)
+              invoicesAsync.when(
+                loading: () => const Padding(
                   padding: EdgeInsets.all(16.0),
-                  child: Center(child: CircularProgressIndicator()),
-                )
-              else if (invoicesAsync.hasError)
-                Padding(
+                  child: Center(
+                      child: CircularProgressIndicator(
+                          color: AppColors.primaryBlue)),
+                ),
+                error: (error, stack) => Padding(
                   padding: const EdgeInsets.all(16.0),
-                  child: Center(child: Text('Error loading invoices: ${invoicesAsync.error}')),
-                )
-              else
-                ..._buildInvoiceRows(invoicesAsync.value ?? []),
+                  child: Center(
+                      child: Text('Error loading invoices: $error',
+                          style: TextStyle(color: AppColors.errorRed))),
+                ),
+                data: (invoices) {
+                  if (invoices.isEmpty) {
+                    return const Padding(
+                      padding: EdgeInsets.all(16.0),
+                      child: Center(
+                          child: Text('No invoices found',
+                              style: TextStyle(color: AppColors.textWhite54))),
+                    );
+                  }
+
+                  return Column(
+                    children: _buildInvoiceRows(invoices),
+                  );
+                },
+              ),
             ],
           ),
         ),
@@ -62,15 +78,6 @@ class InvoicesTable extends ConsumerWidget {
   }
 
   List<Widget> _buildInvoiceRows(List<Map<String, dynamic>> invoices) {
-    if (invoices.isEmpty) {
-      return [
-        const Padding(
-          padding: EdgeInsets.all(16.0),
-          child: Center(child: Text('No invoices found', style: TextStyle(color: AppColors.textWhite54))),
-        )
-      ];
-    }
-
     final rows = <Widget>[];
     for (final invoice in invoices) {
       rows.add(_buildInvoiceRowFromMap(invoice));
@@ -87,7 +94,8 @@ class InvoicesTable extends ConsumerWidget {
     final student = invoice['student_name'] as String? ?? 'Unknown Student';
     final date = invoice['created_at'] as String? ?? '';
     final due = invoice['due_date'] as String? ?? '';
-    final amount = '\$${(invoice['amount'] as num?)?.toStringAsFixed(2) ?? '0.00'}';
+    final amount =
+        '\$${(invoice['amount'] as num?)?.toStringAsFixed(2) ?? '0.00'}';
     final status = invoice['status'] as String? ?? 'Unpaid';
     final avatarColor = Colors.blue; // Default, could be based on student
 
@@ -118,9 +126,11 @@ class InvoicesTable extends ConsumerWidget {
                 filled: true,
                 fillColor: AppColors.surfaceGrey,
                 hintText: "Filter by invoice # or student",
-                hintStyle: const TextStyle(color: AppColors.textWhite38, fontSize: 13),
-                prefixIcon: const Icon(Icons.search, color: AppColors.textWhite38, size: 18),
-                
+                hintStyle:
+                    const TextStyle(color: AppColors.textWhite38, fontSize: 13),
+                prefixIcon: const Icon(Icons.search,
+                    color: AppColors.textWhite38, size: 18),
+
                 // Borders moved inside for perfect alignment
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
@@ -142,11 +152,13 @@ class InvoicesTable extends ConsumerWidget {
         const SizedBox(width: 12),
 
         // Status Dropdown
-        _buildFilterButton(label: "Status: All", icon: Icons.keyboard_arrow_down),
+        _buildFilterButton(
+            label: "Status: All", icon: Icons.keyboard_arrow_down),
         const SizedBox(width: 12),
 
         // Date Picker
-        _buildFilterButton(label: "Select Date Range", icon: Icons.calendar_today),
+        _buildFilterButton(
+            label: "Select Date Range", icon: Icons.calendar_today),
         const SizedBox(width: 12),
 
         // More Filters
@@ -162,7 +174,8 @@ class InvoicesTable extends ConsumerWidget {
             children: [
               Icon(Icons.filter_list, color: AppColors.textWhite70, size: 16),
               SizedBox(width: 8),
-              Text("More Filters", style: TextStyle(color: AppColors.textWhite, fontSize: 13)),
+              Text("More Filters",
+                  style: TextStyle(color: AppColors.textWhite, fontSize: 13)),
             ],
           ),
         ),
@@ -180,7 +193,11 @@ class InvoicesTable extends ConsumerWidget {
             children: [
               Icon(Icons.download, color: Colors.white, size: 16),
               SizedBox(width: 8),
-              Text("Export CSV", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+              Text("Export CSV",
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13)),
             ],
           ),
         ),
@@ -200,13 +217,14 @@ class InvoicesTable extends ConsumerWidget {
       child: Row(
         children: [
           if (icon == Icons.calendar_today) ...[
-             Icon(icon, color: AppColors.textWhite54, size: 16),
-             const SizedBox(width: 8),
+            Icon(icon, color: AppColors.textWhite54, size: 16),
+            const SizedBox(width: 8),
           ],
-          Text(label, style: const TextStyle(color: AppColors.textWhite, fontSize: 13)),
+          Text(label,
+              style: const TextStyle(color: AppColors.textWhite, fontSize: 13)),
           if (icon == Icons.keyboard_arrow_down) ...[
-             const SizedBox(width: 8),
-             Icon(icon, color: AppColors.textWhite54, size: 16),
+            const SizedBox(width: 8),
+            Icon(icon, color: AppColors.textWhite54, size: 16),
           ],
         ],
       ),
@@ -236,25 +254,41 @@ class InvoicesTable extends ConsumerWidget {
       child: Text(
         text,
         textAlign: align,
-        style: const TextStyle(color: AppColors.textWhite38, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.8),
+        style: const TextStyle(
+            color: AppColors.textWhite38,
+            fontSize: 11,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 0.8),
       ),
     );
   }
 
-  Widget _buildInvoiceRow({
-    required String id, required String title, required String student, 
-    required String date, required String due, required String amount, 
-    required String status, required Color avatarColor
-  }) {
+  Widget _buildInvoiceRow(
+      {required String id,
+      required String title,
+      required String student,
+      required String date,
+      required String due,
+      required String amount,
+      required String status,
+      required Color avatarColor}) {
     Color statusColor;
     Color statusBg;
-    
+
     switch (status) {
-      case "Paid": statusColor = AppColors.successGreen; statusBg = AppColors.successGreenBg; break;
-      case "Overdue": statusColor = AppColors.errorRed; statusBg = AppColors.errorRedBg; break;
-      default: statusColor = AppColors.warningOrange; statusBg = AppColors.warningOrange.withAlpha(51);
+      case "Paid":
+        statusColor = AppColors.successGreen;
+        statusBg = AppColors.successGreenBg;
+        break;
+      case "Overdue":
+        statusColor = AppColors.errorRed;
+        statusBg = AppColors.errorRedBg;
+        break;
+      default:
+        statusColor = AppColors.warningOrange;
+        statusBg = AppColors.warningOrange.withAlpha(51);
     }
-    
+
     // Highlight overdue dates in red
     final isOverdue = status == "Overdue";
 
@@ -268,9 +302,15 @@ class InvoicesTable extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(id, style: const TextStyle(color: AppColors.textWhite, fontWeight: FontWeight.bold, fontFamily: 'monospace')),
+                Text(id,
+                    style: const TextStyle(
+                        color: AppColors.textWhite,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'monospace')),
                 const SizedBox(height: 2),
-                Text(title, style: const TextStyle(color: AppColors.textWhite54, fontSize: 12)),
+                Text(title,
+                    style: const TextStyle(
+                        color: AppColors.textWhite54, fontSize: 12)),
               ],
             ),
           ),
@@ -282,27 +322,52 @@ class InvoicesTable extends ConsumerWidget {
                 CircleAvatar(
                   radius: 14,
                   backgroundColor: avatarColor.withAlpha(51),
-                  child: Text(student.substring(0,2).toUpperCase(), style: TextStyle(color: avatarColor, fontSize: 10, fontWeight: FontWeight.bold)),
+                  child: Text(student.substring(0, 2).toUpperCase(),
+                      style: TextStyle(
+                          color: avatarColor,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold)),
                 ),
                 const SizedBox(width: 12),
-                Text(student, style: const TextStyle(color: AppColors.textWhite)),
+                Text(student,
+                    style: const TextStyle(color: AppColors.textWhite)),
               ],
             ),
           ),
           // Dates
-          Expanded(flex: 2, child: Text(date, style: const TextStyle(color: AppColors.textWhite70))),
-          Expanded(flex: 2, child: Text(due, style: TextStyle(color: isOverdue ? AppColors.errorRed : AppColors.textWhite70))),
+          Expanded(
+              flex: 2,
+              child: Text(date,
+                  style: const TextStyle(color: AppColors.textWhite70))),
+          Expanded(
+              flex: 2,
+              child: Text(due,
+                  style: TextStyle(
+                      color: isOverdue
+                          ? AppColors.errorRed
+                          : AppColors.textWhite70))),
           // Amount
-          Expanded(flex: 2, child: Text(amount, style: const TextStyle(color: AppColors.textWhite, fontWeight: FontWeight.bold))),
+          Expanded(
+              flex: 2,
+              child: Text(amount,
+                  style: const TextStyle(
+                      color: AppColors.textWhite,
+                      fontWeight: FontWeight.bold))),
           // Status
           Expanded(
             flex: 2,
             child: Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(color: statusBg, borderRadius: BorderRadius.circular(4)),
-                  child: Text(status, style: TextStyle(color: statusColor, fontSize: 11, fontWeight: FontWeight.bold)),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                      color: statusBg, borderRadius: BorderRadius.circular(4)),
+                  child: Text(status,
+                      style: TextStyle(
+                          color: statusColor,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold)),
                 ),
               ],
             ),
@@ -313,8 +378,14 @@ class InvoicesTable extends ConsumerWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                IconButton(icon: const Icon(Icons.visibility, size: 18, color: AppColors.textWhite54), onPressed: (){}),
-                IconButton(icon: const Icon(Icons.more_vert, size: 18, color: AppColors.textWhite54), onPressed: (){}),
+                IconButton(
+                    icon: const Icon(Icons.visibility,
+                        size: 18, color: AppColors.textWhite54),
+                    onPressed: () {}),
+                IconButton(
+                    icon: const Icon(Icons.more_vert,
+                        size: 18, color: AppColors.textWhite54),
+                    onPressed: () {}),
               ],
             ),
           ),
