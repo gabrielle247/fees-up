@@ -404,6 +404,23 @@ class TransactionService {
       rethrow;
     }
   }
+
+  /// Get recent transactions for school (payments and expenses)
+  Future<List<Map<String, dynamic>>> getSchoolTransactions(String schoolId, {int limit = 50}) async {
+    try {
+      final response = await supabase
+          .from('payments')
+          .select('*, students(name)')
+          .eq('school_id', schoolId)
+          .order('date_paid', ascending: false)
+          .limit(limit);
+
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      debugPrintError('Failed to fetch school transactions: $e');
+      rethrow;
+    }
+  }
 }
 
 void debugPrintError(String message) {

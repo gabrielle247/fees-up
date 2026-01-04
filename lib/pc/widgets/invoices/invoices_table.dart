@@ -1,11 +1,27 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../data/providers/dashboard_provider.dart';
+import '../../../../data/providers/financial_providers.dart';
 
-class InvoicesTable extends StatelessWidget {
+class InvoicesTable extends ConsumerWidget {
   const InvoicesTable({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final dashboardAsync = ref.watch(dashboardDataProvider);
+    
+    if (dashboardAsync.isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    
+    if (dashboardAsync.hasError) {
+      return Center(child: Text('Error: ${dashboardAsync.error}'));
+    }
+    
+    final schoolId = dashboardAsync.value!.schoolId;
+    final invoicesAsync = ref.watch(schoolInvoicesProvider(schoolId));
+    
     return Column(
       children: [
         // --- FILTER BAR ---
@@ -25,30 +41,65 @@ class InvoicesTable extends StatelessWidget {
               _buildTableHeader(),
               const Divider(height: 1, color: AppColors.divider),
               
-              // Data Rows (Mock Data)
-              _buildInvoiceRow(
-                id: "INV-2023-001", title: "Tuition Fee - Term 1",
-                student: "Alice Johnson", date: "Oct 24, 2023", due: "Nov 24, 2023",
-                amount: "\$1,200.00", status: "Paid", avatarColor: Colors.blue,
-              ),
-              const Divider(height: 1, color: AppColors.divider),
-              
-              _buildInvoiceRow(
-                id: "INV-2023-042", title: "Library Fine",
-                student: "Mark Smith", date: "Sep 10, 2023", due: "Oct 10, 2023",
-                amount: "\$45.00", status: "Overdue", avatarColor: Colors.purple,
-              ),
-              const Divider(height: 1, color: AppColors.divider),
-
-              _buildInvoiceRow(
-                id: "INV-2023-055", title: "Bus Transport - Q3",
-                student: "Emma Davis", date: "Oct 28, 2023", due: "Nov 28, 2023",
-                amount: "\$350.00", status: "Unpaid", avatarColor: Colors.orange,
-              ),
+              // Data Rows
+              if (invoicesAsync.isLoading)
+                const Padding(
+                  padding: EdgeInsets.all(16.0),
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              else if (invoicesAsync.hasError)
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Center(child: Text('Error loading invoices: ${invoicesAsync.error}')),
+                )
+              else
+                ..._buildInvoiceRows(invoicesAsync.value ?? []),
             ],
           ),
         ),
       ],
+    );
+  }
+
+  List<Widget> _buildInvoiceRows(List<Map<String, dynamic>> invoices) {
+    if (invoices.isEmpty) {
+      return [
+        const Padding(
+          padding: EdgeInsets.all(16.0),
+          child: Center(child: Text('No invoices found', style: TextStyle(color: AppColors.textWhite54))),
+        )
+      ];
+    }
+
+    final rows = <Widget>[];
+    for (final invoice in invoices) {
+      rows.add(_buildInvoiceRowFromMap(invoice));
+      rows.add(const Divider(height: 1, color: AppColors.divider));
+    }
+    // Remove last divider
+    if (rows.isNotEmpty) rows.removeLast();
+    return rows;
+  }
+
+  Widget _buildInvoiceRowFromMap(Map<String, dynamic> invoice) {
+    final id = invoice['id'] as String? ?? 'Unknown';
+    final title = invoice['title'] as String? ?? 'Invoice';
+    final student = invoice['student_name'] as String? ?? 'Unknown Student';
+    final date = invoice['created_at'] as String? ?? '';
+    final due = invoice['due_date'] as String? ?? '';
+    final amount = '\$${(invoice['amount'] as num?)?.toStringAsFixed(2) ?? '0.00'}';
+    final status = invoice['status'] as String? ?? 'Unpaid';
+    final avatarColor = Colors.blue; // Default, could be based on student
+
+    return _buildInvoiceRow(
+      id: id,
+      title: title,
+      student: student,
+      date: date,
+      due: due,
+      amount: amount,
+      status: status,
+      avatarColor: avatarColor,
     );
   }
 

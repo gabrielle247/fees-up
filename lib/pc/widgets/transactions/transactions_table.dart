@@ -1,19 +1,35 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../data/providers/dashboard_provider.dart';
+import '../../../../data/providers/financial_providers.dart';
 
-class TransactionsTable extends StatefulWidget {
+class TransactionsTable extends ConsumerStatefulWidget {
   const TransactionsTable({super.key});
 
   @override
-  State<TransactionsTable> createState() => _TransactionsTableState();
+  ConsumerState<TransactionsTable> createState() => _TransactionsTableState();
 }
 
-class _TransactionsTableState extends State<TransactionsTable> {
+class _TransactionsTableState extends ConsumerState<TransactionsTable> {
   int _selectedFilterIndex = 0;
   final List<String> _filters = ["All Transactions", "Income", "Expenses", "Pending"];
 
   @override
   Widget build(BuildContext context) {
+    final dashboardAsync = ref.watch(dashboardDataProvider);
+    
+    if (dashboardAsync.isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    
+    if (dashboardAsync.hasError) {
+      return Center(child: Text('Error: ${dashboardAsync.error}'));
+    }
+    
+    final schoolId = dashboardAsync.value!.schoolId;
+    final transactionsAsync = ref.watch(schoolTransactionsProvider(schoolId));
+    
     return Container(
       decoration: BoxDecoration(
         color: AppColors.surfaceGrey,
@@ -84,15 +100,19 @@ class _TransactionsTableState extends State<TransactionsTable> {
           ),
           const Divider(height: 1, color: AppColors.divider),
 
-          // 3. ROWS (Mock Data Loop)
-          ListView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: 7, 
-            itemBuilder: (context, index) {
-              return _TransactionRow(index: index);
-            },
-          ),
+          // 3. ROWS
+          if (transactionsAsync.isLoading)
+            const Padding(
+              padding: EdgeInsets.all(16.0),
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else if (transactionsAsync.hasError)
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Center(child: Text('Error loading transactions: ${transactionsAsync.error}')),
+            )
+          else
+            ..._buildTransactionRows(transactionsAsync.value ?? []),
 
           // 4. FOOTER (Pagination)
           Padding(
@@ -117,6 +137,26 @@ class _TransactionsTableState extends State<TransactionsTable> {
         ],
       ),
     );
+  }
+
+  List<Widget> _buildTransactionRows(List<Map<String, dynamic>> transactions) {
+    if (transactions.isEmpty) {
+      return [
+        const Padding(
+          padding: EdgeInsets.all(16.0),
+          child: Center(child: Text('No transactions found', style: TextStyle(color: AppColors.textWhite54))),
+        )
+      ];
+    }
+
+    final rows = <Widget>[];
+    for (final transaction in transactions) {
+      rows.add(_TransactionRowFromMap(transaction: transaction));
+      rows.add(const Divider(height: 1, color: AppColors.divider));
+    }
+    // Remove last divider
+    if (rows.isNotEmpty) rows.removeLast();
+    return rows;
   }
 
   // --- HELPERS ---
@@ -180,15 +220,18 @@ class _TransactionsTableState extends State<TransactionsTable> {
 
 // --- PRIVATE ROW WIDGET ---
 
-class _TransactionRow extends StatelessWidget {
-  final int index;
-  const _TransactionRow({required this.index});
+class _TransactionRowFromMap extends StatelessWidget {
+  final Map<String, dynamic> transaction;
+  const _TransactionRowFromMap({required this.transaction});
 
   @override
   Widget build(BuildContext context) {
-    // Mock Data Logic for Visuals
-    final isExpense = index == 1 || index == 4 || index == 5;
-    final amount = isExpense ? "-\$450.00" : "+\$1,200.00";
+    final id = transaction['id'] as String? ?? 'Unknown';
+    final date = transaction['date_paid'] as String? ?? '';
+    final method = transaction['method'] as String? ?? 'Unknown';
+    final amount = transaction['amount'] as num? ?? 0;
+    final isExpense = amount < 0;
+    final amountText = isExpense ? '-\$${amount.abs().toStringAsFixed(2)}' : '+\$${amount.toStringAsFixed(2)}';
     final amountColor = isExpense ? AppColors.textWhite : AppColors.successGreen;
     
     return Container(
@@ -208,80 +251,33 @@ class _TransactionRow extends StatelessWidget {
                 Expanded(
                   flex: 2,
                   child: Text(
-                    "#TRX-0092$index",
+                    id,
                     style: const TextStyle(color: AppColors.textWhite, fontWeight: FontWeight.bold, fontFamily: 'monospace'),
                   ),
                 ),
                 // 2. DATE
                 Expanded(
                   flex: 2,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text("Oct 24, 2023", style: TextStyle(color: AppColors.textWhite, fontSize: 13)),
-                      Text("10:45 AM", style: TextStyle(color: AppColors.textWhite.withValues(alpha: 0.4), fontSize: 11)),
-                    ],
+                  child: Text(
+                    date,
+                    style: const TextStyle(color: AppColors.textWhite),
                   ),
                 ),
-                // 3. ENTITY / STUDENT
-                Expanded(
-                  flex: 3,
-                  child: Row(
-                    children: [
-                      CircleAvatar(
-                        radius: 14,
-                        backgroundColor: index.isEven 
-                            ? AppColors.primaryBlue.withValues(alpha: 0.2) 
-                            : AppColors.warningOrange.withValues(alpha: 0.2),
-                        child: Text(
-                          index.isEven ? "AM" : "OS",
-                          style: TextStyle(
-                            fontSize: 10, 
-                            color: index.isEven ? AppColors.primaryBlue : AppColors.warningOrange,
-                            fontWeight: FontWeight.bold
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(index.isEven ? "Alex Morgan" : "Office Supplies Inc.", 
-                              style: const TextStyle(color: AppColors.textWhite, fontSize: 13, fontWeight: FontWeight.w500)),
-                          Text(index.isEven ? "Grade 5" : "Vendor", 
-                              style: TextStyle(color: AppColors.textWhite.withValues(alpha: 0.4), fontSize: 11)),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                // 4. CATEGORY
-                const Expanded(
-                  flex: 3,
-                  child: Text("Tuition Fee - Term 2", style: TextStyle(color: AppColors.textWhite70, fontSize: 13)),
-                ),
-                // 5. METHOD
-                Expanded(
-                  flex: 2,
-                  child: Row(
-                    children: [
-                      const Icon(Icons.credit_card, size: 16, color: AppColors.textWhite54),
-                      const SizedBox(width: 8),
-                      Text(index.isEven ? "Credit Card" : "Bank Transfer", 
-                          style: const TextStyle(color: AppColors.textWhite70, fontSize: 13)),
-                    ],
-                  ),
-                ),
-                // 6. AMOUNT
+                // 3. METHOD
                 Expanded(
                   flex: 2,
                   child: Text(
-                    amount,
+                    method,
+                    style: const TextStyle(color: AppColors.textWhite),
+                  ),
+                ),
+                // 4. AMOUNT
+                Expanded(
+                  flex: 2,
+                  child: Text(
+                    amountText,
                     textAlign: TextAlign.right,
-                    style: TextStyle(
-                      color: amountColor,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(color: amountColor, fontWeight: FontWeight.bold),
                   ),
                 ),
               ],

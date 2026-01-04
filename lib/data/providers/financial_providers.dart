@@ -384,6 +384,14 @@ final selectedSchoolIdProvider = StateProvider<String?>((ref) {
   return null;
 });
 
+/// Get recent transactions for school
+final schoolTransactionsProvider = FutureProvider.family<
+    List<Map<String, dynamic>>,
+    String>((ref, schoolId) async {
+  final transactionService = ref.watch(transactionServiceProvider);
+  return transactionService.getSchoolTransactions(schoolId);
+});
+
 /// Format currency for display
 final currencyFormatterProvider = Provider<String Function(double)>((ref) {
   return (amount) {

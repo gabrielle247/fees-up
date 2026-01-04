@@ -18,7 +18,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // 0. SILENCE LOGS
-  Logger.root.level = Level.SEVERE; 
+  Logger.root.level = Level.SEVERE;
 
   // --- DESKTOP WINDOW SETUP ---
   // Only run this on Desktop platforms
@@ -42,25 +42,47 @@ void main() async {
   }
   // ----------------------------
 
-  // 1. Load Keys
+  // 1. Validate Environment Variables
   const supabaseUrl = String.fromEnvironment('SUPABASE_URL');
   const supabaseAnonKey = String.fromEnvironment('SUPABASE_ANON_KEY');
+  const powerSyncEndpoint = String.fromEnvironment('POWERSYNC_ENDPOINT_URL');
 
+  // Fail fast if critical env vars are missing
   if (supabaseUrl.isEmpty || supabaseAnonKey.isEmpty) {
-    debugPrint("⚠️ WARNING: Supabase Keys missing. Run with 'make run'.");
-  } else {
-    await Supabase.initialize(
-      url: supabaseUrl,
-      anonKey: supabaseAnonKey,
-    );
+    debugPrint(
+        "❌ CRITICAL: SUPABASE_URL and SUPABASE_ANON_KEY required. Run with 'make run'.");
+    runApp(const ProviderScope(child: GreywayApp())); // Will show error in UI
+    return;
   }
 
-  // 2. Initialize Database
-  try {
-    final dbService = DatabaseService();
-    await dbService.initialize();
-  } catch (e) {
-    debugPrint("❌ Database Init Failed: $e");
+  if (powerSyncEndpoint.isEmpty) {
+    debugPrint(
+        "❌ CRITICAL: POWERSYNC_ENDPOINT_URL required. Run with 'make run'.");
+    runApp(const ProviderScope(child: GreywayApp())); // Will show error in UI
+    return;
+  }
+
+  // 2. Initialize Supabase
+  await Supabase.initialize(
+    url: supabaseUrl,
+    anonKey: supabaseAnonKey,
+  );
+
+  // 3. Check Authentication Status
+  final session = Supabase.instance.client.auth.currentSession;
+
+  // 4. Initialize Database only if authenticated
+  // If no session, app will route to auth screen and init later
+  if (session != null) {
+    try {
+      final dbService = DatabaseService();
+      await dbService.initialize();
+      debugPrint("✅ Database initialized with authenticated session");
+    } catch (e) {
+      debugPrint("❌ Database Init Failed: $e");
+    }
+  } else {
+    debugPrint("⚠️ No session found. Database will initialize after login.");
   }
 
   runApp(const ProviderScope(child: GreywayApp()));

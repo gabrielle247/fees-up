@@ -8,7 +8,10 @@ class GlobalSettings {
   final bool twoFactor;
   final int sessionTimeout;
   // ... add others
-  GlobalSettings({required this.themeMode, required this.twoFactor, required this.sessionTimeout});
+  GlobalSettings(
+      {required this.themeMode,
+      required this.twoFactor,
+      required this.sessionTimeout});
 }
 
 class SchoolPreferences {
@@ -16,7 +19,10 @@ class SchoolPreferences {
   final bool notifyOverdue;
   final String landingPage;
   // ... add others
-  SchoolPreferences({required this.notifyPayment, required this.notifyOverdue, required this.landingPage});
+  SchoolPreferences(
+      {required this.notifyPayment,
+      required this.notifyOverdue,
+      required this.landingPage});
 }
 
 // --- PROVIDERS ---
@@ -30,12 +36,29 @@ final globalSettingsProvider = FutureProvider<GlobalSettings>((ref) async {
 });
 
 // 2. Fetch School Context Settings (School-centric)
-final schoolPreferencesProvider = FutureProvider<SchoolPreferences>((ref) async {
+final schoolPreferencesProvider =
+    FutureProvider<SchoolPreferences>((ref) async {
   final dashboard = await ref.watch(dashboardDataProvider.future);
   if (dashboard.schoolId.isEmpty) {
-    return SchoolPreferences(notifyPayment: true, notifyOverdue: true, landingPage: 'overview');
+    return SchoolPreferences(
+        notifyPayment: true, notifyOverdue: true, landingPage: 'overview');
   }
-  
+
   // Logic: Fetch FROM user_school_preferences WHERE school_id = dashboard.schoolId
-  return SchoolPreferences(notifyPayment: true, notifyOverdue: false, landingPage: 'transactions');
+  return SchoolPreferences(
+      notifyPayment: true, notifyOverdue: false, landingPage: 'transactions');
+});
+
+// 3. Fetch School Years
+final schoolYearsProvider =
+    FutureProvider<List<Map<String, dynamic>>>((ref) async {
+  final dashboard = await ref.watch(dashboardDataProvider.future);
+  if (dashboard.schoolId.isEmpty) {
+    return [];
+  }
+
+  final db = DatabaseService();
+  return await db.db.getAll(
+      'SELECT * FROM school_years WHERE school_id = ? ORDER BY start_date DESC',
+      [dashboard.schoolId]);
 });
