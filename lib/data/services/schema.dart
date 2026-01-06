@@ -11,6 +11,11 @@ const Schema appSchema = Schema([
     Column.text('subscription_tier'),
     Column.integer('max_students'),
     Column.integer('is_suspended'),
+    Column.integer('billing_suspended'),
+    Column.text('last_billing_resume_date'),
+    Column.text('contact_info'), // JSON blob: address, email, phone, logo
+    Column.text('notification_prefs'), // JSON blob for notification settings
+    Column.text('logo_url'),
     Column.text('created_at'),
   ]),
 
@@ -133,11 +138,13 @@ const Schema appSchema = Schema([
     Column.text('start_date'),
     Column.text('end_date'),
     Column.integer('is_billable'),
+    Column.text('term_id'),
     Column.text('created_at'),
   ]),
 
   Table('school_terms', [
     Column.text('school_id'),
+    Column.text('school_year_id'),
     Column.text('name'),
     Column.text('start_date'),
     Column.text('end_date'),
@@ -177,10 +184,16 @@ const Schema appSchema = Schema([
   Table('billing_configs', [
     Column.text('school_id'),
     Column.text('currency_code'),
+    Column.real('tax_rate_percentage'),
     Column.real('late_fee_percentage'),
+    Column.real('registration_fee'),
+    Column.integer('grace_period_days'),
     Column.text('invoice_footer_note'),
-    Column.integer('allow_partial_payments'),
+    Column.integer(
+        'allow_partial_payments'), // boolean in Postgres, stored as 1/0 locally
     Column.real('default_fee'),
+    Column.text('invoice_prefix'),
+    Column.integer('invoice_sequence_seed'),
     Column.text('updated_at'),
   ]),
 

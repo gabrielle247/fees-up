@@ -2,6 +2,7 @@ import 'package:fees_up/pc/widgets/settings/integrations_settings_view.dart';
 import 'package:fees_up/pc/widgets/settings/notifications_settings_view.dart';
 import 'package:fees_up/pc/widgets/settings/school_year_settings_view.dart';
 import 'package:fees_up/pc/widgets/settings/users_permissions_view.dart';
+import 'package:fees_up/pc/widgets/settings/audit_trail_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
@@ -18,14 +19,15 @@ class SettingsScreen extends ConsumerStatefulWidget {
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   int _selectedTabIndex = 0;
-  
+
   // The tabs exactly as required for future expansion
   final List<String> _tabs = [
     "General & Financial",
     "School Year",
     "Users & Permissions",
     "Notifications",
-    "Integrations"
+    "Integrations",
+    "Audit Trail"
   ];
 
   void _handleSearchNavigation(int tabIndex) {
@@ -46,11 +48,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               children: [
                 // 1. Header with wired search callback
                 SettingsHeader(onSearchNavigation: _handleSearchNavigation),
-                
+
                 // 2. Inner Navigation Bar
                 Container(
                   decoration: const BoxDecoration(
-                    border: Border(bottom: BorderSide(color: AppColors.divider)),
+                    border:
+                        Border(bottom: BorderSide(color: AppColors.divider)),
                   ),
                   padding: const EdgeInsets.symmetric(horizontal: 32),
                   child: Row(
@@ -59,18 +62,25 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       return GestureDetector(
                         onTap: () => setState(() => _selectedTabIndex = index),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 4),
+                          padding: const EdgeInsets.symmetric(
+                              vertical: 16, horizontal: 4),
                           margin: const EdgeInsets.only(right: 32),
                           decoration: BoxDecoration(
-                            border: isSelected 
-                              ? const Border(bottom: BorderSide(color: AppColors.primaryBlue, width: 2))
-                              : null,
+                            border: isSelected
+                                ? const Border(
+                                    bottom: BorderSide(
+                                        color: AppColors.primaryBlue, width: 2))
+                                : null,
                           ),
                           child: Text(
                             _tabs[index],
                             style: TextStyle(
-                              color: isSelected ? AppColors.primaryBlue : AppColors.textWhite54,
-                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                              color: isSelected
+                                  ? AppColors.primaryBlue
+                                  : AppColors.textWhite54,
+                              fontWeight: isSelected
+                                  ? FontWeight.bold
+                                  : FontWeight.normal,
                               fontSize: 14,
                             ),
                           ),
@@ -107,6 +117,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         return const NotificationsSettingsView();
       case 4:
         return const IntegrationsSettingsView();
+      case 5:
+        return const AuditTrailView();
       default:
         return const SizedBox();
     }

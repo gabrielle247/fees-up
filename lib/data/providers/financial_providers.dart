@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/invoice_service.dart';
 import '../services/transaction_service.dart';
 import '../services/financial_reports_service.dart';
+import 'school_provider.dart'; // 🟢 [FIX 3] School selection
 
 // ========== SERVICE PROVIDERS ==========
 
@@ -381,9 +382,11 @@ final currentReportProvider = FutureProvider<Map<String, dynamic>>((ref) {
 // ========== UTILITY PROVIDERS ==========
 
 /// Selected school ID (from app state)
-final selectedSchoolIdProvider = StateProvider<String?>((ref) {
-  // TODO: Connect to auth/school selection provider
-  return null;
+/// 🟢 [FIX 3] Auto-Select School from User Profile
+final selectedSchoolIdProvider = Provider<String?>((ref) {
+  // Reuse existing activeSchoolIdProvider that already handles:
+  // Auth User → User Profile → School ID extraction
+  return ref.watch(activeSchoolIdProvider);
 });
 
 /// Get recent transactions for school

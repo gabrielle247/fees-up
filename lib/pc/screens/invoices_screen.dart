@@ -35,8 +35,12 @@ class InvoicesScreen extends ConsumerWidget {
                 // B. Scrollable Body
                 Expanded(
                   child: dashboardAsync.when(
-                    loading: () => const Center(child: CircularProgressIndicator(color: AppColors.primaryBlue)),
-                    error: (e, _) => Center(child: Text("Error: $e", style: const TextStyle(color: AppColors.errorRed))),
+                    loading: () => const Center(
+                        child: CircularProgressIndicator(
+                            color: AppColors.primaryBlue)),
+                    error: (e, _) => Center(
+                        child: Text("Error: $e",
+                            style: const TextStyle(color: AppColors.errorRed))),
                     data: (data) => SingleChildScrollView(
                       padding: const EdgeInsets.all(32),
                       child: Column(
@@ -49,7 +53,8 @@ class InvoicesScreen extends ConsumerWidget {
                               showDialog(
                                 context: context,
                                 barrierDismissible: false,
-                                builder: (_) => InvoiceDialog(schoolId: data.schoolId),
+                                builder: (_) =>
+                                    InvoiceDialog(schoolId: data.schoolId),
                               );
                             },
                           ),

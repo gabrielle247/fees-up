@@ -20,7 +20,6 @@ class NotificationsScreen extends ConsumerWidget {
               children: [
                 _NotificationsHeader(),
                 Divider(height: 1, color: AppColors.divider),
-                
                 Expanded(
                   child: SingleChildScrollView(
                     padding: EdgeInsets.all(32),
@@ -29,7 +28,7 @@ class NotificationsScreen extends ConsumerWidget {
                         // 1. Personal Stats (Unread / Urgent)
                         NotificationsKpiCards(),
                         SizedBox(height: 24),
-                        
+
                         // 2. The Personal Inbox List
                         NotificationsList(),
                       ],
@@ -56,13 +55,26 @@ class _NotificationsHeader extends StatelessWidget {
       color: AppColors.backgroundBlack,
       child: Row(
         children: [
-          const Icon(Icons.notifications_active_outlined, color: AppColors.primaryBlue, size: 28),
+          const Icon(Icons.notifications_active_outlined,
+              color: AppColors.primaryBlue, size: 28),
           const SizedBox(width: 12),
-          const Text("My Notifications", style: TextStyle(color: AppColors.textWhite, fontSize: 20, fontWeight: FontWeight.bold)),
+          const Text("My Notifications",
+              style: TextStyle(
+                  color: AppColors.textWhite,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold)),
           const Spacer(),
           // Standard Search or Actions
           IconButton(
-            onPressed: () {}, 
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Filtering coming soon'),
+                  backgroundColor: AppColors.primaryBlue,
+                  duration: Duration(seconds: 2),
+                ),
+              );
+            },
             icon: const Icon(Icons.filter_list, color: AppColors.textWhite54),
             tooltip: "Filter",
           ),

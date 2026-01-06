@@ -31,7 +31,6 @@ class AnnouncementsScreen extends StatelessWidget {
               children: [
                 _BroadcastsHeader(),
                 Divider(height: 1, color: AppColors.divider),
-                
                 Expanded(
                   child: SingleChildScrollView(
                     padding: EdgeInsets.all(32),
@@ -66,11 +65,23 @@ class _BroadcastsHeader extends StatelessWidget {
         children: [
           const Icon(Icons.campaign, color: AppColors.primaryBlue, size: 28),
           const SizedBox(width: 12),
-          const Text("School Broadcasts", style: TextStyle(color: AppColors.textWhite, fontSize: 20, fontWeight: FontWeight.bold)),
+          const Text("School Broadcasts",
+              style: TextStyle(
+                  color: AppColors.textWhite,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold)),
           const Spacer(),
           // Placeholder for search or other header actions
           IconButton(
-            onPressed: () {}, 
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Search/filter coming soon'),
+                  backgroundColor: AppColors.primaryBlue,
+                  duration: Duration(seconds: 2),
+                ),
+              );
+            },
             icon: const Icon(Icons.search, color: AppColors.textWhite54),
           ),
         ],

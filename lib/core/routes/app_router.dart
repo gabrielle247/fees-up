@@ -28,14 +28,16 @@ final appRouterProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     initialLocation: '/',
     debugLogDiagnostics: true,
-    
+
     // 1. LISTEN TO AUTH CHANGES
-    refreshListenable: GoRouterRefreshStream(Supabase.instance.client.auth.onAuthStateChange),
-    
+    refreshListenable:
+        GoRouterRefreshStream(Supabase.instance.client.auth.onAuthStateChange),
+
     // 2. REDIRECT LOGIC
     redirect: (context, state) {
       final session = Supabase.instance.client.auth.currentSession;
-      final isAuthRoute = state.uri.toString() == '/login' || state.uri.toString() == '/signup';
+      final isAuthRoute =
+          state.uri.toString() == '/login' || state.uri.toString() == '/signup';
 
       if (session == null) {
         return isAuthRoute ? null : '/login';
@@ -52,7 +54,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       // -----------------------------------------------------------------------
       // CORE ROUTES
       // -----------------------------------------------------------------------
-      
+
       // 1. HOME / OVERVIEW
       GoRoute(
         path: '/',
@@ -66,15 +68,16 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/transactions',
         builder: (context, state) => const ResponsiveLayout(
-          mobileScaffold: Scaffold(body: Center(child: Text("Mobile Transactions"))), 
-          pcScaffold: TransactionsScreen(), 
+          mobileScaffold:
+              Scaffold(body: Center(child: Text("Mobile Transactions"))),
+          pcScaffold: TransactionsScreen(),
         ),
       ),
 
       // -----------------------------------------------------------------------
       // FEATURE ROUTES
       // -----------------------------------------------------------------------
-      
+
       // 3. INVOICES
       GoRoute(
         path: '/invoices',
@@ -96,7 +99,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       // -----------------------------------------------------------------------
       // MESSAGING ROUTES (Broadcasts & Notifications)
       // -----------------------------------------------------------------------
-      
+
       // 6. ANNOUNCEMENTS (Broadcasts)
       GoRoute(
         path: '/announcements',
@@ -155,8 +158,8 @@ class GoRouterRefreshStream extends ChangeNotifier {
   GoRouterRefreshStream(Stream<dynamic> stream) {
     notifyListeners();
     _subscription = stream.asBroadcastStream().listen(
-      (dynamic _) => notifyListeners(),
-    );
+          (dynamic _) => notifyListeners(),
+        );
   }
 
   @override

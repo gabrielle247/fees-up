@@ -73,7 +73,8 @@ class DatabaseService {
 
   /// Runs a raw SQL SELECT query and returns the list of results once.
   /// Useful for one-off fetches like getting the last invoice number.
-  Future<List<Map<String, dynamic>>> select(String sql, [List<Object?>? arguments]) async {
+  Future<List<Map<String, dynamic>>> select(String sql,
+      [List<Object?>? arguments]) async {
     return await _db.getAll(sql, arguments ?? []);
   }
 
@@ -82,7 +83,8 @@ class DatabaseService {
     return results.isNotEmpty ? results.first : null;
   }
 
-  Future<Map<String, dynamic>?> tryGet(String sql, [List<Object?>? arguments]) async {
+  Future<Map<String, dynamic>?> tryGet(String sql,
+      [List<Object?>? arguments]) async {
     final results = await _db.getAll(sql, arguments ?? []);
     return results.isNotEmpty ? results.first : null;
   }
@@ -96,7 +98,8 @@ class DatabaseService {
     await _db.execute(sql, values);
   }
 
-  Future<void> update(String table, String id, Map<String, dynamic> data) async {
+  Future<void> update(
+      String table, String id, Map<String, dynamic> data) async {
     if (data.isEmpty) return;
     final updates = <String>[];
     final values = <dynamic>[];
@@ -115,5 +118,21 @@ class DatabaseService {
 
   Future<Map<String, dynamic>?> getUserProfile(String userId) async {
     return await getById('user_profiles', userId);
+  }
+
+  /// 🟢 [FIX 1] Watch Classes (Enables Filter)
+  Stream<List<Map<String, dynamic>>> watchClasses(String schoolId) {
+    return _db.watch(
+      'SELECT * FROM classes WHERE school_id = ? ORDER BY name ASC',
+      parameters: [schoolId],
+    );
+  }
+
+  /// 🟢 [FIX 2] Watch Notifications (Enables Bell Icon)
+  Stream<List<Map<String, dynamic>>> watchNotifications(String userId) {
+    return _db.watch(
+      'SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC',
+      parameters: [userId],
+    );
   }
 }

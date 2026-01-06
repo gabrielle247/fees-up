@@ -14,20 +14,26 @@ final invoiceStatsProvider =
         (ref, params) async* {
   final service = ref.watch(financialReportsProvider);
 
-  // Periodic refresh every 30 seconds for real-time-like updates
-  final timer = Stream.periodic(const Duration(seconds: 30));
-
-  await for (final _ in timer) {
-    try {
-      final stats = await service.getInvoiceStatistics(
+  Future<Map<String, dynamic>> fetch() => service.getInvoiceStatistics(
         schoolId: params.schoolId,
-        startDate: params.startDate,
-        endDate: params.endDate,
+        startDate: params.startDate ??
+            DateTime.now().subtract(const Duration(days: 30)),
+        endDate: params.endDate ?? DateTime.now(),
       );
-      yield stats;
-    } catch (e) {
-      // Continue with error state or previous value
-      continue;
+
+  // Emit immediately so the UI is not stuck waiting 30s
+  try {
+    yield await fetch();
+  } catch (e, st) {
+    yield* Stream.error(e, st);
+  }
+
+  // Periodic refresh every 30 seconds for real-time-like updates
+  await for (final _ in Stream.periodic(const Duration(seconds: 30))) {
+    try {
+      yield await fetch();
+    } catch (e, st) {
+      yield* Stream.error(e, st);
     }
   }
 });
@@ -38,20 +44,25 @@ final transactionSummaryProvider =
         (ref, params) async* {
   final service = ref.watch(financialReportsProvider);
 
-  // Periodic refresh every 30 seconds for real-time-like updates
-  final timer = Stream.periodic(const Duration(seconds: 30));
-
-  await for (final _ in timer) {
-    try {
-      final summary = await service.getTransactionSummary(
+  Future<Map<String, dynamic>> fetch() => service.getTransactionSummary(
         schoolId: params.schoolId,
-        startDate: params.startDate,
-        endDate: params.endDate,
+        startDate: params.startDate ??
+            DateTime.now().subtract(const Duration(days: 30)),
+        endDate: params.endDate ?? DateTime.now(),
       );
-      yield summary;
-    } catch (e) {
-      // Continue with error state or previous value
-      continue;
+
+  try {
+    yield await fetch();
+  } catch (e, st) {
+    yield* Stream.error(e, st);
+  }
+
+  // Periodic refresh every 30 seconds for real-time-like updates
+  await for (final _ in Stream.periodic(const Duration(seconds: 30))) {
+    try {
+      yield await fetch();
+    } catch (e, st) {
+      yield* Stream.error(e, st);
     }
   }
 });
@@ -62,16 +73,21 @@ final outstandingBillsProvider =
         (ref, studentId) async* {
   final service = ref.watch(financialReportsProvider);
 
-  // Periodic refresh every 30 seconds for real-time-like updates
-  final timer = Stream.periodic(const Duration(seconds: 30));
+  Future<List<Map<String, dynamic>>> fetch() =>
+      service.getOutstandingBills(studentId);
 
-  await for (final _ in timer) {
+  try {
+    yield await fetch();
+  } catch (e, st) {
+    yield* Stream.error(e, st);
+  }
+
+  // Periodic refresh every 30 seconds for real-time-like updates
+  await for (final _ in Stream.periodic(const Duration(seconds: 30))) {
     try {
-      final bills = await service.getOutstandingBills(studentId);
-      yield bills;
-    } catch (e) {
-      // Continue with error state or previous value
-      continue;
+      yield await fetch();
+    } catch (e, st) {
+      yield* Stream.error(e, st);
     }
   }
 });
@@ -82,19 +98,24 @@ final paymentAllocationHistoryProvider =
         (ref, params) async* {
   final service = ref.watch(financialReportsProvider);
 
-  // Periodic refresh every 30 seconds for real-time-like updates
-  final timer = Stream.periodic(const Duration(seconds: 30));
-
-  await for (final _ in timer) {
-    try {
-      final history = await service.getPaymentAllocationHistory(
+  Future<List<Map<String, dynamic>>> fetch() =>
+      service.getPaymentAllocationHistory(
         studentId: params.studentId,
         limit: params.limit,
       );
-      yield history;
-    } catch (e) {
-      // Continue with error state or previous value
-      continue;
+
+  try {
+    yield await fetch();
+  } catch (e, st) {
+    yield* Stream.error(e, st);
+  }
+
+  // Periodic refresh every 30 seconds for real-time-like updates
+  await for (final _ in Stream.periodic(const Duration(seconds: 30))) {
+    try {
+      yield await fetch();
+    } catch (e, st) {
+      yield* Stream.error(e, st);
     }
   }
 });

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/database_service.dart';
 import 'dashboard_provider.dart';
@@ -29,10 +30,29 @@ class SchoolPreferences {
 
 // 1. Fetch Global Settings (User-centric)
 final globalSettingsProvider = FutureProvider<GlobalSettings>((ref) async {
-  // ignore: unused_local_variable
   final db = DatabaseService();
-  // In production, fetch from Supabase. For UI demo, returning mock default.
-  return GlobalSettings(themeMode: 'dark', twoFactor: true, sessionTimeout: 15);
+
+  try {
+    // Fetch from user_settings table or use sensible defaults
+    final result = await db.db.getAll(
+      'SELECT theme_mode, two_factor_enabled, session_timeout_minutes FROM user_settings LIMIT 1',
+    );
+
+    if (result.isNotEmpty) {
+      final settings = result.first;
+      return GlobalSettings(
+        themeMode: settings['theme_mode'] ?? 'dark',
+        twoFactor: (settings['two_factor_enabled'] as int?) == 1,
+        sessionTimeout: settings['session_timeout_minutes'] ?? 15,
+      );
+    }
+  } catch (e) {
+    debugPrint('⚠️ Error fetching global settings: $e');
+  }
+
+  // Fallback to sensible defaults if table doesn't exist yet
+  return GlobalSettings(
+      themeMode: 'dark', twoFactor: false, sessionTimeout: 15);
 });
 
 // 2. Fetch School Context Settings (School-centric)
@@ -44,9 +64,30 @@ final schoolPreferencesProvider =
         notifyPayment: true, notifyOverdue: true, landingPage: 'overview');
   }
 
-  // Logic: Fetch FROM user_school_preferences WHERE school_id = dashboard.schoolId
+  final db = DatabaseService();
+
+  try {
+    // Fetch FROM school_preferences WHERE school_id = dashboard.schoolId
+    final result = await db.db.getAll(
+      'SELECT notify_payment, notify_overdue, default_landing_page FROM school_preferences WHERE school_id = ?',
+      [dashboard.schoolId],
+    );
+
+    if (result.isNotEmpty) {
+      final prefs = result.first;
+      return SchoolPreferences(
+        notifyPayment: (prefs['notify_payment'] as int?) == 1,
+        notifyOverdue: (prefs['notify_overdue'] as int?) == 1,
+        landingPage: prefs['default_landing_page'] ?? 'overview',
+      );
+    }
+  } catch (e) {
+    debugPrint('⚠️ Error fetching school preferences: $e');
+  }
+
+  // Fallback to sensible defaults
   return SchoolPreferences(
-      notifyPayment: true, notifyOverdue: false, landingPage: 'transactions');
+      notifyPayment: true, notifyOverdue: true, landingPage: 'overview');
 });
 
 // 3. Fetch School Years

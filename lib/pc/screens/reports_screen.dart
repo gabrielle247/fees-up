@@ -90,7 +90,7 @@ class ReportsScreen extends ConsumerWidget {
   void _generateQuickReport(BuildContext context) {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Generating comprehensive financial report...'),
+        content: Text('Quick export is coming soon'),
         backgroundColor: AppColors.primaryBlue,
       ),
     );

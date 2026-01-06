@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../data/providers/dashboard_provider.dart';
+import '../../../../data/providers/students_provider.dart';
 import '../widgets/sidebar.dart';
 import '../widgets/students/students_header.dart';
 import '../widgets/students/students_stats.dart';
 import '../widgets/students/students_table.dart';
 import '../widgets/dashboard/student_dialog.dart'; // Reusing your existing dialog
+import 'student_details_screen.dart';
 
 class StudentsScreen extends ConsumerWidget {
   const StudentsScreen({super.key});
@@ -14,7 +16,16 @@ class StudentsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final dashboardAsync = ref.watch(dashboardDataProvider);
+    final selectedStudent = ref.watch(selectedStudentProvider);
 
+    // If a student is selected, show details instead of list
+    if (selectedStudent != null) {
+      final studentId =
+          selectedStudent['id'] ?? selectedStudent['student_id'] ?? '';
+      return StudentDetailsScreen(studentId: studentId);
+    }
+
+    // Otherwise show student list
     return Scaffold(
       backgroundColor: AppColors.backgroundBlack,
       body: Row(
@@ -33,8 +44,12 @@ class StudentsScreen extends ConsumerWidget {
                 // B. Body
                 Expanded(
                   child: dashboardAsync.when(
-                    loading: () => const Center(child: CircularProgressIndicator(color: AppColors.primaryBlue)),
-                    error: (e, _) => Center(child: Text("Error: $e", style: const TextStyle(color: AppColors.errorRed))),
+                    loading: () => const Center(
+                        child: CircularProgressIndicator(
+                            color: AppColors.primaryBlue)),
+                    error: (e, _) => Center(
+                        child: Text("Error: $e",
+                            style: const TextStyle(color: AppColors.errorRed))),
                     data: (data) {
                       return SingleChildScrollView(
                         padding: const EdgeInsets.all(32),
@@ -97,11 +112,12 @@ class StudentsScreen extends ConsumerWidget {
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppColors.textWhite,
                 side: const BorderSide(color: AppColors.divider),
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
               ),
             ),
             const SizedBox(width: 16),
-            
+
             // Add Student Button
             ElevatedButton.icon(
               onPressed: () {
@@ -116,7 +132,8 @@ class StudentsScreen extends ConsumerWidget {
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primaryBlue,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
               ),
             ),
           ],
