@@ -1,12 +1,9 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import 'package:uuid/uuid.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../data/providers/dashboard_provider.dart';
-import '../../../data/providers/school_year_seeder.dart';
-import '../../../data/services/database_service.dart';
+import '../../../data/providers/year_configuration_provider.dart';
 
 class YearConfigurationCard extends ConsumerStatefulWidget {
   final String yearId;
@@ -73,13 +70,71 @@ class _YearConfigurationCardState extends ConsumerState<YearConfigurationCard> {
           return _errorCard('No school context');
         }
 
-        if (!_hydrated) {
-          _loadYearData(dashboard.schoolId);
-        }
+        // Load year data from repository via provider
+        final yearDataAsync = ref.watch(
+          loadYearProvider((widget.yearId, dashboard.schoolId)),
+        );
 
-        return _buildContent(context, dashboard.schoolId);
+        return yearDataAsync.when(
+          loading: () => _loadingCard(),
+          error: (err, _) => _errorCard('Failed to load year: $err'),
+          data: (yearData) {
+            if (yearData == null) {
+              return _errorCard('Year not found');
+            }
+
+            // Hydrate form fields if needed
+            if (!_hydrated) {
+              _hydrateFromData(yearData);
+            }
+
+            return _buildContent(context, dashboard.schoolId);
+          },
+        );
       },
     );
+  }
+
+  /// Populate form fields from loaded year data
+  void _hydrateFromData(Map<String, dynamic> yearData) {
+    final year = yearData['year'] as Map<String, dynamic>;
+    final terms = yearData['terms'] as List<dynamic>;
+    final months = yearData['months'] as List<dynamic>;
+
+    _labelController.text = year['year_label'] as String? ?? '';
+    _startDateController.text = year['start_date'] as String? ?? '';
+    _endDateController.text = year['end_date'] as String? ?? '';
+    _active = (year['active'] as int? ?? 0) == 1;
+
+    final desc = year['description'] as String? ?? '';
+    _descriptionController.text =
+        (desc.isNotEmpty && terms.isEmpty) ? desc : '';
+
+    _terms = terms
+        .map((t) => {
+              'id': t['id'],
+              'name': (t['name'] ?? '').toString(),
+              'start_date': (t['start_date'] ?? '').toString(),
+              'end_date': (t['end_date'] ?? '').toString(),
+            })
+        .toList();
+
+    _months = months
+        .map((m) => {
+              'id': m['id'],
+              'name': (m['name'] ?? '').toString(),
+              'month_index': m['month_index'],
+              'start_date': (m['start_date'] ?? '').toString(),
+              'end_date': (m['end_date'] ?? '').toString(),
+              'is_billable': m['is_billable'] as bool? ?? false,
+              'term_id': m['term_id'],
+            })
+        .toList();
+
+    _yearData = year;
+    _removedTermIds.clear();
+    _modified = false;
+    _hydrated = true;
   }
 
   Widget _buildContent(BuildContext context, String schoolId) {
@@ -366,7 +421,16 @@ class _YearConfigurationCardState extends ConsumerState<YearConfigurationCard> {
                   children: [
                     TextButton(
                       onPressed: _hydrated && _yearData != null
-                          ? () => _loadYearData(schoolId, force: true)
+                          ? () {
+                              // Reset form to loaded state
+                              if (_yearData != null) {
+                                _hydrateFromData({
+                                  'year': _yearData!,
+                                  'terms': _terms,
+                                  'months': _months,
+                                });
+                              }
+                            }
                           : null,
                       child: const Text('Reset'),
                     ),
@@ -392,132 +456,15 @@ class _YearConfigurationCardState extends ConsumerState<YearConfigurationCard> {
     );
   }
 
-  Future<void> _loadYearData(String schoolId, {bool force = false}) async {
-    if (_hydrated && !force) return;
-
-    try {
-      final db = DatabaseService();
-      final results = await db.db.getAll(
-        'SELECT * FROM school_years WHERE id = ? AND school_id = ?',
-        [widget.yearId, schoolId],
-      );
-
-      if (results.isEmpty) {
-        if (mounted) {
-          setState(() {
-            _hydrated = true;
-            _labelController.text = '';
-            _startDateController.text = '';
-            _endDateController.text = '';
-            _descriptionController.text = '';
-            _active = false;
-            _terms = [];
-            _months = [];
-          });
-        }
-        return;
-      }
-
-      final year = results.first;
-      _yearData = year;
-
-      // Load terms from dedicated table; fallback to encoded description
-      List<Map<String, dynamic>> parsedTerms = [];
-      final desc = year['description'] as String? ?? '';
-
-      final termRows = await db.db.getAll(
-        '''SELECT id, name, start_date, end_date
-           FROM school_terms
-           WHERE school_year_id = ? AND school_id = ?
-           ORDER BY start_date''',
-        [widget.yearId, schoolId],
-      );
-
-      if (termRows.isNotEmpty) {
-        parsedTerms = termRows
-            .map((t) => {
-                  'id': t['id'],
-                  'name': (t['name'] ?? '').toString(),
-                  'start_date': (t['start_date'] ?? '').toString(),
-                  'end_date': (t['end_date'] ?? '').toString(),
-                })
-            .toList();
-      } else if (desc.isNotEmpty) {
-        try {
-          final decoded = jsonDecode(desc);
-          if (decoded is Map && decoded.containsKey('terms')) {
-            final termsList = decoded['terms'] as List?;
-            if (termsList != null) {
-              parsedTerms = termsList
-                  .map((t) => {
-                        'id':
-                            (t['id'] ?? '').toString().isEmpty ? null : t['id'],
-                        'name': (t['name'] ?? '').toString(),
-                        'start_date': (t['start_date'] ?? '').toString(),
-                        'end_date': (t['end_date'] ?? '').toString(),
-                      })
-                  .toList();
-            }
-          }
-        } catch (_) {
-          // Not JSON, treat as plain description
-        }
-      }
-
-      if (mounted) {
-        setState(() {
-          _labelController.text = year['year_label'] as String? ?? '';
-          _startDateController.text = year['start_date'] as String? ?? '';
-          _endDateController.text = year['end_date'] as String? ?? '';
-          _descriptionController.text =
-              (desc.isNotEmpty && parsedTerms.isEmpty) ? desc : '';
-          _active = (year['active'] as int? ?? 0) == 1;
-          _terms = parsedTerms;
-          _removedTermIds.clear();
-          _hydrated = true;
-        });
-      }
-
-      // Load months for this year - auto-seed if none exist
-      final seeder = SchoolYearSeeder();
-      final months = await seeder.getOrCreateMonthsForYear(
-        yearId: widget.yearId,
-        schoolId: schoolId,
-        startDate: DateTime.parse(_startDateController.text),
-        endDate: DateTime.parse(_endDateController.text),
-      );
-
-      if (mounted) {
-        setState(() {
-          _months = months
-              .map((m) => {
-                    'id': m['id'],
-                    'name': (m['name'] ?? '').toString(),
-                    'month_index': m['month_index'],
-                    'start_date': (m['start_date'] ?? '').toString(),
-                    'end_date': (m['end_date'] ?? '').toString(),
-                    'is_billable': (m['is_billable'] as int? ?? 0) == 1,
-                    'term_id': (m['term_id'] ?? '').toString().isEmpty
-                        ? null
-                        : m['term_id'],
-                  })
-              .toList();
-        });
-      }
-    } catch (e) {
-      debugPrint('⚠️ Error loading year data: $e');
-      if (mounted) setState(() => _hydrated = true);
-    }
-  }
-
   void _addTerm() {
     setState(() {
       _terms.add({
-        'id': const Uuid().v4(),
+        'id': null, // Will be generated by repository
         'name': 'Term ${_terms.length + 1}',
         'start_date': '',
         'end_date': '',
       });
+      _modified = true;
     });
   }
 
@@ -571,123 +518,40 @@ class _YearConfigurationCardState extends ConsumerState<YearConfigurationCard> {
     setState(() => _saving = true);
 
     try {
-      final db = DatabaseService();
-
-      // Build description JSON if there are terms
-      String descriptionValue;
-      if (_terms.isNotEmpty) {
-        descriptionValue = jsonEncode({
-          'description': _descriptionController.text.trim(),
-          'terms': _terms,
-        });
-      } else {
-        descriptionValue = _descriptionController.text.trim();
-      }
-
-      // ATOMIC TRANSACTION: Save year AND all months together
-      await db.db.writeTransaction((tx) async {
-        // 1. UPDATE school_years
-        await tx.execute(
-          '''UPDATE school_years 
-             SET year_label = ?, start_date = ?, end_date = ?, description = ?, active = ?
-             WHERE id = ? AND school_id = ?''',
-          [
-            _labelController.text.trim(),
-            _startDateController.text.trim(),
-            _endDateController.text.trim(),
-            descriptionValue,
-            _active ? 1 : 0,
-            widget.yearId,
-            schoolId,
-          ],
-        );
-
-        // 2. UPDATE each month in the transaction
-        for (final month in _months) {
-          final monthId = month['id'];
-          if (monthId == null) continue;
-
-          await tx.execute(
-            '''UPDATE school_year_months 
-               SET start_date = ?, end_date = ?, is_billable = ?, term_id = ?
-               WHERE id = ? AND school_year_id = ?''',
-            [
-              month['start_date'] ?? '',
-              month['end_date'] ?? '',
-              (month['is_billable'] ?? false) ? 1 : 0,
-              month['term_id'],
-              monthId,
-              widget.yearId,
-            ],
+      // Use the repository provider to save
+      await ref.read(saveYearProvider.notifier).saveYear(
+            yearId: widget.yearId,
+            schoolId: schoolId,
+            yearLabel: _labelController.text.trim(),
+            startDate: _startDateController.text.trim(),
+            endDate: _endDateController.text.trim(),
+            description: _descriptionController.text.trim(),
+            active: _active,
+            terms: _terms,
+            removedTermIds: _removedTermIds.toList(),
+            months: _months,
           );
-        }
-      });
 
-      // Upsert terms with IDs for FK usage
-      for (final term in _terms) {
-        final termId = (term['id']?.toString().isNotEmpty ?? false)
-            ? term['id'].toString()
-            : const Uuid().v4();
-        term['id'] = termId;
-
-        await db.db.execute(
-          '''INSERT OR REPLACE INTO school_terms
-             (id, school_id, school_year_id, name, start_date, end_date, academic_year, created_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT created_at FROM school_terms WHERE id = ?), datetime('now')))''',
-          [
-            termId,
-            schoolId,
-            widget.yearId,
-            (term['name'] ?? '').toString().trim(),
-            (term['start_date'] ?? '').toString().trim(),
-            (term['end_date'] ?? '').toString().trim(),
-            null,
-            termId,
-          ],
-        );
-      }
-
-      for (final termId in _removedTermIds) {
-        await db.db.execute(
-          'DELETE FROM school_terms WHERE id = ? AND school_id = ?',
-          [termId, schoolId],
-        );
-      }
       _removedTermIds.clear();
-
-      // Persist month billability toggles
-      for (final m in _months) {
-        if (m['id'] == null) continue;
-        final isBillable = (m['is_billable'] as bool? ?? false) ? 1 : 0;
-        final termId = (m['term_id']?.toString().isNotEmpty ?? false)
-            ? m['term_id'].toString()
-            : null;
-        await db.db.execute(
-          '''UPDATE school_year_months
-             SET is_billable = ?, term_id = ?
-             WHERE id = ? AND school_id = ?''',
-          [isBillable, termId, m['id'], schoolId],
-        );
-      }
 
       if (mounted) {
         // ignore: use_build_context_synchronously
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('School year updated successfully')),
+          const SnackBar(content: Text('✅ School year updated successfully')),
         );
       }
     } catch (e) {
       if (mounted) {
         // ignore: use_build_context_synchronously
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to save: $e')),
+          SnackBar(content: Text('❌ Failed to save: $e')),
         );
       }
     } finally {
       if (mounted) {
         setState(() {
           _saving = false;
-          _modified = false; // Clear modified flag after save
+          _modified = false;
         });
       }
     }
