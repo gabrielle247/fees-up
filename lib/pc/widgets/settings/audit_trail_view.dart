@@ -52,6 +52,7 @@ class _AuditTrailViewState extends ConsumerState<AuditTrailView> {
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
           // Header
           Row(
@@ -152,7 +153,7 @@ class _AuditTrailViewState extends ConsumerState<AuditTrailView> {
           const SizedBox(height: 24),
 
           // Audit Log Table
-          Expanded(
+          Flexible(
             child: FutureBuilder<List<Map<String, dynamic>>>(
               future: _fetchAuditLog(schoolId),
               builder: (context, snapshot) {
@@ -392,6 +393,7 @@ class _AuditTrailViewState extends ConsumerState<AuditTrailView> {
       return result;
     } catch (e) {
       debugPrint('Error fetching audit log: $e');
+      // billing_audit_log table may not exist - that's ok, audit logging not essential
       return [];
     }
   }

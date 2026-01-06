@@ -127,6 +127,9 @@ class _BillingConfigCardState extends ConsumerState<BillingConfigCard> {
                   label: 'Default Tax Rate (%)',
                   controller: _taxController,
                   suffix: '%',
+                  inputType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  hint: 'e.g., 10',
                 ),
               ),
             ],
@@ -148,6 +151,9 @@ class _BillingConfigCardState extends ConsumerState<BillingConfigCard> {
                   label: 'Annual Tuition Fee',
                   controller: _defaultFeeController,
                   prefix: '\$',
+                  inputType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  hint: 'e.g., 1000.00',
                 ),
               ),
               const SizedBox(width: 24),
@@ -156,6 +162,9 @@ class _BillingConfigCardState extends ConsumerState<BillingConfigCard> {
                   label: 'One-time Registration Fee',
                   controller: _registrationFeeController,
                   prefix: '\$',
+                  inputType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  hint: 'e.g., 500.00',
                 ),
               ),
             ],
@@ -200,6 +209,9 @@ class _BillingConfigCardState extends ConsumerState<BillingConfigCard> {
                       label: 'Late Fee Percentage',
                       controller: _lateFeeController,
                       suffix: '%',
+                      inputType:
+                          const TextInputType.numberWithOptions(decimal: true),
+                      hint: 'e.g., 2.5',
                     ),
                     const SizedBox(height: 4),
                     const Text(
@@ -215,6 +227,8 @@ class _BillingConfigCardState extends ConsumerState<BillingConfigCard> {
                 child: _buildInput(
                   label: 'Grace Period (Days)',
                   controller: _graceDaysController,
+                  inputType: TextInputType.number,
+                  hint: 'e.g., 7',
                 ),
               ),
             ],
@@ -233,6 +247,8 @@ class _BillingConfigCardState extends ConsumerState<BillingConfigCard> {
                 child: _buildInput(
                   label: 'Invoice Sequence Seed',
                   controller: _invoiceSequenceController,
+                  inputType: TextInputType.number,
+                  hint: 'e.g., 1000',
                 ),
               ),
             ],
@@ -436,6 +452,8 @@ class _BillingConfigCardState extends ConsumerState<BillingConfigCard> {
     String? prefix,
     int maxLines = 1,
     String? helper,
+    TextInputType inputType = TextInputType.text,
+    String? hint,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -447,12 +465,13 @@ class _BillingConfigCardState extends ConsumerState<BillingConfigCard> {
           controller: controller,
           maxLines: maxLines,
           style: const TextStyle(color: AppColors.textWhite),
-          keyboardType:
-              maxLines > 1 ? TextInputType.multiline : TextInputType.text,
+          keyboardType: inputType,
           decoration: InputDecoration(
             filled: true,
             fillColor: AppColors.backgroundBlack,
             contentPadding: const EdgeInsets.all(16),
+            hintText: hint,
+            hintStyle: const TextStyle(color: AppColors.textWhite38),
             suffixText: suffix,
             prefixText: prefix,
             suffixStyle: const TextStyle(color: AppColors.textWhite54),
