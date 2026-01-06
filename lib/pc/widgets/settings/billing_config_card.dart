@@ -338,12 +338,14 @@ class _BillingConfigCardState extends ConsumerState<BillingConfigCard> {
           );
 
       if (mounted) {
+        // ignore: use_build_context_synchronously
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('✅ Billing settings saved')),
         );
       }
     } catch (e) {
       if (mounted) {
+        // ignore: use_build_context_synchronously
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('❌ Error: $e')),
         );

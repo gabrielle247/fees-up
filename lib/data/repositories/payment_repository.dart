@@ -167,16 +167,15 @@ class PaymentException implements Exception {
 
 /// Thrown when payment validation fails (invalid amount, student not found, etc.)
 class PaymentValidationException extends PaymentException {
-  PaymentValidationException(String message)
-      : super(message, code: 'VALIDATION_ERROR');
+  PaymentValidationException(super.message) : super(code: 'VALIDATION_ERROR');
 }
 
 /// Thrown when a database operation fails.
 class PaymentDatabaseException extends PaymentException {
   final Object? originalError;
 
-  PaymentDatabaseException(String message, {this.originalError})
-      : super(message, code: 'DATABASE_ERROR');
+  PaymentDatabaseException(super.message, {this.originalError})
+      : super(code: 'DATABASE_ERROR');
 
   @override
   String toString() => 'PaymentDatabaseException: $message'

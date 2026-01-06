@@ -260,20 +260,27 @@ class _PaymentAllocationsDialogState
                                                       .toString(),
                                                 )
                                                 .then((_) {
-                                              ScaffoldMessenger.of(context)
-                                                  .showSnackBar(
-                                                const SnackBar(
-                                                  content: Text(
-                                                      '✅ Allocation removed'),
-                                                ),
-                                              );
+                                              if (mounted) {
+                                                // ignore: use_build_context_synchronously
+                                                ScaffoldMessenger.of(context)
+                                                    .showSnackBar(
+                                                  const SnackBar(
+                                                    content: Text(
+                                                        '✅ Allocation removed'),
+                                                  ),
+                                                );
+                                              }
                                             }).catchError((e) {
-                                              ScaffoldMessenger.of(context)
-                                                  .showSnackBar(
-                                                SnackBar(
-                                                  content: Text('❌ Error: $e'),
-                                                ),
-                                              );
+                                              if (mounted) {
+                                                // ignore: use_build_context_synchronously
+                                                ScaffoldMessenger.of(context)
+                                                    .showSnackBar(
+                                                  SnackBar(
+                                                    content:
+                                                        Text('❌ Error: $e'),
+                                                  ),
+                                                );
+                                              }
                                             });
                                           },
                                           style: TextButton.styleFrom(
@@ -416,21 +423,27 @@ class _PaymentAllocationsDialogState
                                                     amount: allocAmount,
                                                   )
                                                   .then((_) {
-                                                ScaffoldMessenger.of(context)
-                                                    .showSnackBar(
-                                                  SnackBar(
-                                                    content: Text(
-                                                        '✅ Allocated ${NumberFormat.simpleCurrency().format(allocAmount)}'),
-                                                  ),
-                                                );
+                                                if (mounted) {
+                                                  // ignore: use_build_context_synchronously
+                                                  ScaffoldMessenger.of(context)
+                                                      .showSnackBar(
+                                                    SnackBar(
+                                                      content: Text(
+                                                          '✅ Allocated ${NumberFormat.simpleCurrency().format(allocAmount)}'),
+                                                    ),
+                                                  );
+                                                }
                                               }).catchError((e) {
-                                                ScaffoldMessenger.of(context)
-                                                    .showSnackBar(
-                                                  SnackBar(
-                                                    content:
-                                                        Text('❌ Error: $e'),
-                                                  ),
-                                                );
+                                                if (mounted) {
+                                                  // ignore: use_build_context_synchronously
+                                                  ScaffoldMessenger.of(context)
+                                                      .showSnackBar(
+                                                    SnackBar(
+                                                      content:
+                                                          Text('❌ Error: $e'),
+                                                    ),
+                                                  );
+                                                }
                                               });
                                             },
                                             style: ElevatedButton.styleFrom(

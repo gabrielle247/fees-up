@@ -590,12 +590,14 @@ class _YearConfigurationCardState extends ConsumerState<YearConfigurationCard> {
       }
 
       if (mounted) {
+        // ignore: use_build_context_synchronously
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('School year updated successfully')),
         );
       }
     } catch (e) {
       if (mounted) {
+        // ignore: use_build_context_synchronously
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Failed to save: $e')),
         );
@@ -921,8 +923,9 @@ class _YearConfigurationCardState extends ConsumerState<YearConfigurationCard> {
   }
 
   void _regenerateMonthDates() {
-    if (_startDateController.text.isEmpty || _endDateController.text.isEmpty)
+    if (_startDateController.text.isEmpty || _endDateController.text.isEmpty) {
       return;
+    }
 
     try {
       final start = DateTime.tryParse(_startDateController.text);
