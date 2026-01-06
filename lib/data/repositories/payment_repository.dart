@@ -153,7 +153,7 @@ abstract class PaymentRepository {
   Future<double> getOutstandingBalance(String studentId);
 }
 
-/// Custom exception for payment-related errors.
+/// Base exception for payment-related errors.
 class PaymentException implements Exception {
   final String message;
   final String? code;
@@ -163,6 +163,24 @@ class PaymentException implements Exception {
   @override
   String toString() =>
       'PaymentException: $message${code != null ? ' ($code)' : ''}';
+}
+
+/// Thrown when payment validation fails (invalid amount, student not found, etc.)
+class PaymentValidationException extends PaymentException {
+  PaymentValidationException(String message)
+      : super(message, code: 'VALIDATION_ERROR');
+}
+
+/// Thrown when a database operation fails.
+class PaymentDatabaseException extends PaymentException {
+  final Object? originalError;
+
+  PaymentDatabaseException(String message, {this.originalError})
+      : super(message, code: 'DATABASE_ERROR');
+
+  @override
+  String toString() => 'PaymentDatabaseException: $message'
+      '${originalError != null ? ' (caused by: $originalError)' : ''}';
 }
 
 /// Validation rules for payments.

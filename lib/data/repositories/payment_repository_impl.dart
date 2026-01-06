@@ -47,11 +47,9 @@ class PaymentRepositoryImpl implements PaymentRepository {
         throw PaymentValidationException('Amount must be greater than 0');
       }
 
-      // Check method is valid
-      final validMethods = ['Cash', 'Check', 'Card', 'Mobile', 'Bank Transfer'];
-      if (!validMethods.contains(method)) {
-        throw PaymentValidationException(
-            'Invalid payment method: $method. Must be one of: $validMethods');
+      // Check method is valid - use the validator utility
+      if (!PaymentValidator.isValidMethod(method)) {
+        throw PaymentValidationException('Invalid payment method: $method');
       }
 
       // Verify student exists
@@ -184,7 +182,7 @@ class PaymentRepositoryImpl implements PaymentRepository {
             'Payment with ID $paymentId not found');
       }
 
-      final payment = Payment.fromMap(paymentData as Map<String, dynamic>);
+      final payment = Payment.fromMap(paymentData);
 
       // Step 2: Validate all invoices exist and allocation amounts
       double totalAllocation = 0;

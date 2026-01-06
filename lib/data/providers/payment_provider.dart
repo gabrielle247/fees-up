@@ -198,7 +198,7 @@ class _RecordPaymentParams {
     required this.amount,
     required this.method,
     required this.invoiceId,
-    this.description,
+    required this.description,
   });
 
   @override
