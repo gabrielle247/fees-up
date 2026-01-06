@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../data/providers/dashboard_provider.dart';
+import '../../../data/providers/school_year_seeder.dart';
 import '../../../data/services/database_service.dart';
 
 class YearConfigurationCard extends ConsumerStatefulWidget {
@@ -29,9 +30,30 @@ class _YearConfigurationCardState extends ConsumerState<YearConfigurationCard> {
   List<Map<String, dynamic>> _months = [];
   Map<String, dynamic>? _yearData;
   final Set<String> _removedTermIds = {};
+  bool _modified = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Track changes to text fields
+    _labelController.addListener(_onContentChanged);
+    _startDateController.addListener(_onContentChanged);
+    _endDateController.addListener(_onContentChanged);
+    _descriptionController.addListener(_onContentChanged);
+  }
+
+  void _onContentChanged() {
+    if (_hydrated) {
+      setState(() => _modified = true);
+    }
+  }
 
   @override
   void dispose() {
+    _labelController.removeListener(_onContentChanged);
+    _startDateController.removeListener(_onContentChanged);
+    _endDateController.removeListener(_onContentChanged);
+    _descriptionController.removeListener(_onContentChanged);
     _labelController.dispose();
     _startDateController.dispose();
     _endDateController.dispose();
@@ -150,7 +172,10 @@ class _YearConfigurationCardState extends ConsumerState<YearConfigurationCard> {
                         const SizedBox(height: 8),
                         Switch(
                           value: _active,
-                          onChanged: (v) => setState(() => _active = v),
+                          onChanged: (v) => setState(() {
+                            _active = v;
+                            _modified = true;
+                          }),
                           activeThumbColor: AppColors.successGreen,
                         ),
                       ],
@@ -306,6 +331,35 @@ class _YearConfigurationCardState extends ConsumerState<YearConfigurationCard> {
 
                 const SizedBox(height: 32),
 
+                // Unsaved changes warning
+                if (_modified)
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: AppColors.warningOrange.withValues(alpha: 0.15),
+                      border:
+                          Border.all(color: AppColors.warningOrange, width: 1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.warning_outlined,
+                            color: AppColors.warningOrange, size: 18),
+                        SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            'You have unsaved changes. Click "Save Changes" to persist them.',
+                            style: TextStyle(
+                              color: AppColors.warningOrange,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
                 // Save/Reset Buttons
                 Row(
                   mainAxisAlignment: MainAxisAlignment.end,
@@ -424,13 +478,13 @@ class _YearConfigurationCardState extends ConsumerState<YearConfigurationCard> {
         });
       }
 
-      // Load months for this year
-      final months = await db.db.getAll(
-        '''SELECT id, name, month_index, start_date, end_date, is_billable, term_id
-            FROM school_year_months
-           WHERE school_year_id = ? AND school_id = ?
-            ORDER BY month_index''',
-        [widget.yearId, schoolId],
+      // Load months for this year - auto-seed if none exist
+      final seeder = SchoolYearSeeder();
+      final months = await seeder.getOrCreateMonthsForYear(
+        yearId: widget.yearId,
+        schoolId: schoolId,
+        startDate: DateTime.parse(_startDateController.text),
+        endDate: DateTime.parse(_endDateController.text),
       );
 
       if (mounted) {
@@ -485,6 +539,7 @@ class _YearConfigurationCardState extends ConsumerState<YearConfigurationCard> {
   void _updateTerm(int index, String field, String value) {
     setState(() {
       _terms[index][field] = value;
+      _modified = true;
     });
   }
 
@@ -493,6 +548,7 @@ class _YearConfigurationCardState extends ConsumerState<YearConfigurationCard> {
       for (final m in _months) {
         if (m['id'] == monthId) {
           m['is_billable'] = value;
+          _modified = true;
           break;
         }
       }
@@ -504,6 +560,7 @@ class _YearConfigurationCardState extends ConsumerState<YearConfigurationCard> {
       for (final m in _months) {
         if (m['id'] == monthId) {
           m['term_id'] = termId;
+          _modified = true;
           break;
         }
       }
@@ -527,20 +584,44 @@ class _YearConfigurationCardState extends ConsumerState<YearConfigurationCard> {
         descriptionValue = _descriptionController.text.trim();
       }
 
-      await db.db.execute(
-        '''UPDATE school_years 
-           SET year_label = ?, start_date = ?, end_date = ?, description = ?, active = ?
-           WHERE id = ? AND school_id = ?''',
-        [
-          _labelController.text.trim(),
-          _startDateController.text.trim(),
-          _endDateController.text.trim(),
-          descriptionValue,
-          _active ? 1 : 0,
-          widget.yearId,
-          schoolId,
-        ],
-      );
+      // ATOMIC TRANSACTION: Save year AND all months together
+      await db.db.writeTransaction((tx) async {
+        // 1. UPDATE school_years
+        await tx.execute(
+          '''UPDATE school_years 
+             SET year_label = ?, start_date = ?, end_date = ?, description = ?, active = ?
+             WHERE id = ? AND school_id = ?''',
+          [
+            _labelController.text.trim(),
+            _startDateController.text.trim(),
+            _endDateController.text.trim(),
+            descriptionValue,
+            _active ? 1 : 0,
+            widget.yearId,
+            schoolId,
+          ],
+        );
+
+        // 2. UPDATE each month in the transaction
+        for (final month in _months) {
+          final monthId = month['id'];
+          if (monthId == null) continue;
+
+          await tx.execute(
+            '''UPDATE school_year_months 
+               SET start_date = ?, end_date = ?, is_billable = ?, term_id = ?
+               WHERE id = ? AND school_year_id = ?''',
+            [
+              month['start_date'] ?? '',
+              month['end_date'] ?? '',
+              (month['is_billable'] ?? false) ? 1 : 0,
+              month['term_id'],
+              monthId,
+              widget.yearId,
+            ],
+          );
+        }
+      });
 
       // Upsert terms with IDs for FK usage
       for (final term in _terms) {
@@ -603,7 +684,12 @@ class _YearConfigurationCardState extends ConsumerState<YearConfigurationCard> {
         );
       }
     } finally {
-      if (mounted) setState(() => _saving = false);
+      if (mounted) {
+        setState(() {
+          _saving = false;
+          _modified = false; // Clear modified flag after save
+        });
+      }
     }
   }
 
