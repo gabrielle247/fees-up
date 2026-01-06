@@ -646,9 +646,15 @@ class _YearConfigurationCardState extends ConsumerState<YearConfigurationCard> {
       (month['start_date'] ?? '').toString(),
       (month['end_date'] ?? '').toString(),
     );
-    final selectedTermId = (month['term_id']?.toString().isNotEmpty ?? false)
+    final rawTermId = (month['term_id']?.toString().isNotEmpty ?? false)
         ? month['term_id'].toString()
         : null;
+
+    // Ensure the selected term exists in the list, otherwise use null
+    final selectedTermId =
+        rawTermId != null && _terms.any((t) => t['id']?.toString() == rawTermId)
+            ? rawTermId
+            : null;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
