@@ -769,7 +769,7 @@ class _YearConfigurationCardState extends ConsumerState<YearConfigurationCard> {
           Switch(
             value: billable,
             onChanged: (v) => _toggleMonthBillable(month['id'], v),
-            activeColor: AppColors.primaryBlue,
+            activeThumbColor: AppColors.primaryBlue,
           ),
           const SizedBox(width: 8),
           Text(

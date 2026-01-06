@@ -37,7 +37,7 @@ class BillingRepository {
     } catch (e) {
       // TODO: Replace with proper logging framework
       debugPrintError('Error fetching billing configurations: $e');
-      return [];
+      rethrow;
     }
   }
 
@@ -59,8 +59,7 @@ class BillingRepository {
   }
 
   /// Update a billing configuration
-  Future<bool> updateBillingConfiguration(
-      BillingConfiguration config) async {
+  Future<bool> updateBillingConfiguration(BillingConfiguration config) async {
     try {
       await supabase
           .from('billing_configurations')
@@ -78,8 +77,7 @@ class BillingRepository {
     try {
       await supabase
           .from('billing_configurations')
-          .update({'is_active': false})
-          .eq('id', configId);
+          .update({'is_active': false}).eq('id', configId);
       return true;
     } catch (e) {
       debugPrintError('Error deactivating configuration: $e');
@@ -101,22 +99,24 @@ class BillingRepository {
   /// Save generated bills to database
   Future<bool> saveBills(List<GeneratedBill> bills) async {
     try {
-      final billMaps = bills.map((b) => {
-            'id': b.id,
-            'school_id': b.schoolId,
-            'student_id': b.studentId,
-            'student_name': b.studentName,
-            'grade_level': b.gradeLevel,
-            'billing_date': b.billingDate.toIso8601String(),
-            'due_date': b.dueDate.toIso8601String(),
-            'subtotal': b.subtotal,
-            'late_fee': b.lateFee,
-            'discount': b.discount,
-            'total': b.total,
-            'frequency': b.frequency,
-            'is_switch_bill': b.isSwitchBill,
-            'created_at': DateTime.now().toIso8601String(),
-          }).toList();
+      final billMaps = bills
+          .map((b) => {
+                'id': b.id,
+                'school_id': b.schoolId,
+                'student_id': b.studentId,
+                'student_name': b.studentName,
+                'grade_level': b.gradeLevel,
+                'billing_date': b.billingDate.toIso8601String(),
+                'due_date': b.dueDate.toIso8601String(),
+                'subtotal': b.subtotal,
+                'late_fee': b.lateFee,
+                'discount': b.discount,
+                'total': b.total,
+                'frequency': b.frequency,
+                'is_switch_bill': b.isSwitchBill,
+                'created_at': DateTime.now().toIso8601String(),
+              })
+          .toList();
 
       await supabase.from('bills').insert(billMaps);
 
@@ -176,8 +176,8 @@ class BillingRepository {
           .order('effective_date', ascending: false);
 
       return (response as List<dynamic>)
-          .map((switch_) => _billingSwitchFromMap(
-              switch_ as Map<String, dynamic>))
+          .map((switch_) =>
+              _billingSwitchFromMap(switch_ as Map<String, dynamic>))
           .toList();
     } catch (e) {
       debugPrintError('Error fetching billing switches: $e');
@@ -218,8 +218,7 @@ class BillingRepository {
     try {
       await supabase
           .from('bills')
-          .update({'is_processed': true})
-          .inFilter('id', billIds);
+          .update({'is_processed': true}).inFilter('id', billIds);
       return true;
     } catch (e) {
       debugPrintError('Error marking bills as processed: $e');
@@ -240,12 +239,12 @@ class BillingRepository {
         0.0,
         (sum, bill) => sum + ((bill['total'] as num?) ?? 0.0).toDouble(),
       );
-      final totalCollected = bills
-          .where((bill) => bill['is_paid'] == true)
-          .fold<double>(
-        0.0,
-        (sum, bill) => sum + ((bill['total'] as num?) ?? 0.0).toDouble(),
-      );
+      final totalCollected =
+          bills.where((bill) => bill['is_paid'] == true).fold<double>(
+                0.0,
+                (sum, bill) =>
+                    sum + ((bill['total'] as num?) ?? 0.0).toDouble(),
+              );
 
       return {
         'total_billed': totalBilled,

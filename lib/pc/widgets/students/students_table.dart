@@ -504,10 +504,17 @@ class _StudentsTableState extends ConsumerState<StudentsTable> {
                         break;
                       case 'sms':
                         // TODO: Open SMS dialog
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                              content: Text('SMS feature coming soon')),
-                        );
+                        // Implementation: Create SmsSendDialog widget
+                        // 1. Display contact number from emergency_contact_phone
+                        // 2. Allow composing message
+                        // 3. Integrate with SMS provider (Twilio, AWS SNS, etc.)
+                        // 4. Track sent messages in database
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                                content: Text('SMS feature coming soon')),
+                          );
+                        }
                         break;
                       case 'edit':
                         // Open edit student dialog

@@ -500,6 +500,7 @@ class TransactionService {
 
 void debugPrintError(String message) {
   // TODO: Replace with proper logging service
+  // Integrate with a logging framework like: Firebase Crashlytics, Sentry, or custom logger
   // ignore: avoid_print
   print('❌ ERROR: $message');
 }

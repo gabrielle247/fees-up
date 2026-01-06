@@ -4,14 +4,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 // --- MOCK PROVIDER ---
 // Toggle this to 'true' to simulate a paid account, 'false' for free tier.
 // We keep it true for now so you can work without disturbance.
-final isPremiumProvider = Provider<bool>((ref) => true); 
+final isPremiumProvider = Provider<bool>((ref) => true);
 
 class PremiumGuard extends ConsumerWidget {
   final Widget child;
   final String featureName;
 
   const PremiumGuard({
-    super.key, 
+    super.key,
     required this.child,
     this.featureName = "This Feature",
   });
@@ -45,7 +45,7 @@ class PremiumGuard extends ConsumerWidget {
               border: Border.all(color: Colors.white10),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withAlpha((0.5*255) as int),
+                  color: Colors.black.withAlpha((0.5 * 255) as int),
                   blurRadius: 30,
                   offset: const Offset(0, 10),
                 )
@@ -54,11 +54,15 @@ class PremiumGuard extends ConsumerWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.diamond_outlined, size: 48, color: Color(0xFFA855F7)), // Purple
+                const Icon(Icons.diamond_outlined,
+                    size: 48, color: Color(0xFFA855F7)), // Purple
                 const SizedBox(height: 20),
                 Text(
                   "Unlock $featureName",
-                  style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 12),
                 const Text(
@@ -70,14 +74,19 @@ class PremiumGuard extends ConsumerWidget {
                 ElevatedButton(
                   onPressed: () {
                     // TODO: Navigate to Payment/Subscription Screen
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text("Subscription Flow Coming Soon")),
-                    );
+                    // This will be implemented when subscription flow is ready
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                            content: Text("Subscription Flow Coming Soon")),
+                      );
+                    }
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFA855F7),
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 32, vertical: 16),
                   ),
                   child: const Text("Get Unlimited Access"),
                 ),

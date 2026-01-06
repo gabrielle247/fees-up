@@ -289,7 +289,9 @@ class _EditStudentDialogState extends ConsumerState<EditStudentDialog> {
                               style: const TextStyle(
                                   color: AppColors.textWhite70)),
                           value: isSelected,
-                          activeColor: AppColors.primaryBlue,
+                          fillColor: WidgetStateProperty.all(
+                            AppColors.primaryBlue,
+                          ),
                           checkColor: AppColors.textWhite,
                           contentPadding: EdgeInsets.zero,
                           onChanged: (val) {

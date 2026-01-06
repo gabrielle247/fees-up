@@ -37,9 +37,14 @@ class _EnableTwoFactorDialogState extends State<EnableTwoFactorDialog> {
               children: [
                 const Row(
                   children: [
-                    Icon(Icons.shield_outlined, color: AppColors.primaryBlue, size: 20),
+                    Icon(Icons.shield_outlined,
+                        color: AppColors.primaryBlue, size: 20),
                     SizedBox(width: 12),
-                    Text("Enable 2FA", style: TextStyle(color: AppColors.textWhite, fontSize: 18, fontWeight: FontWeight.bold)),
+                    Text("Enable 2FA",
+                        style: TextStyle(
+                            color: AppColors.textWhite,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold)),
                   ],
                 ),
                 IconButton(
@@ -55,7 +60,8 @@ class _EnableTwoFactorDialogState extends State<EnableTwoFactorDialog> {
             // 2. QR CODE SECTION
             const Text(
               "Scan this QR code with your authenticator app (like Google Authenticator or Authy) to generate your verification code.",
-              style: TextStyle(color: AppColors.textWhite70, fontSize: 14, height: 1.5),
+              style: TextStyle(
+                  color: AppColors.textWhite70, fontSize: 14, height: 1.5),
             ),
             const SizedBox(height: 24),
             Center(
@@ -69,7 +75,8 @@ class _EnableTwoFactorDialogState extends State<EnableTwoFactorDialog> {
                 ),
                 // Replace with your actual QR code image asset or generator
                 child: const Center(
-                  child: Icon(Icons.qr_code_2, size: 100, color: AppColors.backgroundBlack),
+                  child: Icon(Icons.qr_code_2,
+                      size: 100, color: AppColors.backgroundBlack),
                 ),
               ),
             ),
@@ -81,7 +88,11 @@ class _EnableTwoFactorDialogState extends State<EnableTwoFactorDialog> {
                 Expanded(child: Divider(color: AppColors.divider)),
                 Padding(
                   padding: EdgeInsets.symmetric(horizontal: 16),
-                  child: Text("OR ENTER CODE MANUALLY", style: TextStyle(color: AppColors.textWhite38, fontSize: 12, fontWeight: FontWeight.bold)),
+                  child: Text("OR ENTER CODE MANUALLY",
+                      style: TextStyle(
+                          color: AppColors.textWhite38,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold)),
                 ),
                 Expanded(child: Divider(color: AppColors.divider)),
               ],
@@ -99,16 +110,22 @@ class _EnableTwoFactorDialogState extends State<EnableTwoFactorDialog> {
                 children: [
                   Text(
                     _manualCode,
-                    style: const TextStyle(color: AppColors.primaryBlue, fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 1.2),
+                    style: const TextStyle(
+                        color: AppColors.primaryBlue,
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1.2),
                   ),
                   IconButton(
                     onPressed: () {
                       Clipboard.setData(ClipboardData(text: _manualCode));
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text("Code copied to clipboard")),
+                        const SnackBar(
+                            content: Text("Code copied to clipboard")),
                       );
                     },
-                    icon: const Icon(Icons.copy, color: AppColors.textWhite54, size: 18),
+                    icon: const Icon(Icons.copy,
+                        color: AppColors.textWhite54, size: 18),
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
                   ),
@@ -118,11 +135,13 @@ class _EnableTwoFactorDialogState extends State<EnableTwoFactorDialog> {
             const SizedBox(height: 24),
 
             // 4. VERIFICATION SECTION
-            const Text("Enter 6-digit verification code", style: TextStyle(color: AppColors.textWhite70, fontSize: 14)),
+            const Text("Enter 6-digit verification code",
+                style: TextStyle(color: AppColors.textWhite70, fontSize: 14)),
             const SizedBox(height: 12),
             TextFormField(
               controller: _codeController,
-              style: const TextStyle(color: AppColors.textWhite, letterSpacing: 2),
+              style:
+                  const TextStyle(color: AppColors.textWhite, letterSpacing: 2),
               keyboardType: TextInputType.number,
               maxLength: 6,
               decoration: InputDecoration(
@@ -130,12 +149,19 @@ class _EnableTwoFactorDialogState extends State<EnableTwoFactorDialog> {
                 fillColor: AppColors.backgroundBlack,
                 hintText: "000 000",
                 hintStyle: const TextStyle(color: AppColors.textWhite38),
-                prefixIcon: const Icon(Icons.lock_clock_outlined, color: AppColors.textWhite38, size: 18),
+                prefixIcon: const Icon(Icons.lock_clock_outlined,
+                    color: AppColors.textWhite38, size: 18),
                 counterText: "", // Hide max length counter
                 contentPadding: const EdgeInsets.all(16),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.divider)),
-                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.divider)),
-                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.primaryBlue)),
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: AppColors.divider)),
+                enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: AppColors.divider)),
+                focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: AppColors.primaryBlue)),
               ),
             ),
             const SizedBox(height: 32),
@@ -148,7 +174,8 @@ class _EnableTwoFactorDialogState extends State<EnableTwoFactorDialog> {
                   onPressed: () => Navigator.of(context).pop(),
                   style: TextButton.styleFrom(
                     foregroundColor: AppColors.textWhite70,
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 24, vertical: 16),
                   ),
                   child: const Text("Cancel"),
                 ),
@@ -156,16 +183,24 @@ class _EnableTwoFactorDialogState extends State<EnableTwoFactorDialog> {
                 ElevatedButton(
                   onPressed: () {
                     // TODO: Implement verification logic
-                    Navigator.of(context).pop();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text("2FA Enabled Successfully!")),
-                    );
+                    // 1. Validate the entered code against TOTP
+                    // 2. Store the secret in secure storage
+                    // 3. Mark 2FA as enabled in user profile
+                    if (mounted) {
+                      Navigator.of(context).pop();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                            content: Text("2FA Enabled Successfully!")),
+                      );
+                    }
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primaryBlue,
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 24, vertical: 16),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8)),
                   ),
                   child: const Text("Verify & Enable"),
                 ),
