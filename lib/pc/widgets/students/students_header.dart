@@ -2,10 +2,30 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../data/providers/dashboard_provider.dart';
+import '../../../../data/providers/students_provider.dart';
 import '../../../../data/services/database_service.dart';
 
-class StudentsHeader extends ConsumerWidget {
+class StudentsHeader extends ConsumerStatefulWidget {
   const StudentsHeader({super.key});
+
+  @override
+  ConsumerState<StudentsHeader> createState() => _StudentsHeaderState();
+}
+
+class _StudentsHeaderState extends ConsumerState<StudentsHeader> {
+  late TextEditingController _searchController;
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   String _getInitials(String name) {
     if (name.isEmpty) return "U";
@@ -17,7 +37,7 @@ class StudentsHeader extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final dashboardAsync = ref.watch(dashboardDataProvider);
     final bool isConnected = DatabaseService().db.currentStatus.connected;
 
@@ -38,7 +58,7 @@ class StudentsHeader extends ConsumerWidget {
               letterSpacing: 0.5,
             ),
           ),
-          
+
           const Spacer(),
 
           // --- Search Bar (Fixed Style) ---
@@ -47,6 +67,9 @@ class StudentsHeader extends ConsumerWidget {
             height: 40,
             child: TextField(
               textAlignVertical: TextAlignVertical.center,
+              onChanged: (value) {
+                ref.read(studentSearchProvider.notifier).state = value;
+              },
               style: const TextStyle(color: AppColors.textWhite, fontSize: 13),
               decoration: InputDecoration(
                 isDense: true,
@@ -54,8 +77,9 @@ class StudentsHeader extends ConsumerWidget {
                 fillColor: AppColors.surfaceGrey,
                 hintText: "Search students, IDs, or parents...",
                 hintStyle: const TextStyle(color: AppColors.textWhite38),
-                prefixIcon: const Icon(Icons.search, size: 18, color: AppColors.textWhite54),
-                contentPadding: EdgeInsets.zero, 
+                prefixIcon: const Icon(Icons.search,
+                    size: 18, color: AppColors.textWhite54),
+                contentPadding: EdgeInsets.zero,
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
                   borderSide: const BorderSide(color: AppColors.divider),
@@ -72,14 +96,15 @@ class StudentsHeader extends ConsumerWidget {
             ),
           ),
           const SizedBox(width: 24),
-          
+
           // --- Notification ---
           IconButton(
             onPressed: () {},
-            icon: const Icon(Icons.notifications_none, color: AppColors.textWhite70),
+            icon: const Icon(Icons.notifications_none,
+                color: AppColors.textWhite70),
           ),
           const SizedBox(width: 16),
-          
+
           // --- Profile & Connectivity ---
           dashboardAsync.when(
             loading: () => _buildProfileLoading(),
@@ -97,26 +122,28 @@ class StudentsHeader extends ConsumerWidget {
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      Text(
-                        data.userName.isEmpty ? "User" : data.userName, 
-                        style: const TextStyle(color: AppColors.textWhite, fontWeight: FontWeight.bold, fontSize: 13)
-                      ),
-                      Text(
-                        subtitle, 
-                        style: TextStyle(
-                          color: (subtitle == "Offline Mode") ? AppColors.warningOrange : AppColors.textWhite38, 
-                          fontSize: 11
-                        )
-                      ),
+                      Text(data.userName.isEmpty ? "User" : data.userName,
+                          style: const TextStyle(
+                              color: AppColors.textWhite,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13)),
+                      Text(subtitle,
+                          style: TextStyle(
+                              color: (subtitle == "Offline Mode")
+                                  ? AppColors.warningOrange
+                                  : AppColors.textWhite38,
+                              fontSize: 11)),
                     ],
                   ),
                   const SizedBox(width: 12),
                   CircleAvatar(
-                    backgroundColor: AppColors.primaryBlue.withValues(alpha: 0.2),
-                    child: Text(
-                      initials, 
-                      style: const TextStyle(color: AppColors.primaryBlue, fontWeight: FontWeight.bold, fontSize: 12)
-                    ),
+                    backgroundColor:
+                        AppColors.primaryBlue.withValues(alpha: 0.2),
+                    child: Text(initials,
+                        style: const TextStyle(
+                            color: AppColors.primaryBlue,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12)),
                   ),
                 ],
               );
@@ -128,10 +155,12 @@ class StudentsHeader extends ConsumerWidget {
   }
 
   Widget _buildProfileLoading() {
-    return const CircleAvatar(backgroundColor: AppColors.surfaceGrey, radius: 16);
+    return const CircleAvatar(
+        backgroundColor: AppColors.surfaceGrey, radius: 16);
   }
 
   Widget _buildProfileError(bool isConnected) {
-    return Icon(isConnected ? Icons.error_outline : Icons.wifi_off, color: AppColors.errorRed);
+    return Icon(isConnected ? Icons.error_outline : Icons.wifi_off,
+        color: AppColors.errorRed);
   }
 }

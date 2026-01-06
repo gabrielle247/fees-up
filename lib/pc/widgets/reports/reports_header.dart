@@ -38,7 +38,7 @@ class ReportsHeader extends ConsumerWidget {
               letterSpacing: 0.5,
             ),
           ),
-          
+
           const Spacer(),
 
           // Search Bar
@@ -54,8 +54,9 @@ class ReportsHeader extends ConsumerWidget {
                 fillColor: AppColors.surfaceGrey,
                 hintText: "Search saved reports...",
                 hintStyle: const TextStyle(color: AppColors.textWhite38),
-                prefixIcon: const Icon(Icons.search, size: 18, color: AppColors.textWhite54),
-                contentPadding: EdgeInsets.zero, 
+                prefixIcon: const Icon(Icons.search,
+                    size: 18, color: AppColors.textWhite54),
+                contentPadding: EdgeInsets.zero,
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
                   borderSide: const BorderSide(color: AppColors.divider),
@@ -72,17 +73,29 @@ class ReportsHeader extends ConsumerWidget {
             ),
           ),
           const SizedBox(width: 24),
-          
+
           IconButton(
-            onPressed: () {},
-            icon: const Icon(Icons.notifications_none, color: AppColors.textWhite70),
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Notifications panel coming soon'),
+                  backgroundColor: AppColors.primaryBlue,
+                  duration: Duration(seconds: 2),
+                ),
+              );
+            },
+            icon: const Icon(Icons.notifications_none,
+                color: AppColors.textWhite70),
           ),
           const SizedBox(width: 16),
-          
+
           // Profile & Connectivity
           dashboardAsync.when(
-            loading: () => const CircleAvatar(backgroundColor: AppColors.surfaceGrey, radius: 16),
-            error: (_, __) => Icon(isConnected ? Icons.error_outline : Icons.wifi_off, color: AppColors.errorRed),
+            loading: () => const CircleAvatar(
+                backgroundColor: AppColors.surfaceGrey, radius: 16),
+            error: (_, __) => Icon(
+                isConnected ? Icons.error_outline : Icons.wifi_off,
+                color: AppColors.errorRed),
             data: (data) {
               final initials = _getInitials(data.userName);
               String subtitle = data.schoolName;
@@ -96,26 +109,28 @@ class ReportsHeader extends ConsumerWidget {
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      Text(
-                        data.userName.isEmpty ? "User" : data.userName, 
-                        style: const TextStyle(color: AppColors.textWhite, fontWeight: FontWeight.bold, fontSize: 13)
-                      ),
-                      Text(
-                        subtitle, 
-                        style: TextStyle(
-                          color: (subtitle == "Offline Mode") ? AppColors.warningOrange : AppColors.textWhite38, 
-                          fontSize: 11
-                        )
-                      ),
+                      Text(data.userName.isEmpty ? "User" : data.userName,
+                          style: const TextStyle(
+                              color: AppColors.textWhite,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13)),
+                      Text(subtitle,
+                          style: TextStyle(
+                              color: (subtitle == "Offline Mode")
+                                  ? AppColors.warningOrange
+                                  : AppColors.textWhite38,
+                              fontSize: 11)),
                     ],
                   ),
                   const SizedBox(width: 12),
                   CircleAvatar(
-                    backgroundColor: AppColors.primaryBlue.withValues(alpha: 0.2),
-                    child: Text(
-                      initials, 
-                      style: const TextStyle(color: AppColors.primaryBlue, fontWeight: FontWeight.bold, fontSize: 12)
-                    ),
+                    backgroundColor:
+                        AppColors.primaryBlue.withValues(alpha: 0.2),
+                    child: Text(initials,
+                        style: const TextStyle(
+                            color: AppColors.primaryBlue,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12)),
                   ),
                 ],
               );

@@ -454,7 +454,7 @@ class _ReportSummaryPanel extends ConsumerWidget {
   ) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Generating ${reportState.category} report...'),
+        content: Text('${reportState.category} export is coming soon'),
         backgroundColor: AppColors.primaryBlue,
       ),
     );

@@ -1,9 +1,10 @@
+import 'package:fees_up/data/models/transaction_stats.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../data/providers/dashboard_provider.dart';
-import '../../../data/providers/financial_reports_provider.dart';
+import '../../../data/providers/transactions_provider.dart';
 
 class TransactionsKpiCards extends ConsumerWidget {
   const TransactionsKpiCards({super.key});
@@ -14,14 +15,14 @@ class TransactionsKpiCards extends ConsumerWidget {
 
     return dashboardAsync.when(
       data: (dashboard) {
-        final transactionAsync = ref.watch(transactionSummaryProvider(
-          TransactionSummaryParams(schoolId: dashboard.schoolId),
-        ));
+        final statsAsync =
+            ref.watch(transactionStatsProvider(dashboard.schoolId));
 
-        return transactionAsync.when(
+        return statsAsync.when(
           data: (stats) => _buildCards(stats),
           loading: () => _buildLoadingCards(),
-          error: (err, stack) => _buildErrorCards(ref, dashboard.schoolId, err.toString()),
+          error: (err, stack) =>
+              _buildErrorCards(ref, dashboard.schoolId, err.toString()),
         );
       },
       loading: () => _buildLoadingCards(),
@@ -29,40 +30,35 @@ class TransactionsKpiCards extends ConsumerWidget {
     );
   }
 
-  Widget _buildCards(Map<String, dynamic> stats) {
+  Widget _buildCards(TransactionStats stats) {
     final formatter = NumberFormat.simpleCurrency();
-    
-    final totalRevenue = (stats['total_revenue'] as num?)?.toDouble() ?? 0.0;
-    final totalExpenses = (stats['total_expenses'] as num?)?.toDouble() ?? 0.0;
-    final pendingAmount = (stats['pending_amount'] as num?)?.toDouble() ?? 0.0;
-    final donationsTotal = (stats['donations_total'] as num?)?.toDouble() ?? 0.0;
 
     return Row(
       children: [
         _buildCard(
           title: "TOTAL INCOME",
-          value: formatter.format(totalRevenue),
+          value: formatter.format(stats.totalIncome),
           icon: Icons.trending_up,
           color: AppColors.successGreen,
         ),
         const SizedBox(width: 24),
         _buildCard(
           title: "TOTAL EXPENSES",
-          value: formatter.format(totalExpenses),
+          value: formatter.format(stats.totalExpenses),
           icon: Icons.trending_down,
           color: AppColors.errorRed,
         ),
         const SizedBox(width: 24),
         _buildCard(
           title: "PENDING",
-          value: formatter.format(pendingAmount),
+          value: formatter.format(stats.pendingAmount),
           icon: Icons.pending_actions,
           color: AppColors.primaryBlue,
         ),
         const SizedBox(width: 24),
         _buildCard(
           title: "DONATIONS",
-          value: formatter.format(donationsTotal),
+          value: formatter.format(stats.totalDonations),
           icon: Icons.volunteer_activism,
           color: AppColors.accentPurple,
         ),
@@ -72,23 +68,25 @@ class TransactionsKpiCards extends ConsumerWidget {
 
   Widget _buildLoadingCards() {
     return Row(
-      children: List.generate(4, (index) => Expanded(
-        child: Container(
-          margin: EdgeInsets.only(right: index < 3 ? 24 : 0),
-          height: 100,
-          decoration: BoxDecoration(
-            color: AppColors.surfaceGrey,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppColors.divider),
-          ),
-          child: const Center(
-            child: CircularProgressIndicator(
-              color: AppColors.primaryBlue,
-              strokeWidth: 2,
-            ),
-          ),
-        ),
-      )),
+      children: List.generate(
+          4,
+          (index) => Expanded(
+                child: Container(
+                  margin: EdgeInsets.only(right: index < 3 ? 24 : 0),
+                  height: 100,
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceGrey,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.divider),
+                  ),
+                  child: const Center(
+                    child: CircularProgressIndicator(
+                      color: AppColors.primaryBlue,
+                      strokeWidth: 2,
+                    ),
+                  ),
+                ),
+              )),
     );
   }
 
@@ -104,14 +102,15 @@ class TransactionsKpiCards extends ConsumerWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.error_outline, color: AppColors.errorRed, size: 24),
+            const Icon(Icons.error_outline,
+                color: AppColors.errorRed, size: 24),
             const SizedBox(width: 12),
-            const Text('Failed to load stats', style: TextStyle(color: AppColors.textWhite)),
+            const Text('Failed to load stats',
+                style: TextStyle(color: AppColors.textWhite)),
             const SizedBox(width: 16),
             ElevatedButton.icon(
-              onPressed: () => ref.invalidate(transactionSummaryProvider(
-                TransactionSummaryParams(schoolId: schoolId),
-              )),
+              onPressed: () =>
+                  ref.invalidate(transactionStatsProvider(schoolId)),
               icon: const Icon(Icons.refresh, size: 16),
               label: const Text('Retry'),
               style: ElevatedButton.styleFrom(
@@ -133,7 +132,8 @@ class TransactionsKpiCards extends ConsumerWidget {
         borderRadius: BorderRadius.circular(12),
       ),
       child: const Center(
-        child: Text('Error loading data', style: TextStyle(color: AppColors.errorRed)),
+        child: Text('Error loading data',
+            style: TextStyle(color: AppColors.errorRed)),
       ),
     );
   }

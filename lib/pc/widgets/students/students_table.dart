@@ -2,7 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/utils/safe_data.dart';
 import '../../../../data/providers/students_provider.dart';
+import 'edit_student_dialog.dart';
+import 'quick_payment_dialog.dart';
+import 'student_bills_dialog.dart';
 
 class StudentsTable extends ConsumerStatefulWidget {
   final String schoolId;
@@ -13,11 +17,40 @@ class StudentsTable extends ConsumerStatefulWidget {
 }
 
 class _StudentsTableState extends ConsumerState<StudentsTable> {
-  // We can add local filter state here later (e.g. selectedGrade)
+  List<String> _grades = [];
+  List<String> _classes = [];
+  bool _classesAvailable = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadGradesAndClasses();
+  }
+
+  Future<void> _loadGradesAndClasses() async {
+    // Load ZIMSEC grades (fixed for Zimbabwe)
+    setState(() {
+      _grades = ['All Grades', ...zimsecGrades];
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    final studentsAsync = ref.watch(studentsProvider(widget.schoolId));
+    final filteredStudents =
+        ref.watch(filteredStudentsProvider(widget.schoolId));
+
+    // Watch classes to determine if filter should be enabled
+    final classesAsync = ref.watch(classesProvider(widget.schoolId));
+
+    // Update classes availability
+    classesAsync.when(
+      data: (classes) {
+        _classes = ['All Classes', ...classes.map((c) => c['name'] as String)];
+        _classesAvailable = classes.isNotEmpty;
+      },
+      loading: () {},
+      error: (_, __) {},
+    );
 
     return Container(
       decoration: BoxDecoration(
@@ -36,25 +69,14 @@ class _StudentsTableState extends ConsumerState<StudentsTable> {
           const Divider(height: 1, color: AppColors.divider),
 
           // --- 3. Real Data List (Provider-Powered) ---
-          studentsAsync.when(
-            loading: () => const Padding(
-              padding: EdgeInsets.all(40.0),
-              child: Center(
-                  child:
-                      CircularProgressIndicator(color: AppColors.primaryBlue)),
-            ),
-            error: (error, stack) => Padding(
-              padding: const EdgeInsets.all(40.0),
-              child: Center(
-                  child: Text("Error: $error",
-                      style: const TextStyle(color: AppColors.errorRed))),
-            ),
-            data: (students) {
-              if (students.isEmpty) {
+          Builder(
+            builder: (context) {
+              if (filteredStudents.isEmpty) {
                 return const Padding(
                   padding: EdgeInsets.all(40.0),
                   child: Center(
-                      child: Text("No students found. Add one to get started.",
+                      child: Text(
+                          "No students found. Try adjusting your filters.",
                           style: TextStyle(color: AppColors.textGrey))),
                 );
               }
@@ -62,11 +84,11 @@ class _StudentsTableState extends ConsumerState<StudentsTable> {
               return ListView.separated(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
-                itemCount: students.length,
+                itemCount: filteredStudents.length,
                 separatorBuilder: (_, __) =>
                     const Divider(height: 1, color: AppColors.divider),
                 itemBuilder: (context, index) {
-                  final s = students[index];
+                  final s = filteredStudents[index];
                   return _buildStudentRow(s);
                 },
               );
@@ -74,27 +96,76 @@ class _StudentsTableState extends ConsumerState<StudentsTable> {
           ),
 
           // --- 4. Pagination Footer ---
-          _buildFooter(),
+          _buildFooter(filteredStudents.length),
         ],
       ),
     );
   }
 
   Widget _buildFilterBar() {
+    final selectedGrade = ref.watch(studentGradeFilterProvider);
+    final selectedClass = ref.watch(studentClassFilterProvider);
+    final selectedStatus = ref.watch(studentStatusFilterProvider);
+    final selectedFinancial = ref.watch(studentFinancialFilterProvider);
+
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Row(
         children: [
-          _buildDropdown("All Grades"),
+          // Grade Filter - Always enabled
+          _buildDropdownButton(
+            label: selectedGrade ?? "All Grades",
+            items: _grades,
+            enabled: true,
+            onSelected: (value) {
+              ref.read(studentGradeFilterProvider.notifier).state = value;
+            },
+          ),
           const SizedBox(width: 12),
-          _buildDropdown("All Classes"),
+          // Class Filter - Disabled if no classes exist
+          _buildDropdownButton(
+            label: selectedClass ?? "All Classes",
+            items: _classes.isEmpty ? ['All Classes'] : _classes,
+            enabled: _classesAvailable,
+            onSelected: _classesAvailable
+                ? (value) {
+                    ref.read(studentClassFilterProvider.notifier).state = value;
+                  }
+                : null,
+          ),
           const SizedBox(width: 12),
-          _buildDropdown("Status: Active"),
+          // Status Filter - Now includes Suspended and Banned Forever
+          _buildDropdownButton(
+            label: selectedStatus ?? "Status: All",
+            items: studentStatusOptions,
+            enabled: true,
+            onSelected: (value) {
+              ref.read(studentStatusFilterProvider.notifier).state = value;
+            },
+          ),
           const SizedBox(width: 12),
-          _buildDropdown("Financial: All"),
+          // Financial Filter
+          _buildDropdownButton(
+            label: selectedFinancial ?? "Financial: All",
+            items: const [
+              "Financial: All",
+              "Financial: Owed",
+              "Financial: Paid"
+            ],
+            enabled: true,
+            onSelected: (value) {
+              ref.read(studentFinancialFilterProvider.notifier).state = value;
+            },
+          ),
           const Spacer(),
           TextButton(
-            onPressed: () {},
+            onPressed: () {
+              ref.read(studentSearchProvider.notifier).state = '';
+              ref.read(studentGradeFilterProvider.notifier).state = null;
+              ref.read(studentClassFilterProvider.notifier).state = null;
+              ref.read(studentStatusFilterProvider.notifier).state = null;
+              ref.read(studentFinancialFilterProvider.notifier).state = null;
+            },
             child: const Text("Clear Filters",
                 style: TextStyle(color: AppColors.primaryBlue, fontSize: 13)),
           )
@@ -103,23 +174,46 @@ class _StudentsTableState extends ConsumerState<StudentsTable> {
     );
   }
 
-  Widget _buildDropdown(String label) {
-    return Container(
-      height: 36,
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      decoration: BoxDecoration(
-        color: AppColors.backgroundBlack,
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: AppColors.divider),
-      ),
-      child: Row(
-        children: [
-          Text(label,
-              style: const TextStyle(color: AppColors.textWhite, fontSize: 13)),
-          const SizedBox(width: 8),
-          const Icon(Icons.keyboard_arrow_down,
-              color: AppColors.textWhite54, size: 16),
-        ],
+  Widget _buildDropdownButton(
+      {required String label,
+      required List<String> items,
+      required bool enabled,
+      required Function(String?)? onSelected}) {
+    return Opacity(
+      opacity: enabled ? 1.0 : 0.5,
+      child: PopupMenuButton<String>(
+        enabled: enabled,
+        onSelected: onSelected,
+        child: Container(
+          height: 36,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: AppColors.backgroundBlack,
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(
+                color: enabled ? AppColors.divider : AppColors.textWhite38),
+          ),
+          child: Row(
+            children: [
+              Text(label,
+                  style: TextStyle(
+                      color:
+                          enabled ? AppColors.textWhite : AppColors.textWhite54,
+                      fontSize: 13)),
+              const SizedBox(width: 8),
+              Icon(Icons.keyboard_arrow_down,
+                  color:
+                      enabled ? AppColors.textWhite54 : AppColors.textWhite38,
+                  size: 16),
+            ],
+          ),
+        ),
+        itemBuilder: (context) => items
+            .map((item) => PopupMenuItem<String>(
+                  value: item,
+                  child: Text(item),
+                ))
+            .toList(),
       ),
     );
   }
@@ -161,11 +255,31 @@ class _StudentsTableState extends ConsumerState<StudentsTable> {
     final grade = s['grade'] ?? 'N/A';
     final parentName = s['emergency_contact_name'] ?? 'No Contact';
     final contact = s['parent_contact'] ?? '';
-    final isActive = (s['is_active'] as int?) == 1;
-    final owed = (s['owed_total'] as num?)?.toDouble() ?? 0.0;
+    final isActive = SafeData.parseInt(s['is_active']) == 1;
+    final isSuspended = SafeData.parseInt(s['is_suspended']) == 1;
+    final owed = SafeData.parseDouble(s['owed_total'], 0.0);
 
     // Initials for Avatar
     final initials = name.isNotEmpty ? name.substring(0, 1).toUpperCase() : "?";
+
+    // Determine status display
+    String statusLabel;
+    Color statusColor;
+    Color statusBackgroundColor;
+
+    if (isSuspended) {
+      statusLabel = "Banned Forever";
+      statusColor = AppColors.errorRed;
+      statusBackgroundColor = AppColors.errorRed.withValues(alpha: 0.15);
+    } else if (!isActive) {
+      statusLabel = "Inactive";
+      statusColor = AppColors.textGrey;
+      statusBackgroundColor = AppColors.surfaceLightGrey;
+    } else {
+      statusLabel = "Active";
+      statusColor = AppColors.successGreen;
+      statusBackgroundColor = AppColors.successGreen.withValues(alpha: 0.15);
+    }
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
@@ -252,17 +366,13 @@ class _StudentsTableState extends ConsumerState<StudentsTable> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: isActive
-                        ? AppColors.successGreen.withValues(alpha: 0.15)
-                        : AppColors.surfaceLightGrey,
+                    color: statusBackgroundColor,
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
-                    isActive ? "Active" : "Inactive",
+                    statusLabel,
                     style: TextStyle(
-                        color: isActive
-                            ? AppColors.successGreen
-                            : AppColors.textGrey,
+                        color: statusColor,
                         fontSize: 11,
                         fontWeight: FontWeight.bold),
                   ),
@@ -294,16 +404,137 @@ class _StudentsTableState extends ConsumerState<StudentsTable> {
             ),
           ),
 
-          // 6. Actions
+          // 6. Actions - Quick Actions Popup Menu
           Expanded(
             flex: 1,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                IconButton(
-                    icon: const Icon(Icons.edit,
-                        size: 16, color: AppColors.textWhite54),
-                    onPressed: () {}),
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.more_vert,
+                      size: 18, color: AppColors.textWhite54),
+                  color: AppColors.surfaceGrey,
+                  offset: const Offset(0, 40),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    side: const BorderSide(color: AppColors.divider),
+                  ),
+                  itemBuilder: (context) => [
+                    const PopupMenuItem<String>(
+                      value: 'view',
+                      child: Row(
+                        children: [
+                          Icon(Icons.visibility_outlined,
+                              size: 16, color: AppColors.primaryBlue),
+                          SizedBox(width: 12),
+                          Text('View Details',
+                              style: TextStyle(color: AppColors.textWhite)),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem<String>(
+                      value: 'pay',
+                      child: Row(
+                        children: [
+                          Icon(Icons.payment,
+                              size: 16, color: AppColors.successGreen),
+                          SizedBox(width: 12),
+                          Text('Record Payment',
+                              style: TextStyle(color: AppColors.textWhite)),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem<String>(
+                      value: 'sms',
+                      child: Row(
+                        children: [
+                          Icon(Icons.message_outlined,
+                              size: 16, color: AppColors.textWhite70),
+                          SizedBox(width: 12),
+                          Text('Send SMS',
+                              style: TextStyle(color: AppColors.textWhite)),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem<String>(
+                      value: 'edit',
+                      child: Row(
+                        children: [
+                          Icon(Icons.edit_outlined,
+                              size: 16, color: AppColors.textWhite70),
+                          SizedBox(width: 12),
+                          Text('Edit Student',
+                              style: TextStyle(color: AppColors.textWhite)),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuDivider(),
+                    const PopupMenuItem<String>(
+                      value: 'bills',
+                      child: Row(
+                        children: [
+                          Icon(Icons.receipt_long,
+                              size: 16, color: AppColors.textWhite70),
+                          SizedBox(width: 12),
+                          Text('View Bills',
+                              style: TextStyle(color: AppColors.textWhite)),
+                        ],
+                      ),
+                    ),
+                  ],
+                  onSelected: (value) {
+                    switch (value) {
+                      case 'view':
+                        // Set selected student to show details
+                        ref.read(selectedStudentProvider.notifier).state = s;
+                        break;
+                      case 'pay':
+                        // Open payment dialog
+                        final owed = SafeData.parseDouble(s['owed_total'], 0.0);
+                        showDialog(
+                          context: context,
+                          barrierDismissible: false,
+                          builder: (_) => QuickPaymentDialog(
+                            schoolId: widget.schoolId,
+                            studentId: s['id'] ?? '',
+                            studentName: s['full_name'] ?? 'Student',
+                            outstandingAmount: owed,
+                          ),
+                        );
+                        break;
+                      case 'sms':
+                        // TODO: Open SMS dialog
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                              content: Text('SMS feature coming soon')),
+                        );
+                        break;
+                      case 'edit':
+                        // Open edit student dialog
+                        showDialog(
+                          context: context,
+                          barrierDismissible: false,
+                          builder: (_) => EditStudentDialog(
+                            studentData: s,
+                            schoolId: widget.schoolId,
+                          ),
+                        );
+                        break;
+                      case 'bills':
+                        final studentId = s['student_id'] ?? s['id'] ?? '';
+                        final studentName = s['full_name'] ?? 'Student';
+                        showDialog(
+                          context: context,
+                          barrierDismissible: true,
+                          builder: (_) => StudentBillsDialog(
+                            studentId: studentId,
+                            studentName: studentName,
+                          ),
+                        );
+                        break;
+                    }
+                  },
+                ),
               ],
             ),
           ),
@@ -312,14 +543,15 @@ class _StudentsTableState extends ConsumerState<StudentsTable> {
     );
   }
 
-  Widget _buildFooter() {
+  Widget _buildFooter(int count) {
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
-          const Text("Showing all results",
-              style: TextStyle(color: AppColors.textWhite54, fontSize: 13)),
+          Text("Showing $count results",
+              style:
+                  const TextStyle(color: AppColors.textWhite54, fontSize: 13)),
           const SizedBox(width: 24),
           _paginationBtn("Previous", false),
           const SizedBox(width: 8),

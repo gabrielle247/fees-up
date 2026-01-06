@@ -513,7 +513,7 @@ class _BillingPeriodDialogState extends ConsumerState<BillingPeriodDialog> {
             'Enable this billing period for new students',
             style: TextStyle(color: AppColors.textGrey, fontSize: 12),
           ),
-          activeColor: AppColors.successGreen,
+          activeThumbColor: AppColors.successGreen,
           contentPadding: EdgeInsets.zero,
         ),
       ],
@@ -645,7 +645,7 @@ class _BillingPeriodDialogState extends ConsumerState<BillingPeriodDialog> {
         ),
         const SizedBox(height: 8),
         DropdownButtonFormField<String>(
-          value: value,
+          initialValue: value,
           onChanged: onChanged,
           dropdownColor: AppColors.surfaceGrey,
           style: const TextStyle(color: AppColors.textWhite),

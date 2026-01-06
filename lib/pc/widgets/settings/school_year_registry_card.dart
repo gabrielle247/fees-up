@@ -127,10 +127,10 @@ class SchoolYearRegistryCard extends ConsumerWidget {
     final dates = startDate.isNotEmpty && endDate.isNotEmpty
         ? '$startDate - $endDate'
         : '';
-    final status = year['status'] as String? ?? 'Draft';
-    final statusColor =
-        status == 'Active' ? AppColors.successGreen : AppColors.textWhite54;
-    final isEditable = status == 'Draft';
+    final active = (year['active'] as int? ?? 0) == 1;
+    final status = active ? 'Active' : 'Inactive';
+    final statusColor = active ? AppColors.successGreen : AppColors.textWhite54;
+    const isEditable = true; // Always allow editing
 
     return _buildRow(
       id: id,
