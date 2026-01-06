@@ -646,15 +646,27 @@ class _YearConfigurationCardState extends ConsumerState<YearConfigurationCard> {
       (month['start_date'] ?? '').toString(),
       (month['end_date'] ?? '').toString(),
     );
+
+    // Build dropdown items first
+    final dropdownItems = [
+      const DropdownMenuItem<String?>(value: null, child: Text('Unassigned')),
+      ..._terms.map(
+        (t) => DropdownMenuItem<String?>(
+          value: t['id']?.toString(),
+          child: Text((t['name'] ?? '').toString()),
+        ),
+      ),
+    ];
+
+    // Get the raw term ID from month
     final rawTermId = (month['term_id']?.toString().isNotEmpty ?? false)
         ? month['term_id'].toString()
         : null;
 
-    // Ensure the selected term exists in the list, otherwise use null
+    // Ensure selected value exists in dropdown items
+    final itemValues = dropdownItems.map((item) => item.value).toSet();
     final selectedTermId =
-        rawTermId != null && _terms.any((t) => t['id']?.toString() == rawTermId)
-            ? rawTermId
-            : null;
+        rawTermId != null && itemValues.contains(rawTermId) ? rawTermId : null;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -703,16 +715,7 @@ class _YearConfigurationCardState extends ConsumerState<YearConfigurationCard> {
                                 size: 14, color: AppColors.textWhite54),
                             style: const TextStyle(
                                 color: AppColors.textWhite, fontSize: 12),
-                            items: [
-                              const DropdownMenuItem<String?>(
-                                  value: null, child: Text('Unassigned')),
-                              ..._terms.map(
-                                (t) => DropdownMenuItem<String?>(
-                                  value: t['id']?.toString(),
-                                  child: Text((t['name'] ?? '').toString()),
-                                ),
-                              ),
-                            ],
+                            items: dropdownItems,
                             onChanged: (val) =>
                                 _setMonthTerm(month['id'], val?.trim()),
                           ),
