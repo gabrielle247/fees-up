@@ -2,7 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
-import '../services/database_service.dart';
+import '../../providers/students_provider.dart';
+import '../../services/database_service.dart';
 
 const _uuid = Uuid();
 const _defaultBillingConfig = <String, dynamic>{
@@ -18,18 +19,19 @@ const _defaultBillingConfig = <String, dynamic>{
   'default_fee': 0.0,
 };
 
-final billingConfigProvider = StateNotifierProvider.autoDispose.family<
-    BillingConfigNotifier, AsyncValue<Map<String, dynamic>>, String>(
+final billingSettingsViewModelProvider = StateNotifierProvider.autoDispose.family<
+    BillingSettingsViewModel, AsyncValue<Map<String, dynamic>>, String>(
   (ref, schoolId) {
-    final notifier = BillingConfigNotifier(DatabaseService(), schoolId);
-    notifier.load();
-    return notifier;
+    final db = ref.watch(databaseServiceProvider);
+    final viewModel = BillingSettingsViewModel(db, schoolId);
+    viewModel.load();
+    return viewModel;
   },
 );
 
-class BillingConfigNotifier
+class BillingSettingsViewModel
     extends StateNotifier<AsyncValue<Map<String, dynamic>>> {
-  BillingConfigNotifier(this._db, this.schoolId)
+  BillingSettingsViewModel(this._db, this.schoolId)
       : super(const AsyncLoading());
 
   final DatabaseService _db;

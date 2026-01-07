@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/constants/app_colors.dart';
-import '../../../data/providers/billing_config_provider.dart';
-import '../../../data/providers/dashboard_provider.dart';
+import '../../../../data/providers/dashboard_provider.dart';
+import '../../../../data/viewmodels/settings/billing_settings_viewmodel.dart';
 
 class BillingConfigCard extends ConsumerStatefulWidget {
   const BillingConfigCard({super.key});
@@ -55,7 +55,7 @@ class _BillingConfigCardState extends ConsumerState<BillingConfigCard> {
         }
 
         final configAsync =
-            ref.watch(billingConfigProvider(dashboard.schoolId));
+            ref.watch(billingSettingsViewModelProvider(dashboard.schoolId));
         return configAsync.when(
           loading: () => _loadingCard(),
           error: (err, _) => _errorCard('Billing config load failed: $err'),
@@ -335,7 +335,7 @@ class _BillingConfigCardState extends ConsumerState<BillingConfigCard> {
 
     setState(() => _saving = true);
     try {
-      await ref.read(billingConfigProvider(schoolId).notifier).saveConfig(
+      await ref.read(billingSettingsViewModelProvider(schoolId).notifier).saveConfig(
             currencyCode: _currencyController.text.trim().isEmpty
                 ? 'USD'
                 : _currencyController.text.trim(),
