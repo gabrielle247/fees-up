@@ -125,6 +125,36 @@ class YearConfigurationRepositoryImpl implements YearConfigurationRepository {
     required List<Map<String, dynamic>> months,
   }) async {
     try {
+      // Basic date sanity checks
+      final start = DateTime.tryParse(startDate);
+      final end = DateTime.tryParse(endDate);
+      if (start == null || end == null) {
+        throw YearConfigurationException('Invalid start/end date format');
+      }
+      if (start.isAfter(end)) {
+        throw YearConfigurationException(
+            'Start date must be on/before end date');
+      }
+
+      // Ensure this year does not overlap existing years for the same school
+      final conflicts = await _db.db.getAll(
+        '''SELECT id, year_label, start_date, end_date
+           FROM school_years
+           WHERE school_id = ? AND id != ?
+             AND NOT (date(end_date) < date(?) OR date(start_date) > date(?))
+           LIMIT 1''',
+        [schoolId, yearId, startDate, endDate],
+      );
+
+      if (conflicts.isNotEmpty) {
+        final c = conflicts.first;
+        final label = (c['year_label'] ?? '').toString();
+        final cStart = (c['start_date'] ?? '').toString();
+        final cEnd = (c['end_date'] ?? '').toString();
+        throw YearConfigurationException(
+            'Year dates overlap with "$label" ($cStart → $cEnd)');
+      }
+
       // Build description JSON if there are terms
       String descriptionValue;
       if (terms.isNotEmpty) {

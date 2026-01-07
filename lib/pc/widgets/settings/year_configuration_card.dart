@@ -331,7 +331,7 @@ class _YearConfigurationCardState extends ConsumerState<YearConfigurationCard> {
                                     fontSize: 14,
                                     fontWeight: FontWeight.bold)),
                             Text(
-                                "Toggle which months are billable for this year.",
+                                "Edit dates or toggle billing status per month.",
                                 style: TextStyle(
                                     color: AppColors.textWhite54,
                                     fontSize: 12)),
@@ -339,19 +339,30 @@ class _YearConfigurationCardState extends ConsumerState<YearConfigurationCard> {
                         ),
                       ],
                     ),
-                    TextButton(
-                      onPressed: _months.isEmpty
-                          ? null
-                          : () {
-                              setState(() {
-                                final shouldEnable = _months
-                                    .any((m) => m['is_billable'] == false);
-                                for (final m in _months) {
-                                  m['is_billable'] = shouldEnable;
-                                }
-                              });
-                            },
-                      child: const Text('Toggle All'),
+                    Row(
+                      children: [
+                        TextButton(
+                          onPressed: _months.isEmpty
+                              ? null
+                              : () {
+                                  setState(() {
+                                    final shouldEnable = _months
+                                        .any((m) => m['is_billable'] == false);
+                                    for (final m in _months) {
+                                      m['is_billable'] = shouldEnable;
+                                    }
+                                  });
+                                },
+                          child: const Text('Toggle All'),
+                        ),
+                        const SizedBox(width: 12),
+                        TextButton.icon(
+                          onPressed:
+                              _months.isEmpty ? null : _regenerateMonthDates,
+                          icon: const Icon(Icons.refresh, size: 16),
+                          label: const Text('Regenerate'),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -642,10 +653,8 @@ class _YearConfigurationCardState extends ConsumerState<YearConfigurationCard> {
   Widget _buildMonthRow(Map<String, dynamic> month) {
     final bool billable = month['is_billable'] as bool? ?? false;
     final name = (month['name'] ?? '').toString();
-    final range = _formatRange(
-      (month['start_date'] ?? '').toString(),
-      (month['end_date'] ?? '').toString(),
-    );
+    final startDate = (month['start_date'] ?? '').toString();
+    final endDate = (month['end_date'] ?? '').toString();
 
     // Build dropdown items first
     final dropdownItems = [
@@ -675,30 +684,85 @@ class _YearConfigurationCardState extends ConsumerState<YearConfigurationCard> {
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: AppColors.divider),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            flex: 6,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(name,
-                    style: const TextStyle(
-                        color: AppColors.textWhite,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13)),
-                const SizedBox(height: 2),
-                Text(range,
-                    style: const TextStyle(
-                        color: AppColors.textWhite54, fontSize: 11)),
-                if (_terms.isNotEmpty) ...[
-                  const SizedBox(height: 10),
-                  Row(
+          // Header row
+          Row(
+            children: [
+              Expanded(
+                flex: 6,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(name,
+                        style: const TextStyle(
+                            color: AppColors.textWhite,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13)),
+                    const SizedBox(height: 2),
+                  ],
+                ),
+              ),
+              Switch(
+                value: billable,
+                onChanged: (v) => _toggleMonthBillable(month['id'], v),
+                activeThumbColor: AppColors.primaryBlue,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                billable ? 'Billable' : 'Not billable',
+                style: TextStyle(
+                  color: billable ? AppColors.textWhite : AppColors.textWhite54,
+                  fontSize: 12,
+                  fontWeight: billable ? FontWeight.w600 : FontWeight.normal,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Date editing row
+          Row(
+            children: [
+              Expanded(
+                flex: 3,
+                child: _buildMonthDateInput(
+                  "Start Date",
+                  startDate,
+                  onChanged: (newDate) {
+                    setState(() {
+                      month['start_date'] = newDate;
+                      _modified = true;
+                    });
+                  },
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                flex: 3,
+                child: _buildMonthDateInput(
+                  "End Date",
+                  endDate,
+                  onChanged: (newDate) {
+                    setState(() {
+                      month['end_date'] = newDate;
+                      _modified = true;
+                    });
+                  },
+                ),
+              ),
+              const SizedBox(width: 12),
+              if (_terms.isNotEmpty)
+                Expanded(
+                  flex: 4,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text('Term',
                           style: TextStyle(
-                              color: AppColors.textWhite54, fontSize: 12)),
-                      const SizedBox(width: 8),
+                              color: AppColors.textWhite54, fontSize: 11)),
+                      const SizedBox(height: 6),
                       Container(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 12, vertical: 6),
@@ -723,27 +787,86 @@ class _YearConfigurationCardState extends ConsumerState<YearConfigurationCard> {
                       ),
                     ],
                   ),
-                ],
-              ],
-            ),
-          ),
-          Switch(
-            value: billable,
-            onChanged: (v) => _toggleMonthBillable(month['id'], v),
-            activeThumbColor: AppColors.primaryBlue,
-          ),
-          const SizedBox(width: 8),
-          Text(
-            billable ? 'Billable' : 'Not billable',
-            style: TextStyle(
-              color: billable ? AppColors.textWhite : AppColors.textWhite54,
-              fontSize: 12,
-              fontWeight: billable ? FontWeight.w600 : FontWeight.normal,
-            ),
+                ),
+            ],
           ),
         ],
       ),
     );
+  }
+
+  Widget _buildMonthDateInput(
+    String label,
+    String value, {
+    required ValueChanged<String> onChanged,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label,
+            style: const TextStyle(color: AppColors.textWhite54, fontSize: 11)),
+        const SizedBox(height: 6),
+        GestureDetector(
+          onTap: () => _pickMonthDate(value, onChanged),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: AppColors.backgroundBlack,
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: AppColors.divider),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  value.isNotEmpty ? value : 'Pick date',
+                  style: TextStyle(
+                    color: value.isNotEmpty
+                        ? AppColors.textWhite
+                        : AppColors.textWhite54,
+                    fontSize: 12,
+                  ),
+                ),
+                const Icon(Icons.calendar_today,
+                    color: AppColors.textWhite38, size: 14),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _pickMonthDate(
+      String currentValue, ValueChanged<String> onChanged) async {
+    try {
+      final initialDate = currentValue.isNotEmpty
+          ? DateTime.tryParse(currentValue) ?? DateTime.now()
+          : DateTime.now();
+
+      final picked = await showDatePicker(
+        context: context,
+        initialDate: initialDate,
+        firstDate: DateTime(1900),
+        lastDate: DateTime(2100),
+        builder: (context, child) => Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.dark(
+              primary: AppColors.primaryBlue,
+              surface: AppColors.surfaceGrey,
+            ),
+          ),
+          child: child!,
+        ),
+      );
+
+      if (picked != null) {
+        final formatted = DateFormat('yyyy-MM-dd').format(picked);
+        onChanged(formatted);
+      }
+    } catch (e) {
+      debugPrint('⚠️ Error picking month date: $e');
+    }
   }
 
   Widget _buildSubInput(String label, String value,
