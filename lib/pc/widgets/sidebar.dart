@@ -1,7 +1,9 @@
-import 'package:fees_up/pc/widgets/logout_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/constants/navigation_constants.dart';
+import 'common/sidebar_item_widget.dart';
+import 'logout_dialog.dart';
 
 class DashboardSidebar extends StatefulWidget {
   const DashboardSidebar({super.key});
@@ -22,21 +24,6 @@ class _DashboardSidebarState extends State<DashboardSidebar> {
     if (itemRoute == '/' && currentRoute != '/') return false;
     return currentRoute.startsWith(itemRoute);
   }
-
-  // GROUP 1: OPERATIONAL (Day-to-day Management)
-  final List<Map<String, dynamic>> _operationalItems = [
-    {'icon': Icons.grid_view_rounded, 'label': 'Overview', 'route': '/'},
-    {'icon': Icons.receipt_long_rounded, 'label': 'Transactions', 'route': '/transactions'},
-    {'icon': Icons.description_outlined, 'label': 'Invoices', 'route': '/invoices'},
-    {'icon': Icons.school_outlined, 'label': 'Students', 'route': '/students'},
-    {'icon': Icons.bar_chart_rounded, 'label': 'Reports', 'route': '/reports'},
-  ];
-
-  // GROUP 2: MESSAGING (Communication Hub)
-  final List<Map<String, dynamic>> _messagingItems = [
-    {'icon': Icons.campaign_outlined, 'label': 'Broadcasts', 'route': '/announcements'}, // System-wide
-    {'icon': Icons.notifications_none_rounded, 'label': 'Notifications', 'route': '/notifications'}, // Personal
-  ];
 
   @override
   Widget build(BuildContext context) {
@@ -85,22 +72,22 @@ class _DashboardSidebarState extends State<DashboardSidebar> {
               padding: const EdgeInsets.symmetric(horizontal: 16),
               children: [
                 // --- SECTION: OPERATIONS ---
-                ..._operationalItems.map((item) => _SidebarItem(
-                  icon: item['icon'],
-                  label: item['label'],
-                  isSelected: _isActive(currentRoute, item['route']),
-                  onTap: () => context.go(item['route']),
+                ...NavigationConstants.operationalItems.map((item) => SidebarItemWidget(
+                  icon: item.icon,
+                  label: item.label,
+                  isSelected: _isActive(currentRoute, item.route),
+                  onTap: () => context.go(item.route),
                 )),
 
                 const SizedBox(height: 24),
                 
                 // --- SECTION: MESSAGING ---
                 _sectionLabel("MESSAGING"),
-                ..._messagingItems.map((item) => _SidebarItem(
-                  icon: item['icon'],
-                  label: item['label'],
-                  isSelected: _isActive(currentRoute, item['route']),
-                  onTap: () => context.go(item['route']),
+                ...NavigationConstants.messagingItems.map((item) => SidebarItemWidget(
+                  icon: item.icon,
+                  label: item.label,
+                  isSelected: _isActive(currentRoute, item.route),
+                  onTap: () => context.go(item.route),
                 )),
               ],
             ),
@@ -115,7 +102,7 @@ class _DashboardSidebarState extends State<DashboardSidebar> {
               children: [
                 _sectionLabel("PREFERENCES"),
                 
-                _SidebarItem(
+                SidebarItemWidget(
                   icon: Icons.person_outline_rounded,
                   label: "Profile",
                   isSelected: _isActive(currentRoute, '/profile'),
@@ -123,7 +110,7 @@ class _DashboardSidebarState extends State<DashboardSidebar> {
                 ),
                 const SizedBox(height: 4),
 
-                _SidebarItem(
+                SidebarItemWidget(
                   icon: Icons.settings_outlined,
                   label: "Settings",
                   isSelected: _isActive(currentRoute, '/settings'),
@@ -131,7 +118,7 @@ class _DashboardSidebarState extends State<DashboardSidebar> {
                 ),
                 const SizedBox(height: 4),
 
-                _SidebarItem(
+                SidebarItemWidget(
                   icon: Icons.logout_rounded,
                   label: "Log Out",
                   isSelected: false,
@@ -162,77 +149,6 @@ class _DashboardSidebarState extends State<DashboardSidebar> {
           fontSize: 11,
           fontWeight: FontWeight.bold,
           letterSpacing: 1.2,
-        ),
-      ),
-    );
-  }
-}
-
-class _SidebarItem extends StatefulWidget {
-  final IconData icon;
-  final String label;
-  final bool isSelected;
-  final bool isDestructive;
-  final VoidCallback onTap;
-
-  const _SidebarItem({
-    required this.icon,
-    required this.label,
-    required this.isSelected,
-    this.isDestructive = false,
-    required this.onTap,
-  });
-
-  @override
-  State<_SidebarItem> createState() => _SidebarItemState();
-}
-
-class _SidebarItemState extends State<_SidebarItem> {
-  bool _isHovered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final Color bgColor = widget.isSelected
-        ? AppColors.primaryBlue
-        : (_isHovered ? Colors.white.withValues(alpha: 0.05) : Colors.transparent);
-
-    final Color textColor = widget.isDestructive
-        ? AppColors.errorRed
-        : (widget.isSelected ? Colors.white : Colors.white70);
-
-    final Color iconColor = widget.isDestructive
-        ? AppColors.errorRed
-        : (widget.isSelected ? Colors.white : Colors.white54);
-
-    return MouseRegion(
-      onEnter: (_) => setState(() => _isHovered = true),
-      onExit: (_) => setState(() => _isHovered = false),
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          curve: Curves.easeInOut,
-          margin: const EdgeInsets.only(bottom: 8),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-            color: bgColor,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Row(
-            children: [
-              Icon(widget.icon, size: 20, color: iconColor),
-              const SizedBox(width: 12),
-              Text(
-                widget.label,
-                style: TextStyle(
-                  color: textColor,
-                  fontWeight: widget.isSelected ? FontWeight.bold : FontWeight.w500,
-                  fontSize: 14,
-                ),
-              ),
-            ],
-          ),
         ),
       ),
     );

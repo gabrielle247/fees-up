@@ -3,46 +3,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../data/providers/students_provider.dart';
+import '../../../../data/viewmodels/student_details_viewmodel.dart';
 
 class StudentViewerSidebar extends ConsumerWidget {
   const StudentViewerSidebar({super.key});
 
-  String _getInitials(String name) {
-    if (name.isEmpty) return "U";
-    final parts = name.trim().split(' ');
-    if (parts.length > 1) {
-      return "${parts[0][0]}${parts[1][0]}".toUpperCase();
-    }
-    return name[0].toUpperCase();
-  }
-
-  String _getStatusLabel(Map<String, dynamic> student) {
-    final isActive = (student['is_active'] as int?) == 1;
-    final isSuspended = (student['is_suspended'] as int?) == 1;
-
-    if (isSuspended) {
-      return "Banned Forever";
-    } else if (!isActive) {
-      return "Inactive";
-    }
-    return "Active";
-  }
-
-  Color _getStatusColor(Map<String, dynamic> student) {
-    final isActive = (student['is_active'] as int?) == 1;
-    final isSuspended = (student['is_suspended'] as int?) == 1;
-
-    if (isSuspended) {
-      return AppColors.errorRed;
-    } else if (!isActive) {
-      return AppColors.textGrey;
-    }
-    return AppColors.successGreen;
-  }
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final selectedStudent = ref.watch(selectedStudentProvider);
+    final logic = ref.watch(studentDetailsLogicProvider);
 
     // If no student is selected, show empty state
     if (selectedStudent == null) {
@@ -124,9 +93,11 @@ class StudentViewerSidebar extends ConsumerWidget {
     final subjects = selectedStudent['subjects'] ?? 'Not assigned';
     final owed = (selectedStudent['owed_total'] as num?)?.toDouble() ?? 0.0;
     final paid = (selectedStudent['paid_total'] as num?)?.toDouble() ?? 0.0;
-    final initials = _getInitials(name);
-    final statusLabel = _getStatusLabel(selectedStudent);
-    final statusColor = _getStatusColor(selectedStudent);
+
+    // Use reused logic
+    final initials = logic.getInitials(name);
+    final statusLabel = logic.getStatusLabel(selectedStudent);
+    final statusColor = logic.getStatusColor(selectedStudent);
 
     return Container(
       width: 350,
@@ -244,14 +215,14 @@ class StudentViewerSidebar extends ConsumerWidget {
 
                   // Personal Information
                   _buildSectionTitle("Personal Information"),
-                  _buildDetailRow("Date of Birth", dob),
+                  _buildDetailRow("Date of Birth", logic.formatDate(dob)),
                   _buildDetailRow("Gender", gender),
                   _buildDetailRow("Address", address),
                   const SizedBox(height: 16),
 
                   // Enrollment
                   _buildSectionTitle("Enrollment"),
-                  _buildDetailRow("Enrollment Date", enrollmentDate),
+                  _buildDetailRow("Enrollment Date", logic.formatDate(enrollmentDate)),
                   const SizedBox(height: 16),
 
                   // Parent/Guardian
@@ -282,7 +253,7 @@ class StudentViewerSidebar extends ConsumerWidget {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              NumberFormat.simpleCurrency().format(paid),
+                              logic.formatCurrency(paid),
                               style: const TextStyle(
                                 color: AppColors.successGreen,
                                 fontSize: 12,
@@ -307,7 +278,7 @@ class StudentViewerSidebar extends ConsumerWidget {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              NumberFormat.simpleCurrency().format(owed),
+                              logic.formatCurrency(owed),
                               style: TextStyle(
                                 color: owed > 0
                                     ? AppColors.errorRed
