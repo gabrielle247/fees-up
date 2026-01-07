@@ -6,6 +6,10 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/utils/safe_data.dart';
 import '../../../../data/models/subjects.dart';
 import '../../../../data/services/database_service.dart';
+import 'forms/contact_info_form.dart';
+import 'forms/enrollment_form.dart';
+import 'forms/form_helpers.dart';
+import 'forms/personal_info_form.dart';
 
 class EditStudentDialog extends ConsumerStatefulWidget {
   final Map<String, dynamic> studentData;
@@ -414,341 +418,47 @@ class _EditStudentDialogState extends ConsumerState<EditStudentDialog> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              // Personal Info Section
-                              const Text("STUDENT DETAILS",
-                                  style: TextStyle(
-                                      color: AppColors.textGrey,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
-                                      letterSpacing: 1.2)),
-                              const SizedBox(height: 24),
-                              _buildLabel("Full Name", AppColors.textWhite),
-                              _buildTextField(
-                                controller: _fullNameController,
-                                hint: "e.g. Gabriel",
-                                prefixIcon: Icons.person_outline,
-                              ),
-                              const SizedBox(height: 16),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        _buildLabel(
-                                            "Student ID", AppColors.textWhite),
-                                        _buildTextField(
-                                          controller: _studentIdController,
-                                          hint: "STU-...",
-                                          readOnly: true,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  const SizedBox(width: 16),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        _buildLabel(
-                                            "Grade", AppColors.textWhite),
-                                        _buildDropdown(
-                                          value: _selectedGrade,
-                                          items: _grades,
-                                          onChanged: (v) => setState(
-                                              () => _selectedGrade = v!),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 16),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        _buildLabel("Date of Birth",
-                                            AppColors.textWhite),
-                                        _buildDatePicker(
-                                          context,
-                                          _dob,
-                                          (d) => setState(() => _dob = d),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  const SizedBox(width: 16),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        _buildLabel(
-                                            "Gender", AppColors.textWhite),
-                                        _buildDropdown(
-                                          value: _selectedGender,
-                                          items: _genders,
-                                          onChanged: (v) => setState(
-                                              () => _selectedGender = v!),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 16),
-                              _buildLabel("Subjects", AppColors.textWhite),
-                              InkWell(
-                                onTap: _openSubjectSelector,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 16, vertical: 14),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.surfaceGrey,
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(
-                                        color: AppColors.surfaceLightGrey),
-                                  ),
-                                  child: Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Text(
-                                        _selectedSubjects.isEmpty
-                                            ? "Select Subjects..."
-                                            : "${_selectedSubjects.length} subjects selected",
-                                        style: TextStyle(
-                                            color: _selectedSubjects.isEmpty
-                                                ? AppColors.textWhite54
-                                                : AppColors.textWhite),
-                                      ),
-                                      const Icon(Icons.arrow_drop_down,
-                                          color: AppColors.textWhite54),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                              if (_selectedSubjects.isNotEmpty) ...[
-                                const SizedBox(height: 8),
-                                Wrap(
-                                  spacing: 8,
-                                  runSpacing: 8,
-                                  children: _selectedSubjects
-                                      .take(10)
-                                      .map((s) => Chip(
-                                            label: Text(s,
-                                                style: const TextStyle(
-                                                    fontSize: 10,
-                                                    color:
-                                                        AppColors.textWhite)),
-                                            backgroundColor: AppColors
-                                                .primaryBlue
-                                                .withValues(alpha: 0.2),
-                                            padding: EdgeInsets.zero,
-                                            side: BorderSide.none,
-                                          ))
-                                      .toList(),
-                                ),
-                              ],
-                              const SizedBox(height: 16),
-                              _buildLabel("Medical Notes", AppColors.textWhite),
-                              _buildTextField(
-                                controller: _medicalNotesController,
-                                hint: "Allergies, conditions, etc.",
-                                prefixIcon: Icons.medical_information_outlined,
-                                maxLines: 2,
+                              PersonalInfoForm(
+                                fullNameController: _fullNameController,
+                                studentIdController: _studentIdController,
+                                medicalNotesController: _medicalNotesController,
+                                selectedGrade: _selectedGrade,
+                                dob: _dob,
+                                selectedGender: _selectedGender,
+                                selectedSubjects: _selectedSubjects,
+                                grades: _grades,
+                                genders: _genders,
+                                onGradeChanged: (v) =>
+                                    setState(() => _selectedGrade = v!),
+                                onDobChanged: (d) => setState(() => _dob = d),
+                                onGenderChanged: (v) =>
+                                    setState(() => _selectedGender = v!),
+                                onSelectSubjects: _openSubjectSelector,
                               ),
                               const SizedBox(height: 24),
-
-                              // Contact Section
-                              const Text("CONTACT & FINANCIAL",
-                                  style: TextStyle(
-                                      color: AppColors.textGrey,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
-                                      letterSpacing: 1.2)),
-                              const SizedBox(height: 24),
-                              _buildLabel("Address", AppColors.textWhite),
-                              _buildTextField(
-                                controller: _addressController,
-                                hint: "Street address...",
-                                prefixIcon: Icons.location_on_outlined,
-                              ),
-                              const SizedBox(height: 16),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        _buildLabel(
-                                            "Tuition Fee", AppColors.textWhite),
-                                        _buildTextField(
-                                          controller: _feeController,
-                                          hint: "0.00",
-                                          prefix: "\$ ",
-                                          isNumber: true,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
+                              ContactInfoForm(
+                                addressController: _addressController,
+                                feeController: _feeController,
                               ),
                               const SizedBox(height: 24),
-
-                              // Enrollment & Billing Section
-                              const Text("ENROLLMENT & BILLING",
-                                  style: TextStyle(
-                                      color: AppColors.textGrey,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
-                                      letterSpacing: 1.2)),
-                              const SizedBox(height: 24),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        _buildLabel("Registration Date",
-                                            AppColors.textWhite),
-                                        _buildDatePicker(
-                                          context,
-                                          _registrationDate,
-                                          (d) => setState(
-                                              () => _registrationDate = d),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  const SizedBox(width: 16),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        _buildLabel("Enrollment Date",
-                                            AppColors.textWhite),
-                                        _buildDatePicker(
-                                          context,
-                                          _enrollmentDate,
-                                          (d) => setState(
-                                              () => _enrollmentDate = d),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 16),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        _buildLabel("Billing Date",
-                                            AppColors.textWhite),
-                                        _buildDatePicker(
-                                          context,
-                                          _billingDate,
-                                          (d) =>
-                                              setState(() => _billingDate = d),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  const SizedBox(width: 16),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        _buildLabel(
-                                            "Term", AppColors.textWhite),
-                                        _buildDropdown(
-                                          value: _selectedTerm,
-                                          items: _terms,
-                                          onChanged: (v) => setState(
-                                              () => _selectedTerm = v!),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 16),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        _buildLabel("Billing Type",
-                                            AppColors.textWhite),
-                                        Container(
-                                          height: 52,
-                                          decoration: BoxDecoration(
-                                            color: AppColors.surfaceGrey,
-                                            borderRadius:
-                                                BorderRadius.circular(8),
-                                            border: Border.all(
-                                                color:
-                                                    AppColors.surfaceLightGrey),
-                                          ),
-                                          padding: const EdgeInsets.all(4),
-                                          child: Row(
-                                            children: _billingTypes.map((type) {
-                                              final isSelected =
-                                                  _selectedBillingType == type;
-                                              return Expanded(
-                                                child: GestureDetector(
-                                                  onTap: () => setState(() =>
-                                                      _selectedBillingType =
-                                                          type),
-                                                  child: Container(
-                                                    decoration: BoxDecoration(
-                                                      color: isSelected
-                                                          ? AppColors
-                                                              .primaryBlue
-                                                          : Colors.transparent,
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                              6),
-                                                    ),
-                                                    alignment: Alignment.center,
-                                                    child: Text(
-                                                      type.toUpperCase(),
-                                                      style: TextStyle(
-                                                          fontSize: 12,
-                                                          fontWeight:
-                                                              FontWeight.bold,
-                                                          color: isSelected
-                                                              ? AppColors
-                                                                  .textWhite
-                                                              : AppColors
-                                                                  .textGrey),
-                                                    ),
-                                                  ),
-                                                ),
-                                              );
-                                            }).toList(),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
+                              EnrollmentForm(
+                                registrationDate: _registrationDate,
+                                enrollmentDate: _enrollmentDate,
+                                billingDate: _billingDate,
+                                selectedTerm: _selectedTerm,
+                                selectedBillingType: _selectedBillingType,
+                                terms: _terms,
+                                billingTypes: _billingTypes,
+                                onRegistrationDateChanged: (d) =>
+                                    setState(() => _registrationDate = d),
+                                onEnrollmentDateChanged: (d) =>
+                                    setState(() => _enrollmentDate = d),
+                                onBillingDateChanged: (d) =>
+                                    setState(() => _billingDate = d),
+                                onTermChanged: (v) =>
+                                    setState(() => _selectedTerm = v!),
+                                onBillingTypeChanged: (v) =>
+                                    setState(() => _selectedBillingType = v),
                               ),
                               const SizedBox(height: 24),
 
@@ -763,7 +473,7 @@ class _EditStudentDialogState extends ConsumerState<EditStudentDialog> {
                               Row(
                                 children: [
                                   Expanded(
-                                    child: _buildCheckbox(
+                                    child: FormHelpers.buildCheckbox(
                                       label: "Active",
                                       value: _isActive,
                                       onChanged: (v) =>
@@ -772,7 +482,7 @@ class _EditStudentDialogState extends ConsumerState<EditStudentDialog> {
                                   ),
                                   const SizedBox(width: 32),
                                   Expanded(
-                                    child: _buildCheckbox(
+                                    child: FormHelpers.buildCheckbox(
                                       label: "Photo Consent",
                                       value: _photoConsent,
                                       onChanged: (v) =>
@@ -957,17 +667,6 @@ class _EditStudentDialogState extends ConsumerState<EditStudentDialog> {
 
   // --- WIDGET HELPERS ---
 
-  Widget _buildLabel(String text, Color color) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8.0),
-      child: Text(text,
-          style: TextStyle(
-              color: color.withValues(alpha: 0.9),
-              fontSize: 14,
-              fontWeight: FontWeight.w500)),
-    );
-  }
-
   Widget _buildSummaryRow(String label, String value, Color valueColor) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -976,150 +675,6 @@ class _EditStudentDialogState extends ConsumerState<EditStudentDialog> {
         Text(value,
             style: TextStyle(color: valueColor, fontWeight: FontWeight.bold)),
       ],
-    );
-  }
-
-  Widget _buildTextField({
-    required TextEditingController controller,
-    required String hint,
-    String? prefix,
-    IconData? prefixIcon,
-    IconData? suffixIcon,
-    VoidCallback? onSuffixTap,
-    bool isNumber = false,
-    bool readOnly = false,
-    int maxLines = 1,
-  }) {
-    return TextFormField(
-      controller: controller,
-      readOnly: readOnly,
-      maxLines: maxLines,
-      keyboardType: isNumber
-          ? const TextInputType.numberWithOptions(decimal: true)
-          : TextInputType.text,
-      validator: (val) => val == null || val.isEmpty ? 'Required' : null,
-      style: const TextStyle(color: AppColors.textWhite),
-      decoration: InputDecoration(
-        filled: true,
-        fillColor: AppColors.surfaceGrey,
-        hintText: hint,
-        hintStyle: TextStyle(color: AppColors.textWhite.withValues(alpha: 0.3)),
-        prefixText: prefix,
-        prefixStyle: const TextStyle(
-            color: AppColors.textWhite, fontWeight: FontWeight.bold),
-        prefixIcon: prefixIcon != null
-            ? Icon(prefixIcon, color: AppColors.textWhite54, size: 20)
-            : null,
-        suffixIcon: suffixIcon != null
-            ? GestureDetector(
-                onTap: onSuffixTap,
-                child: Icon(suffixIcon, color: AppColors.textWhite54, size: 20))
-            : null,
-        border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: const BorderSide(color: AppColors.surfaceLightGrey)),
-        enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: const BorderSide(color: AppColors.surfaceLightGrey)),
-        focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide:
-                const BorderSide(color: AppColors.primaryBlue, width: 2)),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-      ),
-    );
-  }
-
-  Widget _buildDropdown({
-    required String value,
-    required List<String> items,
-    required Function(String?) onChanged,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceGrey,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.surfaceLightGrey),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: value,
-          dropdownColor: AppColors.surfaceGrey,
-          icon: const Icon(Icons.keyboard_arrow_down,
-              color: AppColors.textWhite54),
-          isExpanded: true,
-          style: const TextStyle(color: AppColors.textWhite),
-          items: items
-              .map((e) => DropdownMenuItem(value: e, child: Text(e)))
-              .toList(),
-          onChanged: onChanged,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDatePicker(
-      BuildContext context, DateTime initial, Function(DateTime) onPicked) {
-    return GestureDetector(
-      onTap: () async {
-        final picked = await showDatePicker(
-          context: context,
-          initialDate: initial,
-          firstDate: DateTime(1990),
-          lastDate: DateTime(2030),
-          builder: (context, child) => Theme(
-            data: ThemeData.dark().copyWith(
-              colorScheme: const ColorScheme.dark(
-                  primary: AppColors.primaryBlue,
-                  onPrimary: AppColors.textWhite,
-                  surface: AppColors.surfaceGrey),
-            ),
-            child: child!,
-          ),
-        );
-        if (picked != null) onPicked(picked);
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(
-          color: AppColors.surfaceGrey,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: AppColors.surfaceLightGrey),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(DateFormat('MMM dd, yyyy').format(initial),
-                style: const TextStyle(color: AppColors.textWhite)),
-            const Icon(Icons.calendar_today_outlined,
-                size: 18, color: AppColors.textWhite54),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCheckbox({
-    required String label,
-    required bool value,
-    required Function(bool?) onChanged,
-  }) {
-    return CheckboxListTile(
-      value: value,
-      onChanged: onChanged,
-      title: Text(
-        label,
-        style: const TextStyle(color: AppColors.textWhite),
-      ),
-      fillColor: WidgetStateProperty.resolveWith(
-        (states) => states.contains(WidgetState.selected)
-            ? AppColors.primaryBlue
-            : Colors.transparent,
-      ),
-      side: const BorderSide(color: AppColors.divider),
-      contentPadding: EdgeInsets.zero,
     );
   }
 }

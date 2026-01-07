@@ -71,15 +71,23 @@ class SupabaseConnector extends PowerSyncBackendConnector {
 
         // "Create or Update" Logic
         if (op.op == UpdateType.put) {
+          if (data == null) {
+            debugPrint('⚠️ Warning: data is null for PUT operation on $table');
+            continue;
+          }
           // .upsert is the safest bet: it handles both new and existing records.
           // onConflict: 'id' ensures we don't get duplicate key errors.
           await db.from(table).upsert(
-            {...data!, 'id': id},
+            {...data, 'id': id},
             onConflict: 'id',
             ignoreDuplicates: false,
           );
         } else if (op.op == UpdateType.patch) {
-          await db.from(table).update(data!).eq('id', id);
+          if (data == null) {
+            debugPrint('⚠️ Warning: data is null for PATCH operation on $table');
+            continue;
+          }
+          await db.from(table).update(data).eq('id', id);
         } else if (op.op == UpdateType.delete) {
           await db.from(table).delete().eq('id', id);
         }
