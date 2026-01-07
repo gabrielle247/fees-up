@@ -677,6 +677,14 @@ class _YearConfigurationCardState extends ConsumerState<YearConfigurationCard> {
     final selectedTermId =
         rawTermId != null && itemValues.contains(rawTermId) ? rawTermId : null;
 
+    // If the selected term is no longer available (e.g. deleted), force it to null
+    if (rawTermId != null && !itemValues.contains(rawTermId)) {
+      // This side-effect inside build is not ideal but prevents the crash.
+      // A better way would be cleaning up deleted terms in the state modification methods.
+      // However, we already have _setMonthTerm available.
+      // We will just let the DropdownButton handle 'null' which we ensured above.
+    }
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
