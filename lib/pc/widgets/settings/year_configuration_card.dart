@@ -1050,6 +1050,7 @@ class _YearConfigurationCardState extends ConsumerState<YearConfigurationCard> {
     );
   }
 
+  // ignore: unused_element
   String _formatRange(String start, String end) {
     if (start.isEmpty && end.isEmpty) return '';
     if (start.isEmpty) return end;
