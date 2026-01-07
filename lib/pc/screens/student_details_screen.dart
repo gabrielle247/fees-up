@@ -3,130 +3,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/utils/safe_data.dart';
-import '../../../../data/providers/students_provider.dart';
 import '../../../../data/providers/dashboard_provider.dart';
+import '../../../../data/providers/students_provider.dart';
+import '../../../../data/viewmodels/student_details_viewmodel.dart';
 import '../widgets/sidebar.dart';
 import '../widgets/students/students_header.dart';
 import '../widgets/students/edit_student_dialog.dart';
 import '../widgets/students/financial_ledger_dialog.dart';
 
-/// Real-time student data provider - watches database for updates
-final studentDetailProvider =
-    StreamProvider.family<Map<String, dynamic>, String>(
-  (ref, studentId) {
-    final db = ref.watch(databaseServiceProvider);
-    return db.db.watch(
-      'SELECT * FROM students WHERE id = ?',
-      parameters: [studentId],
-    ).map<Map<String, dynamic>>((results) {
-      if (results.isNotEmpty) {
-        final row = results.first;
-        return Map<String, dynamic>.from(row);
-      }
-      return <String, dynamic>{};
-    }).asBroadcastStream();
-  },
-);
-
-/// Real-time student academic data provider
-final studentEnrollmentsProvider =
-    StreamProvider.family<List<Map<String, dynamic>>, String>(
-  (ref, studentId) {
-    final db = ref.watch(databaseServiceProvider);
-    return db.db.watch(
-      '''SELECT e.*, c.name as class_name, t.full_name as teacher_name 
-         FROM enrollments e
-         LEFT JOIN classes c ON e.class_id = c.id
-         LEFT JOIN teachers t ON c.teacher_id = t.id
-         WHERE e.student_id = ?
-         ORDER BY e.enrolled_at DESC''',
-      parameters: [studentId],
-    ).asBroadcastStream();
-  },
-);
-
-/// Real-time student attendance data provider
-final studentAttendanceProvider =
-    StreamProvider.family<List<Map<String, dynamic>>, String>(
-  (ref, studentId) {
-    final db = ref.watch(databaseServiceProvider);
-    return db.db.watch(
-      '''SELECT * FROM attendance 
-         WHERE student_id = ?
-         ORDER BY date DESC LIMIT 30''',
-      parameters: [studentId],
-    ).asBroadcastStream();
-  },
-);
-
-/// Real-time student bills provider
-final studentBillsProvider =
-    StreamProvider.family<List<Map<String, dynamic>>, String>(
-  (ref, studentId) {
-    final db = ref.watch(databaseServiceProvider);
-    return db.db.watch(
-      '''SELECT * FROM bills 
-         WHERE student_id = ?
-         ORDER BY created_at DESC''',
-      parameters: [studentId],
-    ).asBroadcastStream();
-  },
-);
-
-/// Real-time student payments provider
-final studentPaymentsProvider =
-    StreamProvider.family<List<Map<String, dynamic>>, String>(
-  (ref, studentId) {
-    final db = ref.watch(databaseServiceProvider);
-    return db.db.watch(
-      '''SELECT * FROM payments 
-         WHERE student_id = ?
-         ORDER BY date_paid DESC''',
-      parameters: [studentId],
-    ).asBroadcastStream();
-  },
-);
-
 class StudentDetailsScreen extends ConsumerWidget {
   final String studentId;
 
   const StudentDetailsScreen({super.key, required this.studentId});
-
-  String _getInitials(String name) {
-    if (name.isEmpty) return "U";
-    final parts = name.trim().split(' ');
-    if (parts.length > 1) {
-      return "${parts[0][0]}${parts[1][0]}".toUpperCase();
-    }
-    return name[0].toUpperCase();
-  }
-
-  String _getStatusLabel(Map<String, dynamic> studentData) {
-    final isActive = SafeData.parseInt(studentData['is_active']) == 1;
-    if (!isActive) return "Inactive";
-    return "Active";
-  }
-
-  Color _getStatusColor(Map<String, dynamic> studentData) {
-    final isActive = SafeData.parseInt(studentData['is_active']) == 1;
-    if (!isActive) return AppColors.textGrey;
-    return AppColors.successGreen;
-  }
-
-  String _formatDate(String? isoDate) {
-    if (isoDate == null || isoDate.isEmpty) return 'Not provided';
-    try {
-      final date = DateTime.parse(isoDate);
-      return DateFormat('MMM d, yyyy').format(date);
-    } catch (_) {
-      return isoDate;
-    }
-  }
-
-  String _formatCurrency(double? value) {
-    final amount = value ?? 0;
-    return NumberFormat.simpleCurrency().format(amount);
-  }
 
   void _showComingSoon(BuildContext context, String label) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -143,8 +31,11 @@ class StudentDetailsScreen extends ConsumerWidget {
     // Get dashboard data to retrieve schoolId
     final dashboardAsync = ref.watch(dashboardDataProvider);
 
-    // Watch real-time student data from database
+    // Watch real-time student data from database via ViewModel
     final studentDataAsync = ref.watch(studentDetailProvider(studentId));
+
+    // Access business logic
+    final logic = ref.watch(studentDetailsLogicProvider);
 
     return dashboardAsync.when(
       loading: () => const Scaffold(
@@ -219,24 +110,14 @@ class StudentDetailsScreen extends ConsumerWidget {
             final createdAt = studentData['created_at'];
             final updatedAt = studentData['updated_at'];
             final lastSynced = studentData['last_synced_at'];
-            final initials = _getInitials(name);
-            final statusLabel = _getStatusLabel(studentData);
-            final statusColor = _getStatusColor(studentData);
 
-            // Calculate age if DOB is available
-            String age = '10 yo'; // Default
-            if (dob != 'Not provided') {
-              try {
-                final dobDate = DateTime.parse(dob);
-                final now = DateTime.now();
-                final years = now.year - dobDate.year;
-                age = '$years yo';
-              } catch (e) {
-                age = '10 yo';
-              }
-            }
+            // Use ViewModel logic for formatting and calculations
+            final initials = logic.getInitials(name);
+            final statusLabel = logic.getStatusLabel(studentData);
+            final statusColor = logic.getStatusColor(studentData);
+            final age = logic.calculateAge(dob);
 
-            // Watch real-time related data from database
+            // Watch real-time related data from database via ViewModel
             final enrollmentsAsync = ref.watch(studentEnrollmentsProvider(id));
             final attendanceAsync = ref.watch(studentAttendanceProvider(id));
             final billsAsync = ref.watch(studentBillsProvider(id));
@@ -245,6 +126,7 @@ class StudentDetailsScreen extends ConsumerWidget {
             return _buildDetailsContent(
               context,
               ref,
+              logic,
               name,
               id,
               grade,
@@ -285,6 +167,7 @@ class StudentDetailsScreen extends ConsumerWidget {
   Widget _buildDetailsContent(
     BuildContext context,
     WidgetRef ref,
+    StudentDetailsLogic logic,
     String name,
     String id,
     String grade,
@@ -561,6 +444,7 @@ class StudentDetailsScreen extends ConsumerWidget {
                                   constraints:
                                       const BoxConstraints(minHeight: 420),
                                   child: _buildAcademicDataCard(
+                                    logic: logic,
                                     enrollmentsAsync: enrollmentsAsync,
                                     attendanceAsync: attendanceAsync,
                                     grade: grade,
@@ -579,6 +463,7 @@ class StudentDetailsScreen extends ConsumerWidget {
                                       const BoxConstraints(minHeight: 420),
                                   child: _buildFinancialDataCard(
                                     context: context,
+                                    logic: logic,
                                     studentId: id,
                                     studentName: name,
                                     studentRid:
@@ -599,6 +484,7 @@ class StudentDetailsScreen extends ConsumerWidget {
                         const SizedBox(height: 24),
 
                         _buildMetadataSection(
+                          logic: logic,
                           adminUid: adminUid,
                           createdAt: createdAt,
                           updatedAt: updatedAt,
@@ -664,6 +550,7 @@ class StudentDetailsScreen extends ConsumerWidget {
   }
 
   Widget _buildAcademicDataCard({
+    required StudentDetailsLogic logic,
     required AsyncValue<List<Map<String, dynamic>>> enrollmentsAsync,
     required AsyncValue<List<Map<String, dynamic>>> attendanceAsync,
     required String grade,
@@ -711,7 +598,7 @@ class StudentDetailsScreen extends ConsumerWidget {
               Expanded(
                 child: _boxedInfo(
                   title: 'ENROLLED ON',
-                  value: _formatDate(enrollmentDate),
+                  value: logic.formatDate(enrollmentDate),
                 ),
               ),
             ],
@@ -901,6 +788,7 @@ class StudentDetailsScreen extends ConsumerWidget {
 
   Widget _buildFinancialDataCard({
     required BuildContext context,
+    required StudentDetailsLogic logic,
     required String studentId,
     required String studentName,
     required String studentRid,
@@ -1053,7 +941,7 @@ class StudentDetailsScreen extends ConsumerWidget {
                   _rowItem(label: 'Billing Type', value: billingType),
                   const SizedBox(height: 12),
                   _rowItem(
-                      label: 'Default Fee', value: _formatCurrency(defaultFee)),
+                      label: 'Default Fee', value: logic.formatCurrency(defaultFee)),
                   const SizedBox(height: 12),
                   _rowItem(label: 'Billing Date', value: billingDate),
                   const SizedBox(height: 24),
@@ -1154,6 +1042,7 @@ class StudentDetailsScreen extends ConsumerWidget {
   }
 
   Widget _buildMetadataSection({
+    required StudentDetailsLogic logic,
     required String adminUid,
     required String? createdAt,
     required String? updatedAt,
@@ -1187,9 +1076,9 @@ class StudentDetailsScreen extends ConsumerWidget {
           _metaRow(
               label: 'Admin UID',
               value: adminUid.isNotEmpty ? adminUid : '---'),
-          _metaRow(label: 'Registered', value: _formatDate(createdAt)),
-          _metaRow(label: 'Last Synced', value: _formatDate(lastSynced)),
-          _metaRow(label: 'Updated', value: _formatDate(updatedAt)),
+          _metaRow(label: 'Registered', value: logic.formatDate(createdAt)),
+          _metaRow(label: 'Last Synced', value: logic.formatDate(lastSynced)),
+          _metaRow(label: 'Updated', value: logic.formatDate(updatedAt)),
         ],
       ),
     );

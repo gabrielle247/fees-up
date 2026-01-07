@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/utils/safe_data.dart';
 import '../../../../data/models/subjects.dart';
-import '../../../../data/services/database_service.dart';
+import '../../../../data/viewmodels/edit_student_viewmodel.dart';
 import 'forms/contact_info_form.dart';
 import 'forms/enrollment_form.dart';
 import 'forms/form_helpers.dart';
@@ -27,7 +26,6 @@ class EditStudentDialog extends ConsumerStatefulWidget {
 
 class _EditStudentDialogState extends ConsumerState<EditStudentDialog> {
   final _formKey = GlobalKey<FormState>();
-  final DatabaseService _dbService = DatabaseService();
 
   // -- Controllers --
   late TextEditingController _fullNameController;
@@ -50,7 +48,6 @@ class _EditStudentDialogState extends ConsumerState<EditStudentDialog> {
   List<String> _selectedSubjects = [];
   bool _isActive = true;
   bool _photoConsent = false;
-  bool _isLoading = false;
 
   // -- Constants --
   final List<String> _genders = ['Male', 'Female'];
@@ -153,94 +150,30 @@ class _EditStudentDialogState extends ConsumerState<EditStudentDialog> {
   Future<void> _saveChanges() async {
     if (!_formKey.currentState!.validate()) return;
 
-    setState(() => _isLoading = true);
-
-    try {
-      final db = _dbService;
-      final studentId = widget.studentData['id'];
-
-      // 🛡️ Issue #5: Field-level validation
-      final fullName = SafeData.sanitize(_fullNameController.text);
-      final parentContact = SafeData.sanitize(_parentContactController.text);
-      final emergencyContact =
-          SafeData.sanitize(_emergencyContactController.text);
-      final address = SafeData.sanitize(_addressController.text);
-      final medicalNotes = SafeData.sanitize(_medicalNotesController.text);
-      final defaultFee =
+    final defaultFee =
           SafeData.parseDouble(_feeController.text.replaceAll(',', ''), 0.0);
 
-      // Validate critical fields
-      if (fullName.isEmpty || fullName.length < 3) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Full name must be at least 3 characters'),
-              backgroundColor: AppColors.errorRed,
-            ),
-          );
-        }
-        setState(() => _isLoading = false);
-        return;
-      }
-
-      if (parentContact.isNotEmpty && !SafeData.isValidPhone(parentContact)) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Please enter a valid phone number'),
-              backgroundColor: AppColors.errorRed,
-            ),
-          );
-        }
-        setState(() => _isLoading = false);
-        return;
-      }
-
-      // 🛡️ Issue #12: Sanitized update data (ALL schema fields)
-      final updateData = {
-        'full_name': fullName,
-        'parent_contact': parentContact,
-        'emergency_contact_name': emergencyContact,
-        'address': address,
-        'medical_notes': medicalNotes,
-        'subjects': _selectedSubjects.join(','),
-        'date_of_birth': DateFormat('yyyy-MM-dd').format(_dob),
-        'registration_date': DateFormat('yyyy-MM-dd').format(_registrationDate),
-        'enrollment_date': DateFormat('yyyy-MM-dd').format(_enrollmentDate),
-        'billing_date': DateFormat('yyyy-MM-dd').format(_billingDate),
-        'gender': _selectedGender,
-        'grade': _selectedGrade,
-        'billing_type': _selectedBillingType,
-        'term_id': _selectedTerm,
-        'default_fee': defaultFee,
-        'photo_consent': _photoConsent ? 1 : 0,
-        'is_active': _isActive ? 1 : 0,
-        'updated_at': DateTime.now().toIso8601String(),
-      };
-
-      await db.update('students', studentId, updateData);
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('✅ Student updated successfully!'),
-            backgroundColor: AppColors.successGreen,
-          ),
-        );
-        Navigator.of(context).pop();
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: AppColors.errorRed,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
+    // Call ViewModel to save data
+    await ref.read(editStudentViewModelProvider.notifier).saveChanges(
+      studentId: widget.studentData['id'],
+      fullName: _fullNameController.text,
+      parentContact: _parentContactController.text,
+      emergencyContact: _emergencyContactController.text,
+      address: _addressController.text,
+      medicalNotes: _medicalNotesController.text,
+      subjects: _selectedSubjects,
+      dob: _dob,
+      registrationDate: _registrationDate,
+      enrollmentDate: _enrollmentDate,
+      billingDate: _billingDate,
+      gender: _selectedGender,
+      grade: _selectedGrade,
+      billingType: _selectedBillingType,
+      termId: _selectedTerm,
+      defaultFee: defaultFee,
+      photoConsent: _photoConsent,
+      isActive: _isActive,
+    );
   }
 
   // --- SUB-DIALOGS (Subject Selector) ---
@@ -339,6 +272,29 @@ class _EditStudentDialogState extends ConsumerState<EditStudentDialog> {
 
   @override
   Widget build(BuildContext context) {
+    // Listen to ViewModel state
+    ref.listen<EditStudentState>(editStudentViewModelProvider, (previous, next) {
+      if (next.error != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(next.error!),
+            backgroundColor: AppColors.errorRed,
+          ),
+        );
+      } else if (next.isSuccess) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ Student updated successfully!'),
+            backgroundColor: AppColors.successGreen,
+          ),
+        );
+        Navigator.of(context).pop();
+      }
+    });
+
+    final state = ref.watch(editStudentViewModelProvider);
+    final isLoading = state.isLoading;
+
     return Dialog(
       backgroundColor: Colors.transparent,
       insetPadding: const EdgeInsets.all(24),
@@ -629,7 +585,7 @@ class _EditStudentDialogState extends ConsumerState<EditStudentDialog> {
                   ),
                   const SizedBox(width: 16),
                   ElevatedButton.icon(
-                    onPressed: _isLoading ? null : _saveChanges,
+                    onPressed: isLoading ? null : _saveChanges,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primaryBlue,
                       padding: const EdgeInsets.symmetric(
@@ -641,7 +597,7 @@ class _EditStudentDialogState extends ConsumerState<EditStudentDialog> {
                       ),
                       foregroundColor: AppColors.textWhite,
                     ),
-                    icon: _isLoading
+                    icon: isLoading
                         ? const SizedBox(
                             width: 16,
                             height: 16,
@@ -652,7 +608,7 @@ class _EditStudentDialogState extends ConsumerState<EditStudentDialog> {
                           )
                         : const Icon(Icons.check, size: 18),
                     label: Text(
-                      _isLoading ? "Saving..." : "Save Changes",
+                      isLoading ? "Saving..." : "Save Changes",
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
                   ),
