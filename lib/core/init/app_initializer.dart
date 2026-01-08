@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:window_manager/window_manager.dart';
-import 'dart:io';
 
 import '../../data/services/app_logger.dart';
 import '../config/app_config.dart';
@@ -15,13 +14,20 @@ class AppInitializer {
 
     final stopwatch = Stopwatch()..start();
     AppLogger.info('Starting application initialization...');
+    _logConfiguration();
 
     try {
       // 1. Flutter Binding
       WidgetsFlutterBinding.ensureInitialized();
 
       // 2. Window Manager (Desktop only)
-      if (!kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS)) {
+      // Use kIsWeb and defaultTargetPlatform to avoid dart:io dependency
+      final isDesktop = !kIsWeb &&
+        (defaultTargetPlatform == TargetPlatform.windows ||
+         defaultTargetPlatform == TargetPlatform.linux ||
+         defaultTargetPlatform == TargetPlatform.macOS);
+
+      if (isDesktop) {
         await windowManager.ensureInitialized();
         WindowOptions windowOptions = const WindowOptions(
           size: Size(1280, 720),
@@ -37,15 +43,14 @@ class AppInitializer {
       }
 
       // 3. Supabase
-      // Check if the URL is a placeholder to avoid crashing on startup
-      if (AppConfig.supabaseUrl.contains('your-project') || AppConfig.supabaseUrl.isEmpty) {
-         AppLogger.warning('Supabase is not configured (placeholder URL detected). Skipping initialization.');
-         AppLogger.warning('To fix: Update SUPABASE_URL in lib/core/config/app_config.dart or use --dart-define.');
+      if (AppConfig.supabaseUrl.isEmpty || AppConfig.supabaseUrl.contains('your-project')) {
+         AppLogger.warning('Supabase is not configured. Skipping initialization.');
       } else {
         await Supabase.initialize(
           url: AppConfig.supabaseUrl,
           anonKey: AppConfig.supabaseAnonKey,
         );
+        AppLogger.success('Supabase initialized successfully');
       }
 
       AppLogger.success('Initialization completed in ${stopwatch.elapsedMilliseconds}ms');
@@ -54,5 +59,11 @@ class AppInitializer {
       // Re-throw to prevent app from starting in a broken state
       Error.throwWithStackTrace(e, stackTrace);
     }
+  }
+
+  static void _logConfiguration() {
+    AppLogger.info('Environment: ${AppConfig.environment}');
+    AppLogger.info('Supabase URL: ${AppConfig.supabaseUrl.isNotEmpty ? "Set" : "Not Set"}');
+    AppLogger.info('PowerSync URL: ${AppConfig.powerSyncUrl.isNotEmpty ? "Set" : "Not Set"}');
   }
 }

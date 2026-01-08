@@ -1,5 +1,5 @@
 import 'package:logging/logging.dart';
-import 'dart:io';
+import 'package:flutter/foundation.dart';
 
 /// Production-grade logger wrapping `package:logging`.
 class AppLogger {
@@ -20,12 +20,14 @@ class AppLogger {
       final formattedMessage = '$timestamp [${record.loggerName}] $level: $message';
 
       if (record.level >= Level.SEVERE) {
-        stderr.writeln(formattedMessage);
-        if (error != null) stderr.writeln('  ➜ Error: $error');
-        if (stackTrace != null) stderr.writeln('  ➜ StackTrace:\n$stackTrace');
+        // debugPrint uses the platform's native logging (e.g. Android Logcat, iOS Console, Browser Console)
+        // It also throttles output on Android to prevent dropped logs.
+        debugPrint(formattedMessage);
+        if (error != null) debugPrint('  ➜ Error: $error');
+        if (stackTrace != null) debugPrint('  ➜ StackTrace:\n$stackTrace');
       } else {
-        // Use stdout for non-error logs
-        stdout.writeln(formattedMessage);
+        // Use debugPrint for all logs to ensure they appear in the console across platforms
+        debugPrint(formattedMessage);
       }
     });
   }
