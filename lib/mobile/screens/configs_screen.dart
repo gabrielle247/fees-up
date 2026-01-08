@@ -1,25 +1,19 @@
 import 'package:fees_up/constants/app_colors.dart';
+import 'package:fees_up/data/models/saas.dart';
+import 'package:fees_up/data/providers/core_providers.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:isar/isar.dart';
 
-class ConfigsScreen extends StatefulWidget {
+class ConfigsScreen extends ConsumerStatefulWidget {
   const ConfigsScreen({super.key});
 
   @override
-  State<ConfigsScreen> createState() => _ConfigsScreenState();
+  ConsumerState<ConfigsScreen> createState() => _ConfigsScreenState();
 }
 
-class _ConfigsScreenState extends State<ConfigsScreen> {
-  // Mock school data
-  bool _schoolCreated = true;
-  Map<String, dynamic> _schoolData = {
-    'name': 'Harare High School',
-    'id': '88392',
-    'email': 'admin@hararehighschool.edu.zw',
-    'phone': '+263 78 123 4567',
-    'country': 'Zimbabwe',
-    'district': 'Harare',
-  };
-
+class _ConfigsScreenState extends ConsumerState<ConfigsScreen> {
+  // Mock data for fees (as they are not yet fully wired to backend for this screen specifically)
   final List<Map<String, dynamic>> _feeCharges = [
     {
       'name': 'Tuition Term 2',
@@ -60,11 +54,19 @@ class _ConfigsScreenState extends State<ConfigsScreen> {
       ),
       isScrollControlled: true,
       builder: (context) => _SchoolCreatorModal(
-        onSchoolCreated: (schoolData) {
-          setState(() {
-            _schoolData = schoolData;
-            _schoolCreated = true;
+        onSchoolCreated: (schoolData) async {
+          final isar = await ref.read(isarInstanceProvider);
+          final newSchool = School()
+            ..name = schoolData['name']
+            ..id = schoolData['id'] // In real app, generate UUID
+            ..createdAt = DateTime.now();
+            // Store other fields in local storage or expand School model
+
+          await isar.writeTxn(() async {
+            await isar.schools.put(newSchool);
           });
+
+          ref.refresh(currentSchoolProvider);
           Navigator.pop(context);
         },
       ),
@@ -73,197 +75,71 @@ class _ConfigsScreenState extends State<ConfigsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (!_schoolCreated) {
-      return Scaffold(
-        backgroundColor: AppColors.backgroundBlack,
-        body: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  width: 100,
-                  height: 100,
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryBlue.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(50),
-                  ),
-                  child: const Icon(
-                    Icons.business,
-                    size: 50,
-                    color: AppColors.primaryBlue,
-                  ),
-                ),
-                const SizedBox(height: 24),
-                const Text(
-                  'Create Your School',
-                  style: TextStyle(
-                    color: AppColors.textWhite,
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 12),
-                const Text(
-                  'Set up your school profile to start managing fees and student data',
-                  style: TextStyle(
-                    color: AppColors.textGrey,
-                    fontSize: 14,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 40),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: _showSchoolCreator,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primaryBlue,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: const Text(
-                      'Create School',
-                      style: TextStyle(
-                        color: AppColors.textWhite,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-    }
+    final schoolAsync = ref.watch(currentSchoolProvider);
 
     return Scaffold(
       backgroundColor: AppColors.backgroundBlack,
       body: SafeArea(
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  children: [
-                    GestureDetector(
-                      onTap: () => Navigator.pop(context),
-                      child: const Icon(
-                        Icons.arrow_back,
-                        color: AppColors.textWhite,
-                        size: 24,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    const Text(
-                      'Configs',
-                      style: TextStyle(
-                        color: AppColors.textWhite,
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              // School Profile Section
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: schoolAsync.when(
+          loading: () => const Center(child: CircularProgressIndicator(color: AppColors.primaryBlue)),
+          error: (e, s) => Center(child: Text('Error: $e', style: const TextStyle(color: AppColors.errorRed))),
+          data: (school) {
+            if (school == null) {
+              return Padding(
+                padding: const EdgeInsets.all(24),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Center(
-                      child: Container(
-                        width: 120,
-                        height: 120,
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [
-                              AppColors.primaryBlue,
-                              AppColors.accentPurple,
-                            ],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          borderRadius: BorderRadius.circular(60),
-                          border: Border.all(
-                            color: AppColors.successGreen,
-                            width: 3,
-                          ),
-                        ),
-                        child: Stack(
-                          alignment: Alignment.bottomRight,
-                          children: [
-                            const Icon(
-                              Icons.school,
-                              size: 60,
-                              color: AppColors.textWhite,
-                            ),
-                            Container(
-                              width: 36,
-                              height: 36,
-                              decoration: BoxDecoration(
-                                color: AppColors.successGreen,
-                                borderRadius: BorderRadius.circular(18),
-                              ),
-                              child: const Icon(
-                                Icons.check,
-                                color: AppColors.textWhite,
-                                size: 20,
-                              ),
-                            ),
-                          ],
-                        ),
+                    Container(
+                      width: 100,
+                      height: 100,
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryBlue.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(50),
+                      ),
+                      child: const Icon(
+                        Icons.business,
+                        size: 50,
+                        color: AppColors.primaryBlue,
                       ),
                     ),
-                    const SizedBox(height: 20),
-                    Text(
-                      _schoolData['name'],
-                      style: const TextStyle(
+                    const SizedBox(height: 24),
+                    const Text(
+                      'Create Your School',
+                      style: TextStyle(
                         color: AppColors.textWhite,
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
                       ),
                       textAlign: TextAlign.center,
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'ID: ${_schoolData['id']}',
-                      style: const TextStyle(
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Set up your school profile to start managing fees and student data',
+                      style: TextStyle(
                         color: AppColors.textGrey,
-                        fontSize: 13,
+                        fontSize: 14,
                       ),
+                      textAlign: TextAlign.center,
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 40),
                     SizedBox(
                       width: double.infinity,
-                      child: OutlinedButton(
-                        onPressed: () {},
-                        style: OutlinedButton.styleFrom(
-                          side: const BorderSide(
-                            color: AppColors.primaryBlue,
-                            width: 1.5,
-                          ),
-                          padding: const EdgeInsets.symmetric(vertical: 12),
+                      child: ElevatedButton(
+                        onPressed: _showSchoolCreator,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primaryBlue,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
                         ),
                         child: const Text(
-                          'Edit Details',
+                          'Create School',
                           style: TextStyle(
-                            color: AppColors.primaryBlue,
-                            fontSize: 14,
+                            color: AppColors.textWhite,
+                            fontSize: 16,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -271,168 +147,105 @@ class _ConfigsScreenState extends State<ConfigsScreen> {
                     ),
                   ],
                 ),
-              ),
+              );
+            }
 
-              const SizedBox(height: 32),
-
-              // Fee Charges Section
-              _Section(
-                title: 'FEE CHARGES',
-                action: 'History',
-                onActionTap: () {},
+            return SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  ..._feeCharges.map((fee) => _FeeChargeCard(
-                        name: fee['name'],
-                        description: fee['description'],
-                        amount: fee['amount'],
-                        icon: fee['icon'],
-                        color: fee['color'],
-                      )),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () {},
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primaryBlue,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                  // Header
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      children: [
+                        GestureDetector(
+                          onTap: () => Navigator.pop(context),
+                          child: const Icon(
+                            Icons.arrow_back,
+                            color: AppColors.textWhite,
+                            size: 24,
+                          ),
                         ),
-                      ),
-                      child: const Text(
-                        'Manage Fees',
-                        style: TextStyle(
-                          color: AppColors.textWhite,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
+                        const SizedBox(width: 12),
+                        const Text(
+                          'Configs',
+                          style: TextStyle(
+                            color: AppColors.textWhite,
+                            fontSize: 28,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                      ),
+                      ],
                     ),
                   ),
-                ],
-              ),
 
-              const SizedBox(height: 24),
-
-              // Academic Calendar Section
-              _Section(
-                title: 'ACADEMIC CALENDAR',
-                action: null,
-                onActionTap: () {},
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: AppColors.surfaceGrey,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+                  // School Profile Section
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                        Center(
+                          child: Container(
+                            width: 120,
+                            height: 120,
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [
+                                  AppColors.primaryBlue,
+                                  AppColors.accentPurple,
+                                ],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              borderRadius: BorderRadius.circular(60),
+                              border: Border.all(
+                                color: AppColors.successGreen,
+                                width: 3,
+                              ),
+                            ),
+                            child: Stack(
+                              alignment: Alignment.bottomRight,
                               children: [
-                                Row(
-                                  children: [
-                                    Container(
-                                      width: 8,
-                                      height: 8,
-                                      decoration: BoxDecoration(
-                                        color: AppColors.successGreen,
-                                        borderRadius: BorderRadius.circular(4),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    const Text(
-                                      'CURRENT SESSION',
-                                      style: TextStyle(
-                                        color: AppColors.textGrey,
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ],
+                                const Icon(
+                                  Icons.school,
+                                  size: 60,
+                                  color: AppColors.textWhite,
                                 ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  _currentTerm['name'],
-                                  style: const TextStyle(
-                                    color: AppColors.textWhite,
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.bold,
+                                Container(
+                                  width: 36,
+                                  height: 36,
+                                  decoration: BoxDecoration(
+                                    color: AppColors.successGreen,
+                                    borderRadius: BorderRadius.circular(18),
                                   ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  '${_currentTerm['startDate']} - ${_currentTerm['endDate']}',
-                                  style: const TextStyle(
-                                    color: AppColors.textGrey,
-                                    fontSize: 12,
+                                  child: const Icon(
+                                    Icons.check,
+                                    color: AppColors.textWhite,
+                                    size: 20,
                                   ),
                                 ),
                               ],
                             ),
-                            Container(
-                              width: 48,
-                              height: 48,
-                              decoration: BoxDecoration(
-                                color: AppColors.backgroundBlack,
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: const Icon(
-                                Icons.calendar_today,
-                                color: AppColors.primaryBlue,
-                                size: 24,
-                              ),
-                            ),
-                          ],
+                          ),
                         ),
                         const SizedBox(height: 20),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Week ${_currentTerm['week']}',
-                                    style: const TextStyle(
-                                      color: AppColors.textGrey,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  ClipRRect(
-                                    borderRadius: BorderRadius.circular(4),
-                                    child: LinearProgressIndicator(
-                                      value: _currentTerm['week'] /
-                                          _currentTerm['totalWeeks'],
-                                      minHeight: 6,
-                                      backgroundColor:
-                                          AppColors.surfaceLightGrey,
-                                      valueColor:
-                                          const AlwaysStoppedAnimation<Color>(
-                                        AppColors.primaryBlue,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Text(
-                              '${_currentTerm['totalWeeks']} Weeks Total',
-                              style: const TextStyle(
-                                color: AppColors.textGrey,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
+                        Text(
+                          school.name,
+                          style: const TextStyle(
+                            color: AppColors.textWhite,
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'ID: ${school.id}',
+                          style: const TextStyle(
+                            color: AppColors.textGrey,
+                            fontSize: 13,
+                          ),
                         ),
                         const SizedBox(height: 16),
                         SizedBox(
@@ -441,17 +254,18 @@ class _ConfigsScreenState extends State<ConfigsScreen> {
                             onPressed: () {},
                             style: OutlinedButton.styleFrom(
                               side: const BorderSide(
-                                color: AppColors.textGrey,
+                                color: AppColors.primaryBlue,
+                                width: 1.5,
                               ),
                               padding: const EdgeInsets.symmetric(vertical: 12),
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
+                                borderRadius: BorderRadius.circular(12),
                               ),
                             ),
                             child: const Text(
-                              'Manage Terms',
+                              'Edit Details',
                               style: TextStyle(
-                                color: AppColors.textWhite,
+                                color: AppColors.primaryBlue,
                                 fontSize: 14,
                                 fontWeight: FontWeight.w600,
                               ),
@@ -461,57 +275,161 @@ class _ConfigsScreenState extends State<ConfigsScreen> {
                       ],
                     ),
                   ),
-                ],
-              ),
 
-              const SizedBox(height: 24),
+                  const SizedBox(height: 32),
 
-              // Sync & Backup Section
-              _Section(
-                title: 'SYNC & BACKUP',
-                action: null,
-                onActionTap: () {},
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: AppColors.surfaceGrey,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              width: 44,
-                              height: 44,
-                              decoration: BoxDecoration(
-                                color: AppColors.successGreen
-                                    .withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: const Icon(
-                                Icons.cloud_done,
-                                color: AppColors.successGreen,
-                                size: 22,
-                              ),
+                  // Fee Charges Section
+                  _Section(
+                    title: 'FEE CHARGES',
+                    action: 'History',
+                    onActionTap: () {},
+                    children: [
+                      ..._feeCharges.map((fee) => _FeeChargeCard(
+                            name: fee['name'],
+                            description: fee['description'],
+                            amount: fee['amount'],
+                            icon: fee['icon'],
+                            color: fee['color'],
+                          )),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: () {},
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primaryBlue,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
                             ),
-                            const SizedBox(width: 12),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                          ),
+                          child: const Text(
+                            'Manage Fees',
+                            style: TextStyle(
+                              color: AppColors.textWhite,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // Academic Calendar Section
+                  _Section(
+                    title: 'ACADEMIC CALENDAR',
+                    action: null,
+                    onActionTap: () {},
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceGrey,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                const Text(
-                                  'System Synchronized',
-                                  style: TextStyle(
-                                    color: AppColors.textWhite,
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w600,
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Container(
+                                          width: 8,
+                                          height: 8,
+                                          decoration: BoxDecoration(
+                                            color: AppColors.successGreen,
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        const Text(
+                                          'CURRENT SESSION',
+                                          style: TextStyle(
+                                            color: AppColors.textGrey,
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      _currentTerm['name'],
+                                      style: const TextStyle(
+                                        color: AppColors.textWhite,
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      '${_currentTerm['startDate']} - ${_currentTerm['endDate']}',
+                                      style: const TextStyle(
+                                        color: AppColors.textGrey,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                Container(
+                                  width: 48,
+                                  height: 48,
+                                  decoration: BoxDecoration(
+                                    color: AppColors.backgroundBlack,
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: const Icon(
+                                    Icons.calendar_today,
+                                    color: AppColors.primaryBlue,
+                                    size: 24,
                                   ),
                                 ),
-                                const SizedBox(height: 4),
+                              ],
+                            ),
+                            const SizedBox(height: 20),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Week ${_currentTerm['week']}',
+                                        style: const TextStyle(
+                                          color: AppColors.textGrey,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 6),
+                                      ClipRRect(
+                                        borderRadius: BorderRadius.circular(4),
+                                        child: LinearProgressIndicator(
+                                          value: _currentTerm['week'] /
+                                              _currentTerm['totalWeeks'],
+                                          minHeight: 6,
+                                          backgroundColor:
+                                              AppColors.surfaceLightGrey,
+                                          valueColor:
+                                              const AlwaysStoppedAnimation<Color>(
+                                            AppColors.primaryBlue,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
                                 Text(
-                                  _syncData['lastSync'],
+                                  '${_currentTerm['totalWeeks']} Weeks Total',
                                   style: const TextStyle(
                                     color: AppColors.textGrey,
                                     fontSize: 12,
@@ -519,131 +437,218 @@ class _ConfigsScreenState extends State<ConfigsScreen> {
                                 ),
                               ],
                             ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: ElevatedButton(
-                                onPressed: () {},
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.primaryBlue,
-                                  padding:
-                                      const EdgeInsets.symmetric(vertical: 12),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                ),
-                                child: const Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(Icons.sync, size: 16),
-                                    SizedBox(width: 8),
-                                    Text(
-                                      'Sync Now',
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
+                            const SizedBox(height: 16),
+                            SizedBox(
+                              width: double.infinity,
                               child: OutlinedButton(
                                 onPressed: () {},
                                 style: OutlinedButton.styleFrom(
                                   side: const BorderSide(
                                     color: AppColors.textGrey,
                                   ),
-                                  padding:
-                                      const EdgeInsets.symmetric(vertical: 12),
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(10),
                                   ),
                                 ),
-                                child: const Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.download,
-                                      size: 16,
-                                      color: AppColors.textGrey,
-                                    ),
-                                    SizedBox(width: 8),
-                                    Text(
-                                      'Export Data',
-                                      style: TextStyle(
-                                        color: AppColors.textGrey,
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ],
+                                child: const Text(
+                                  'Manage Terms',
+                                  style: TextStyle(
+                                    color: AppColors.textWhite,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
                               ),
                             ),
                           ],
                         ),
-                      ],
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // Sync & Backup Section
+                  _Section(
+                    title: 'SYNC & BACKUP',
+                    action: null,
+                    onActionTap: () {},
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceGrey,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  width: 44,
+                                  height: 44,
+                                  decoration: BoxDecoration(
+                                    color: AppColors.successGreen
+                                        .withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: const Icon(
+                                    Icons.cloud_done,
+                                    color: AppColors.successGreen,
+                                    size: 22,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'System Synchronized',
+                                      style: TextStyle(
+                                        color: AppColors.textWhite,
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      _syncData['lastSync'],
+                                      style: const TextStyle(
+                                        color: AppColors.textGrey,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: ElevatedButton(
+                                    onPressed: () {},
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppColors.primaryBlue,
+                                      padding:
+                                          const EdgeInsets.symmetric(vertical: 12),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                    ),
+                                    child: const Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Icon(Icons.sync, size: 16),
+                                        SizedBox(width: 8),
+                                        Text(
+                                          'Sync Now',
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: OutlinedButton(
+                                    onPressed: () {},
+                                    style: OutlinedButton.styleFrom(
+                                      side: const BorderSide(
+                                        color: AppColors.textGrey,
+                                      ),
+                                      padding:
+                                          const EdgeInsets.symmetric(vertical: 12),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                    ),
+                                    child: const Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Icon(
+                                          Icons.download,
+                                          size: 16,
+                                          color: AppColors.textGrey,
+                                        ),
+                                        SizedBox(width: 8),
+                                        Text(
+                                          'Export Data',
+                                          style: TextStyle(
+                                            color: AppColors.textGrey,
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // Advanced Settings Section
+                  _Section(
+                    title: 'ADVANCED SETTINGS',
+                    action: null,
+                    onActionTap: () {},
+                    children: [
+                      _SettingsItem(
+                        icon: Icons.language,
+                        iconColor: AppColors.primaryBlue,
+                        title: 'Language',
+                        value: 'English',
+                        onTap: () {},
+                      ),
+                      const SizedBox(height: 12),
+                      _SettingsItem(
+                        icon: Icons.palette,
+                        iconColor: AppColors.warningOrange,
+                        title: 'Theme',
+                        value: 'Lively Slate',
+                        onTap: () {},
+                      ),
+                      const SizedBox(height: 12),
+                      _SettingsItem(
+                        icon: Icons.help,
+                        iconColor: AppColors.primaryBlue,
+                        title: 'Help & Support',
+                        value: null,
+                        onTap: () {},
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 32),
+
+                  // Version Info
+                  Center(
+                    child: Text(
+                      'Fees Up v2.4.0 (Build 204)',
+                      style: TextStyle(
+                        color: AppColors.textGrey.withValues(alpha: 0.6),
+                        fontSize: 12,
+                      ),
                     ),
                   ),
+
+                  const SizedBox(height: 24),
                 ],
               ),
-
-              const SizedBox(height: 24),
-
-              // Advanced Settings Section
-              _Section(
-                title: 'ADVANCED SETTINGS',
-                action: null,
-                onActionTap: () {},
-                children: [
-                  _SettingsItem(
-                    icon: Icons.language,
-                    iconColor: AppColors.primaryBlue,
-                    title: 'Language',
-                    value: 'English',
-                    onTap: () {},
-                  ),
-                  const SizedBox(height: 12),
-                  _SettingsItem(
-                    icon: Icons.palette,
-                    iconColor: AppColors.warningOrange,
-                    title: 'Theme',
-                    value: 'Lively Slate',
-                    onTap: () {},
-                  ),
-                  const SizedBox(height: 12),
-                  _SettingsItem(
-                    icon: Icons.help,
-                    iconColor: AppColors.primaryBlue,
-                    title: 'Help & Support',
-                    value: null,
-                    onTap: () {},
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 32),
-
-              // Version Info
-              Center(
-                child: Text(
-                  'Fees Up v2.4.0 (Build 204)',
-                  style: TextStyle(
-                    color: AppColors.textGrey.withValues(alpha: 0.6),
-                    fontSize: 12,
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 24),
-            ],
-          ),
+            );
+          },
         ),
       ),
     );

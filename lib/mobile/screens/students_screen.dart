@@ -1,331 +1,60 @@
 import 'package:fees_up/constants/app_colors.dart';
+import 'package:fees_up/data/models/people.dart';
+import 'package:fees_up/data/providers/core_providers.dart';
+import 'package:fees_up/data/providers/student_providers.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class StudentsScreen extends StatefulWidget {
+class StudentsScreen extends ConsumerStatefulWidget {
   const StudentsScreen({super.key});
 
   @override
-  State<StudentsScreen> createState() => _StudentsScreenState();
+  ConsumerState<StudentsScreen> createState() => _StudentsScreenState();
 }
 
-class _StudentsScreenState extends State<StudentsScreen> {
+class _StudentsScreenState extends ConsumerState<StudentsScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
-  final Map<String, bool> _expandedForms = {
-    'FORM 1': true,
-    'FORM 2': false,
-    'FORM 3': false,
-    'FORM 4': false,
-  };
+  final Map<String, bool> _expandedForms = {};
 
-  // Mock student data grouped by form
-  final Map<String, List<Map<String, dynamic>>> _studentsByForm = {
-    'FORM 1': [
-      {
-        'id': 'STU-001',
-        'name': 'John Mwangi',
-        'initials': 'JM',
-        'owed': 15000,
-        'paid': 45000,
-        'status': 'ACTIVE',
-      },
-      {
-        'id': 'STU-002',
-        'name': 'Jane Kipchoge',
-        'initials': 'JK',
-        'owed': 0,
-        'paid': 60000,
-        'status': 'ACTIVE',
-      },
-      {
-        'id': 'STU-003',
-        'name': 'Michael Ochieng',
-        'initials': 'MO',
-        'owed': 22000,
-        'paid': 38000,
-        'status': 'ACTIVE',
-      },
-      {
-        'id': 'STU-004',
-        'name': 'Sarah Wanjiru',
-        'initials': 'SW',
-        'owed': 8500,
-        'paid': 52000,
-        'status': 'ACTIVE',
-      },
-      {
-        'id': 'STU-005',
-        'name': 'David Kariuki',
-        'initials': 'DK',
-        'owed': 31000,
-        'paid': 29000,
-        'status': 'ACTIVE',
-      },
-      {
-        'id': 'STU-006',
-        'name': 'Emily Nakitare',
-        'initials': 'EN',
-        'owed': 5000,
-        'paid': 55000,
-        'status': 'ACTIVE',
-      },
-      {
-        'id': 'STU-007',
-        'name': 'Peter Kipkemboi',
-        'initials': 'PK',
-        'owed': 18000,
-        'paid': 42000,
-        'status': 'ACTIVE',
-      },
-    ],
-    'FORM 2': [
-      {
-        'id': 'STU-008',
-        'name': 'Alice Kamau',
-        'initials': 'AK',
-        'owed': 12000,
-        'paid': 48000,
-        'status': 'ACTIVE',
-      },
-      {
-        'id': 'STU-009',
-        'name': 'Kevin Muthuri',
-        'initials': 'KM',
-        'owed': 0,
-        'paid': 60000,
-        'status': 'ACTIVE',
-      },
-      {
-        'id': 'STU-010',
-        'name': 'Rachel Kimani',
-        'initials': 'RK',
-        'owed': 25000,
-        'paid': 35000,
-        'status': 'ACTIVE',
-      },
-      {
-        'id': 'STU-011',
-        'name': 'Thomas Kipchoge',
-        'initials': 'TK',
-        'owed': 0,
-        'paid': 60000,
-        'status': 'ACTIVE',
-      },
-      {
-        'id': 'STU-012',
-        'name': 'Grace Omondi',
-        'initials': 'GO',
-        'owed': 20000,
-        'paid': 40000,
-        'status': 'ACTIVE',
-      },
-      {
-        'id': 'STU-013',
-        'name': 'Charles Kiplagat',
-        'initials': 'CK',
-        'owed': 5000,
-        'paid': 55000,
-        'status': 'ACTIVE',
-      },
-      {
-        'id': 'STU-014',
-        'name': 'Victoria Njoroge',
-        'initials': 'VN',
-        'owed': 30000,
-        'paid': 30000,
-        'status': 'ACTIVE',
-      },
-      {
-        'id': 'STU-015',
-        'name': 'Joseph Koech',
-        'initials': 'JK',
-        'owed': 10000,
-        'paid': 50000,
-        'status': 'ACTIVE',
-      },
-    ],
-    'FORM 3': [
-      {
-        'id': 'STU-016',
-        'name': 'Amelia Wambui',
-        'initials': 'AW',
-        'owed': 0,
-        'paid': 60000,
-        'status': 'ACTIVE',
-      },
-      {
-        'id': 'STU-017',
-        'name': 'Brian Kipchoge',
-        'initials': 'BK',
-        'owed': 15000,
-        'paid': 45000,
-        'status': 'ACTIVE',
-      },
-      {
-        'id': 'STU-018',
-        'name': 'Catherine Mutua',
-        'initials': 'CM',
-        'owed': 28000,
-        'paid': 32000,
-        'status': 'ACTIVE',
-      },
-      {
-        'id': 'STU-019',
-        'name': 'Daniel Kipkemboi',
-        'initials': 'DK',
-        'owed': 0,
-        'paid': 60000,
-        'status': 'ACTIVE',
-      },
-      {
-        'id': 'STU-020',
-        'name': 'Eleanor Ng\'eno',
-        'initials': 'EN',
-        'owed': 22000,
-        'paid': 38000,
-        'status': 'ACTIVE',
-      },
-      {
-        'id': 'STU-021',
-        'name': 'Francis Kiplagat',
-        'initials': 'FK',
-        'owed': 10000,
-        'paid': 50000,
-        'status': 'ACTIVE',
-      },
-      {
-        'id': 'STU-022',
-        'name': 'Gloria Kiprotich',
-        'initials': 'GK',
-        'owed': 0,
-        'paid': 60000,
-        'status': 'ACTIVE',
-      },
-      {
-        'id': 'STU-023',
-        'name': 'Henry Kipkemboi',
-        'initials': 'HK',
-        'owed': 18000,
-        'paid': 42000,
-        'status': 'ACTIVE',
-      },
-      {
-        'id': 'STU-024',
-        'name': 'Iris Kipchoge',
-        'initials': 'IK',
-        'owed': 5000,
-        'paid': 55000,
-        'status': 'ACTIVE',
-      },
-      {
-        'id': 'STU-025',
-        'name': 'James Kiplagat',
-        'initials': 'JL',
-        'owed': 35000,
-        'paid': 25000,
-        'status': 'ACTIVE',
-      },
-      {
-        'id': 'STU-026',
-        'name': 'Karen Kipkemboi',
-        'initials': 'KK',
-        'owed': 0,
-        'paid': 60000,
-        'status': 'ACTIVE',
-      },
-      {
-        'id': 'STU-027',
-        'name': 'Luke Kipchoge',
-        'initials': 'LK',
-        'owed': 12000,
-        'paid': 48000,
-        'status': 'ACTIVE',
-      },
-      {
-        'id': 'STU-028',
-        'name': 'Maria Kiplagat',
-        'initials': 'MK',
-        'owed': 25000,
-        'paid': 35000,
-        'status': 'ACTIVE',
-      },
-      {
-        'id': 'STU-029',
-        'name': 'Nina Kipkemboi',
-        'initials': 'NK',
-        'owed': 20000,
-        'paid': 40000,
-        'status': 'ACTIVE',
-      },
-      {
-        'id': 'STU-030',
-        'name': 'Oliver Kipchoge',
-        'initials': 'OK',
-        'owed': 8000,
-        'paid': 52000,
-        'status': 'ACTIVE',
-      },
-      {
-        'id': 'STU-031',
-        'name': 'Paula Kiplagat',
-        'initials': 'PL',
-        'owed': 0,
-        'paid': 60000,
-        'status': 'ACTIVE',
-      },
-      {
-        'id': 'STU-032',
-        'name': 'Quinn Kipkemboi',
-        'initials': 'QK',
-        'owed': 30000,
-        'paid': 30000,
-        'status': 'ACTIVE',
-      },
-    ],
-    'FORM 4': [
-      {
-        'id': 'STU-033',
-        'name': 'Rachel Kipchoge',
-        'initials': 'RK',
-        'owed': 0,
-        'paid': 60000,
-        'status': 'ACTIVE',
-      },
-      {
-        'id': 'STU-034',
-        'name': 'Samuel Kiplagat',
-        'initials': 'SK',
-        'owed': 15000,
-        'paid': 45000,
-        'status': 'ACTIVE',
-      },
-      {
-        'id': 'STU-035',
-        'name': 'Tasha Kipkemboi',
-        'initials': 'TK',
-        'owed': 22000,
-        'paid': 38000,
-        'status': 'ACTIVE',
-      },
-    ],
-  };
-
-  List<Map<String, dynamic>> _getFilteredStudents(
-      List<Map<String, dynamic>> students) {
+  List<Student> _getFilteredStudents(List<Student> students) {
     if (_searchQuery.isEmpty) {
       return students;
     }
     return students
         .where((student) =>
-            student['name']
-                .toString()
-                .toLowerCase()
+            (student.firstName.toLowerCase() + ' ' + student.lastName.toLowerCase())
                 .contains(_searchQuery.toLowerCase()) ||
-            student['id']
-                .toString()
-                .toLowerCase()
-                .contains(_searchQuery.toLowerCase()))
+            student.admissionNumber.toLowerCase().contains(_searchQuery.toLowerCase()))
         .toList();
+  }
+
+  // Group students by form/grade
+  Map<String, List<Student>> _groupStudentsByForm(List<Student> students) {
+    final Map<String, List<Student>> grouped = {};
+    for (var student in students) {
+      // Assuming 'grade' field holds 'Form 1', 'Grade 5', etc.
+      // If grade is just a number/code, we might need mapping.
+      // Assuming it's a string like 'Form 1' or '1'
+      final key = (student.currentGrade ?? 'Unknown').toUpperCase();
+
+      // Vocabulary adjustments: If it's just a number 1-7, treat as Grade. 8-13 or Form.
+      // Assuming stored data matches vocabulary or we map it here.
+
+      if (!grouped.containsKey(key)) {
+        grouped[key] = [];
+      }
+      grouped[key]!.add(student);
+    }
+
+    // Ensure keys are sorted if possible
+    final sortedKeys = grouped.keys.toList()..sort();
+    final Map<String, List<Student>> sortedMap = {};
+    for (var key in sortedKeys) {
+      sortedMap[key] = grouped[key]!;
+    }
+
+    return sortedMap;
   }
 
   Color _getAvatarColor(String initials) {
@@ -341,7 +70,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
     return colors[initials.hashCode % colors.length];
   }
 
-  void _showStudentDetails(Map<String, dynamic> student) {
+  void _showStudentDetails(Student student) {
     showModalBottomSheet(
       context: context,
       backgroundColor: AppColors.surfaceGrey,
@@ -360,351 +89,370 @@ class _StudentsScreenState extends State<StudentsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final schoolIdAsync = ref.watch(currentSchoolIdProvider);
+
     return Scaffold(
       backgroundColor: AppColors.backgroundBlack,
       body: SafeArea(
-        child: Column(
-          children: [
-            // Header with back button, title, and add button
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
+        child: schoolIdAsync.when(
+          loading: () => const Center(child: CircularProgressIndicator(color: AppColors.primaryBlue)),
+          error: (e, s) => Center(child: Text('Error loading school: $e', style: const TextStyle(color: AppColors.errorRed))),
+          data: (schoolId) {
+            final studentsAsync = ref.watch(studentsProvider(schoolId));
+
+            return Column(
+              children: [
+                // Header with back button, title, and add button
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      GestureDetector(
-                        onTap: () => Navigator.pop(context),
-                        child: const Icon(
-                          Icons.arrow_back,
-                          color: AppColors.textWhite,
-                          size: 24,
-                        ),
+                      Row(
+                        children: [
+                          GestureDetector(
+                            onTap: () => Navigator.pop(context),
+                            child: const Icon(
+                              Icons.arrow_back,
+                              color: AppColors.textWhite,
+                              size: 24,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          const Text(
+                            'Learners',
+                            style: TextStyle(
+                              color: AppColors.textWhite,
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 12),
-                      const Text(
-                        'Learners',
-                        style: TextStyle(
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: AppColors.successGreen,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(
+                          Icons.add,
                           color: AppColors.textWhite,
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
+                          size: 20,
                         ),
                       ),
                     ],
                   ),
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: AppColors.successGreen,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Icon(
-                      Icons.add,
-                      color: AppColors.textWhite,
-                      size: 20,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+                ),
 
-            // Search and Filter bar
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: AppColors.surfaceGrey,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: TextField(
-                        controller: _searchController,
-                        onChanged: (value) {
-                          setState(() => _searchQuery = value);
-                        },
-                        style: const TextStyle(color: AppColors.textWhite),
-                        decoration: const InputDecoration(
-                          hintText: 'Search',
-                          hintStyle: TextStyle(color: AppColors.textGrey),
-                          prefixIcon: Icon(Icons.search,
-                              color: AppColors.textGrey),
-                          border: InputBorder.none,
-                          contentPadding:
-                              EdgeInsets.symmetric(vertical: 14),
+                // Search and Filter bar
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: AppColors.surfaceGrey,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: TextField(
+                            controller: _searchController,
+                            onChanged: (value) {
+                              setState(() => _searchQuery = value);
+                            },
+                            style: const TextStyle(color: AppColors.textWhite),
+                            decoration: const InputDecoration(
+                              hintText: 'Search',
+                              hintStyle: TextStyle(color: AppColors.textGrey),
+                              prefixIcon: Icon(Icons.search,
+                                  color: AppColors.textGrey),
+                              border: InputBorder.none,
+                              contentPadding:
+                                  EdgeInsets.symmetric(vertical: 14),
+                            ),
+                          ),
                         ),
                       ),
-                    ),
+                      const SizedBox(width: 12),
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceGrey,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(
+                          Icons.tune,
+                          color: AppColors.textGrey,
+                          size: 20,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 12),
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: AppColors.surfaceGrey,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Icon(
-                      Icons.tune,
-                      color: AppColors.textGrey,
-                      size: 20,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+                ),
 
-            const SizedBox(height: 16),
+                const SizedBox(height: 16),
 
-            // Expandable Form Sections
-            Expanded(
-              child: SingleChildScrollView(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Column(
-                    children: _studentsByForm.entries.map((entry) {
-                      final form = entry.key;
-                      final students = entry.value;
-                      final filteredStudents = _getFilteredStudents(students);
-                      final isExpanded = _expandedForms[form] ?? false;
+                // Expandable Form Sections
+                Expanded(
+                  child: studentsAsync.when(
+                    loading: () => const Center(child: CircularProgressIndicator(color: AppColors.primaryBlue)),
+                    error: (e, s) => Center(child: Text('Error loading students: $e', style: const TextStyle(color: AppColors.errorRed))),
+                    data: (students) {
+                      if (students.isEmpty) {
+                         return const Center(child: Text('No students found', style: TextStyle(color: AppColors.textGrey)));
+                      }
 
-                      return Column(
-                        children: [
-                          // Form Header
-                          GestureDetector(
-                            onTap: () {
-                              setState(() {
-                                _expandedForms[form] = !isExpanded;
-                              });
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 12,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppColors.surfaceGrey,
-                                borderRadius: BorderRadius.circular(8),
-                                border: const Border(
-                                  left: BorderSide(
-                                    color: AppColors.successGreen,
-                                    width: 4,
-                                  ),
-                                ),
-                              ),
-                              child: Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
+                      final groupedStudents = _groupStudentsByForm(students);
+
+                      // Initialize expanded state for new keys
+                      for (var key in groupedStudents.keys) {
+                        if (!_expandedForms.containsKey(key)) {
+                          // Expand first one by default
+                          _expandedForms[key] = groupedStudents.keys.first == key;
+                        }
+                      }
+
+                      return SingleChildScrollView(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: Column(
+                            children: groupedStudents.entries.map((entry) {
+                              final form = entry.key;
+                              final formStudents = entry.value;
+                              final filteredStudents = _getFilteredStudents(formStudents);
+                              final isExpanded = _expandedForms[form] ?? false;
+
+                              if (filteredStudents.isEmpty && _searchQuery.isNotEmpty) return const SizedBox.shrink();
+
+                              return Column(
                                 children: [
-                                  Row(
-                                    children: [
-                                      Text(
-                                        form,
-                                        style: const TextStyle(
-                                          color: AppColors.textWhite,
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w600,
-                                        ),
+                                  // Form Header
+                                  GestureDetector(
+                                    onTap: () {
+                                      setState(() {
+                                        _expandedForms[form] = !isExpanded;
+                                      });
+                                    },
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                        vertical: 12,
                                       ),
-                                      const SizedBox(width: 12),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 8,
-                                          vertical: 4,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: AppColors.successGreen
-                                              .withValues(alpha: 0.2),
-                                          borderRadius:
-                                              BorderRadius.circular(12),
-                                        ),
-                                        child: Text(
-                                          '${filteredStudents.length}',
-                                          style: const TextStyle(
+                                      decoration: BoxDecoration(
+                                        color: AppColors.surfaceGrey,
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: const Border(
+                                          left: BorderSide(
                                             color: AppColors.successGreen,
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w600,
+                                            width: 4,
                                           ),
                                         ),
                                       ),
-                                    ],
-                                  ),
-                                  Icon(
-                                    isExpanded
-                                        ? Icons.expand_less
-                                        : Icons.expand_more,
-                                    color: AppColors.textGrey,
-                                    size: 24,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-
-                          // Expanded Student List
-                          if (isExpanded && filteredStudents.isNotEmpty)
-                            Column(
-                              children: [
-                                const SizedBox(height: 12),
-                                ...filteredStudents.map((student) {
-                                  final isOwing = student['owed'] > 0;
-
-                                  return Padding(
-                                    padding: const EdgeInsets.only(bottom: 12),
-                                    child: GestureDetector(
-                                      onTap: () => _showStudentDetails(student),
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 16,
-                                          vertical: 12,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: AppColors.surfaceGrey,
-                                          borderRadius:
-                                              BorderRadius.circular(8),
-                                        ),
-                                        child: Row(
-                                          children: [
-                                            // Avatar
-                                            Container(
-                                              width: 48,
-                                              height: 48,
-                                              decoration: BoxDecoration(
-                                                color: _getAvatarColor(
-                                                    student['initials']),
-                                                borderRadius:
-                                                    BorderRadius.circular(24),
+                                      child: Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              Text(
+                                                form,
+                                                style: const TextStyle(
+                                                  color: AppColors.textWhite,
+                                                  fontSize: 16,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
                                               ),
-                                              child: Center(
+                                              const SizedBox(width: 12),
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(
+                                                  horizontal: 8,
+                                                  vertical: 4,
+                                                ),
+                                                decoration: BoxDecoration(
+                                                  color: AppColors.successGreen
+                                                      .withValues(alpha: 0.2),
+                                                  borderRadius:
+                                                      BorderRadius.circular(12),
+                                                ),
                                                 child: Text(
-                                                  student['initials'],
+                                                  '${filteredStudents.length}',
                                                   style: const TextStyle(
-                                                    color: AppColors.textWhite,
-                                                    fontSize: 14,
+                                                    color: AppColors.successGreen,
+                                                    fontSize: 12,
                                                     fontWeight: FontWeight.w600,
                                                   ),
                                                 ),
                                               ),
-                                            ),
-
-                                            const SizedBox(width: 12),
-
-                                            // Name and Status
-                                            Expanded(
-                                              child: Column(
-                                                crossAxisAlignment:
-                                                    CrossAxisAlignment.start,
-                                                children: [
-                                                  Text(
-                                                    student['name'],
-                                                    style: const TextStyle(
-                                                      color:
-                                                          AppColors.textWhite,
-                                                      fontSize: 14,
-                                                      fontWeight:
-                                                          FontWeight.w600,
-                                                    ),
-                                                  ),
-                                                  const SizedBox(height: 4),
-                                                  Row(
-                                                    children: [
-                                                      Container(
-                                                        width: 8,
-                                                        height: 8,
-                                                        decoration:
-                                                            BoxDecoration(
-                                                          color: AppColors
-                                                              .successGreen,
-                                                          borderRadius:
-                                                              BorderRadius
-                                                                  .circular(4),
-                                                        ),
-                                                      ),
-                                                      const SizedBox(width: 6),
-                                                      const Text(
-                                                        'ACTIVE',
-                                                        style: TextStyle(
-                                                          color: AppColors
-                                                              .textGrey,
-                                                          fontSize: 11,
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-
-                                            // Financial Status
-                                            Column(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.end,
-                                              children: [
-                                                Text(
-                                                  isOwing
-                                                      ? '-Ksh ${student['owed']}'
-                                                      : '+Ksh ${student['paid']}',
-                                                  style: TextStyle(
-                                                    color: isOwing
-                                                        ? AppColors.errorRed
-                                                        : AppColors
-                                                            .successGreen,
-                                                    fontSize: 13,
-                                                    fontWeight: FontWeight.w600,
-                                                  ),
-                                                ),
-                                                const SizedBox(height: 4),
-                                                Text(
-                                                  isOwing ? 'OWING' : 'PAID',
-                                                  style: const TextStyle(
-                                                    color: AppColors.textGrey,
-                                                    fontSize: 10,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ],
-                                        ),
+                                            ],
+                                          ),
+                                          Icon(
+                                            isExpanded
+                                                ? Icons.expand_less
+                                                : Icons.expand_more,
+                                            color: AppColors.textGrey,
+                                            size: 24,
+                                          ),
+                                        ],
                                       ),
                                     ),
-                                  );
-                                }),
-                              ],
-                            ),
+                                  ),
 
-                          const SizedBox(height: 16),
-                        ],
+                                  // Expanded Student List
+                                  if (isExpanded && filteredStudents.isNotEmpty)
+                                    Column(
+                                      children: [
+                                        const SizedBox(height: 12),
+                                        ...filteredStudents.map((student) {
+                                          // Placeholder for owed amount - assuming logic or field exists
+                                          // Student model doesn't have 'owed' field in current view
+                                          // We might need to fetch this or assume 0 for now
+                                          final isOwing = false;
+                                          final owedAmount = 0;
+                                          final paidAmount = 0;
+                                          final initials = (student.firstName.isNotEmpty ? student.firstName[0] : '') +
+                                                           (student.lastName.isNotEmpty ? student.lastName[0] : '');
+                                          final fullName = '${student.firstName} ${student.lastName}';
+
+                                          return Padding(
+                                            padding: const EdgeInsets.only(bottom: 12),
+                                            child: GestureDetector(
+                                              onTap: () => _showStudentDetails(student),
+                                              child: Container(
+                                                padding: const EdgeInsets.symmetric(
+                                                  horizontal: 16,
+                                                  vertical: 12,
+                                                ),
+                                                decoration: BoxDecoration(
+                                                  color: AppColors.surfaceGrey,
+                                                  borderRadius:
+                                                      BorderRadius.circular(8),
+                                                ),
+                                                child: Row(
+                                                  children: [
+                                                    // Avatar
+                                                    Container(
+                                                      width: 48,
+                                                      height: 48,
+                                                      decoration: BoxDecoration(
+                                                        color: _getAvatarColor(initials),
+                                                        borderRadius:
+                                                            BorderRadius.circular(24),
+                                                      ),
+                                                      child: Center(
+                                                        child: Text(
+                                                          initials,
+                                                          style: const TextStyle(
+                                                            color: AppColors.textWhite,
+                                                            fontSize: 14,
+                                                            fontWeight: FontWeight.w600,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ),
+
+                                                    const SizedBox(width: 12),
+
+                                                    // Name and Status
+                                                    Expanded(
+                                                      child: Column(
+                                                        crossAxisAlignment:
+                                                            CrossAxisAlignment.start,
+                                                        children: [
+                                                          Text(
+                                                            fullName,
+                                                            style: const TextStyle(
+                                                              color:
+                                                                  AppColors.textWhite,
+                                                              fontSize: 14,
+                                                              fontWeight:
+                                                                  FontWeight.w600,
+                                                            ),
+                                                          ),
+                                                          const SizedBox(height: 4),
+                                                          Row(
+                                                            children: [
+                                                              Container(
+                                                                width: 8,
+                                                                height: 8,
+                                                                decoration:
+                                                                    BoxDecoration(
+                                                                  color: AppColors
+                                                                      .successGreen,
+                                                                  borderRadius:
+                                                                      BorderRadius
+                                                                          .circular(4),
+                                                                ),
+                                                              ),
+                                                              const SizedBox(width: 6),
+                                                              Text(
+                                                                student.status ?? 'ACTIVE',
+                                                                style: const TextStyle(
+                                                                  color: AppColors
+                                                                      .textGrey,
+                                                                  fontSize: 11,
+                                                                ),
+                                                              ),
+                                                            ],
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+
+                                                    // Financial Status (Placeholder)
+                                                    /*
+                                                    Column(
+                                                      crossAxisAlignment:
+                                                          CrossAxisAlignment.end,
+                                                      children: [
+                                                        Text(
+                                                          isOwing
+                                                              ? '-\$${owedAmount}'
+                                                              : '+\$${paidAmount}',
+                                                          style: TextStyle(
+                                                            color: isOwing
+                                                                ? AppColors.errorRed
+                                                                : AppColors
+                                                                    .successGreen,
+                                                            fontSize: 13,
+                                                            fontWeight: FontWeight.w600,
+                                                          ),
+                                                        ),
+                                                        const SizedBox(height: 4),
+                                                        Text(
+                                                          isOwing ? 'OWING' : 'PAID',
+                                                          style: const TextStyle(
+                                                            color: AppColors.textGrey,
+                                                            fontSize: 10,
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                    */
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
+                                          );
+                                        }),
+                                      ],
+                                    ),
+
+                                  const SizedBox(height: 16),
+                                ],
+                              );
+                            }).toList(),
+                          ),
+                        ),
                       );
-                    }).toList(),
+                    },
                   ),
                 ),
-              ),
-            ),
-
-            // Load more button
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: SizedBox(
-                width: double.infinity,
-                child: OutlinedButton(
-                  onPressed: () {},
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: AppColors.textGrey),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
-                  child: const Text(
-                    'Load more...',
-                    style: TextStyle(
-                      color: AppColors.textGrey,
-                      fontSize: 14,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
+              ],
+            );
+          },
         ),
       ),
     );
@@ -713,12 +461,14 @@ class _StudentsScreenState extends State<StudentsScreen> {
 
 // Student Details Bottom Sheet
 class _StudentDetailsSheet extends StatelessWidget {
-  final Map<String, dynamic> student;
+  final Student student;
 
   const _StudentDetailsSheet({required this.student});
 
   @override
   Widget build(BuildContext context) {
+    final fullName = '${student.firstName} ${student.lastName}';
+
     return Padding(
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -733,7 +483,7 @@ class _StudentDetailsSheet extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    student['name'],
+                    fullName,
                     style: const TextStyle(
                       color: AppColors.textWhite,
                       fontSize: 20,
@@ -742,7 +492,7 @@ class _StudentDetailsSheet extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    student['id'],
+                    student.admissionNumber,
                     style: const TextStyle(
                       color: AppColors.textGrey,
                       fontSize: 12,
@@ -763,28 +513,38 @@ class _StudentDetailsSheet extends StatelessWidget {
 
           const SizedBox(height: 24),
 
-          // Details Grid
+          // Details Grid (Mocked Financials as Student model lacks them currently)
+          // We could use a Provider here to fetch financials for this student
+          /*
           Row(
             children: [
               Expanded(
                 child: _DetailCard(
                   label: 'Outstanding',
-                  value:
-                      student['owed'] > 0 ? 'Ksh ${student['owed']}' : 'Ksh 0',
-                  valueColor: student['owed'] > 0
-                      ? AppColors.errorRed
-                      : AppColors.successGreen,
+                  value: '\$0', // Placeholder
+                  valueColor: AppColors.successGreen,
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: _DetailCard(
                   label: 'Paid',
-                  value: 'Ksh ${student['paid']}',
+                  value: '\$0', // Placeholder
                   valueColor: AppColors.successGreen,
                 ),
               ),
             ],
+          ),
+          */
+
+          const Text(
+            'Personal Details',
+            style: TextStyle(color: AppColors.textGrey, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Grade: ${student.currentGrade ?? 'N/A'}',
+            style: const TextStyle(color: AppColors.textWhite),
           ),
 
           const SizedBox(height: 24),

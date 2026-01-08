@@ -1,81 +1,83 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:fees_up/data/repositories/finance_repository.dart';
+import 'package:fees_up/data/models/finance.dart';
+import 'package:fees_up/data/providers/student_providers.dart';
+import 'core_providers.dart';
+
+/// Provides the FinanceRepository instance.
+final financeRepositoryProvider = Provider<Future<FinanceRepository>>((ref) async {
+  final isar = await ref.watch(isarInstanceProvider);
+  return FinanceRepository(isar);
+});
 
 /// Provides total count of enrolled learners
 final learnerCountProvider = FutureProvider<int>((ref) async {
-  // TODO: Connect to IsarService once DB is initialized
-  return 24;
+  final schoolId = await ref.watch(currentSchoolIdProvider.future);
+  return ref.watch(activeStudentCountProvider(schoolId).future);
 });
 
 /// Provides total outstanding fees (owes)
 final totalOutstandingProvider = FutureProvider<int>((ref) async {
-  // TODO: Connect to IsarService once DB is initialized
-  return 420000; // in cents = $4,200
+  final schoolId = await ref.watch(currentSchoolIdProvider.future);
+  final repo = await ref.watch(financeRepositoryProvider);
+  return repo.getTotalOutstanding(schoolId);
 });
 
 /// Provides total collected cash (payments received today)
 final totalCashTodayProvider = FutureProvider<int>((ref) async {
-  // TODO: Connect to IsarService once DB is initialized
-  return 1542000; // in cents = $15,420
+  final schoolId = await ref.watch(currentSchoolIdProvider.future);
+  final repo = await ref.watch(financeRepositoryProvider);
+  return repo.getTotalCashToday(schoolId);
 });
 
 /// Provides total collected cash (all time)
 final totalCashCollectedProvider = FutureProvider<int>((ref) async {
-  // TODO: Connect to IsarService once DB is initialized
-  return 895000; // in cents = $8,950.00
-});
-
-/// Provides recent activity feed (payments + invoices)
-final recentActivityProvider =
-    FutureProvider<List<ActivityFeedItem>>((ref) async {
-  // TODO: Connect to IsarService once DB is initialized
-  final now = DateTime.now();
-  return [
-    ActivityFeedItem(
-      type: 'payment',
-      title: 'Tuition Payment from John Doe',
-      amount: 50000,
-      timestamp: DateTime(now.year, now.month, now.day, 10, 23),
-    ),
-    ActivityFeedItem(
-      type: 'invoice',
-      title: 'Term 1 Invoice for Grade 5A',
-      amount: 50000,
-      timestamp: DateTime(now.year, now.month, now.day - 1, 16, 15),
-    ),
-    ActivityFeedItem(
-      type: 'payment',
-      title: 'Sports Fee from Sarah Smith',
-      amount: 4500,
-      timestamp: DateTime(now.year, now.month, now.day - 1, 14, 30),
-    ),
-    ActivityFeedItem(
-      type: 'invoice',
-      title: 'Bus Levy for Route 4',
-      amount: 12000,
-      timestamp: DateTime(now.year, 3, 12, 9, 0),
-    ),
-  ];
+  final schoolId = await ref.watch(currentSchoolIdProvider.future);
+  final repo = await ref.watch(financeRepositoryProvider);
+  return repo.getTotalCashCollected(schoolId);
 });
 
 /// Provides pending invoices count
 final pendingInvoicesCountProvider = FutureProvider<int>((ref) async {
-  // TODO: Connect to IsarService once DB is initialized
-  return 128;
+  final schoolId = await ref.watch(currentSchoolIdProvider.future);
+  final repo = await ref.watch(financeRepositoryProvider);
+  return repo.getPendingInvoicesCount(schoolId);
 });
 
-/// Provides learners by form/class
-final learnersByFormProvider = FutureProvider<Map<String, int>>((ref) async {
-  // TODO: Connect to IsarService once DB is initialized
-  return {
-    'Form 1': 8,
-    'Form 2': 12,
-    'Form 3': 4,
-  };
+/// Provides recent activity feed (payments + invoices)
+final recentActivityProvider = FutureProvider<List<ActivityFeedItem>>((ref) async {
+  final schoolId = await ref.watch(currentSchoolIdProvider.future);
+  final repo = await ref.watch(financeRepositoryProvider);
+  final rawActivities = await repo.getRecentActivity(schoolId);
+
+  return rawActivities.map((item) {
+    if (item is Payment) {
+      return ActivityFeedItem(
+        type: 'payment',
+        title: 'Payment Received', // Can enhance with Student Name if we fetch it
+        amount: item.amount,
+        timestamp: item.receivedAt,
+      );
+    } else if (item is Invoice) {
+      return ActivityFeedItem(
+        type: 'invoice',
+        title: 'Invoice #${item.invoiceNumber}',
+        amount: 0, // Invoices don't have a single amount field easily accessible without items, or we can add it to Invoice model
+        timestamp: item.createdAt ?? DateTime.now(),
+      );
+    }
+    return ActivityFeedItem(
+      type: 'unknown',
+      title: 'Unknown Activity',
+      timestamp: DateTime.now(),
+    );
+  }).toList();
 });
+
 
 /// Activity feed item model
 class ActivityFeedItem {
-  final String type; // 'payment', 'invoice', 'enrollment'
+  final String type; // 'payment', 'invoice'
   final String title;
   final int? amount; // in cents
   final DateTime timestamp;
@@ -87,26 +89,9 @@ class ActivityFeedItem {
     required this.timestamp,
   });
 
-  String get timeAgo {
-    final now = DateTime.now();
-    final difference = now.difference(timestamp);
-
-    if (difference.inMinutes < 1) {
-      return 'just now';
-    } else if (difference.inMinutes < 60) {
-      return '${difference.inMinutes}m ago';
-    } else if (difference.inHours < 24) {
-      return '${difference.inHours}h ago';
-    } else if (difference.inDays < 7) {
-      return '${difference.inDays}d ago';
-    } else {
-      return '${(difference.inDays / 7).floor()}w ago';
-    }
-  }
-
   String get formattedAmount {
     if (amount == null) return '';
     final dollars = amount! / 100;
-    return '\$$dollars';
+    return '\$${dollars.toStringAsFixed(2)}';
   }
 }

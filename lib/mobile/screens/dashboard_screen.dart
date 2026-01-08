@@ -1,5 +1,6 @@
 import 'package:fees_up/constants/app_colors.dart';
 import 'package:fees_up/data/providers/dashboard_providers.dart';
+import 'package:fees_up/data/providers/core_providers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -12,6 +13,7 @@ class DashboardScreen extends ConsumerWidget {
     final totalOutstanding = ref.watch(totalOutstandingProvider);
     final pendingInvoices = ref.watch(pendingInvoicesCountProvider);
     final recentActivity = ref.watch(recentActivityProvider);
+    final userProfileAsync = ref.watch(currentUserProfileProvider);
 
     return Scaffold(
       backgroundColor: AppColors.backgroundBlack,
@@ -60,18 +62,34 @@ class DashboardScreen extends ConsumerWidget {
                     ),
                     const SizedBox(width: 12),
                     // Welcome Text
-                    const Expanded(
+                    Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            'Welcome back,',
-                            style: TextStyle(
-                              color: AppColors.textGrey,
-                              fontSize: 14,
+                          userProfileAsync.when(
+                            data: (profile) => Text(
+                              'Welcome back, ${profile?.firstName ?? 'Admin'}',
+                              style: const TextStyle(
+                                color: AppColors.textGrey,
+                                fontSize: 14,
+                              ),
+                            ),
+                            loading: () => const Text(
+                              'Welcome back...',
+                              style: TextStyle(
+                                color: AppColors.textGrey,
+                                fontSize: 14,
+                              ),
+                            ),
+                            error: (e, s) => const Text(
+                              'Welcome back',
+                              style: TextStyle(
+                                color: AppColors.textGrey,
+                                fontSize: 14,
+                              ),
                             ),
                           ),
-                          Text(
+                          const Text(
                             'Finance Dashboard',
                             style: TextStyle(
                               color: AppColors.textWhite,
