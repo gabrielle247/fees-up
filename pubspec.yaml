@@ -18,11 +18,12 @@ dependencies:
   responsive_framework: ^1.5.1
   equatable: ^2.0.7
 
-  # --- 2. Backend & Database (Supabase + PowerSync) ---
-  supabase_flutter: ^2.6.0
+  # --- 2. Backend & Database (Supabase + PowerSync + Isar) ---
+  supabase_flutter: ^2.12.0
   powersync: ^1.8.0
   sqflite: ^2.3.3
   sqflite_common_ffi: ^2.3.3
+  isar: ^3.1.0+1
   
   # --- 3. UI, Assets & Styling ---
   google_fonts: ^6.2.1
@@ -35,7 +36,7 @@ dependencies:
 
   # --- 4. Device Services & Storage ---
   shared_preferences: ^2.3.2
-  path_provider: ^2.1.4
+  path_provider: ^2.1.5
   permission_handler: ^11.3.1
   image_picker: ^1.1.2
   connectivity_plus: ^6.0.5
@@ -44,7 +45,7 @@ dependencies:
 
   # --- 5. Utilities ---
   intl: ^0.20.2
-  uuid: ^4.4.0
+  uuid: ^4.5.2
   path: ^1.9.0
   logging: ^1.2.0
   pdf: ^3.11.3
@@ -62,15 +63,23 @@ dependencies:
   windows_printer: ^0.2.1
   ticket_widget: ^1.0.2
   elevated_ticket_widget: ^0.0.4
+  electricsql: ^0.7.0
+  flutter_secure_storage: ^10.0.0
+  cryptography: ^2.9.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  build_runner: ^2.4.11
+  build_runner: ^2.4.13
   flutter_lints: ^4.0.0
+  isar_generator: 3.1.0+1
+  analyzer: ^5.13.0
 
 flutter:
   uses-material-design: true
   assets:
     - assets/avatar_placeholder.png
     - assets/background.svg
+    - assets/images/
+    - assets/icons/
+    - assets/illustrations/
