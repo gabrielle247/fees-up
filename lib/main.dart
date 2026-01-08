@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'config/router.dart';
 import 'constants/app_theme.dart';
+import 'core/init/app_initializer.dart';
 
-void main() {
+void main() async {
+  await AppInitializer.init();
   runApp(const ProviderScope(child: FeesUpApp()));
 }
 
