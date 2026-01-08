@@ -8,31 +8,18 @@
 
 #include <app_links/app_links_plugin_c_api.h>
 #include <connectivity_plus/connectivity_plus_windows_plugin.h>
-#include <file_selector_windows/file_selector_windows.h>
-#include <flutter_secure_storage_windows/flutter_secure_storage_windows_plugin.h>
-#include <local_auth_windows/local_auth_plugin.h>
-#include <permission_handler_windows/permission_handler_windows_plugin.h>
 #include <powersync_flutter_libs/powersync_flutter_libs_plugin.h>
 #include <printing/printing_plugin.h>
 #include <screen_retriever_windows/screen_retriever_windows_plugin_c_api.h>
 #include <sqlite3_flutter_libs/sqlite3_flutter_libs_plugin.h>
 #include <url_launcher_windows/url_launcher_windows.h>
 #include <window_manager/window_manager_plugin.h>
-#include <windows_printer/windows_printer_plugin_c_api.h>
 
 void RegisterPlugins(flutter::PluginRegistry* registry) {
   AppLinksPluginCApiRegisterWithRegistrar(
       registry->GetRegistrarForPlugin("AppLinksPluginCApi"));
   ConnectivityPlusWindowsPluginRegisterWithRegistrar(
       registry->GetRegistrarForPlugin("ConnectivityPlusWindowsPlugin"));
-  FileSelectorWindowsRegisterWithRegistrar(
-      registry->GetRegistrarForPlugin("FileSelectorWindows"));
-  FlutterSecureStorageWindowsPluginRegisterWithRegistrar(
-      registry->GetRegistrarForPlugin("FlutterSecureStorageWindowsPlugin"));
-  LocalAuthPluginRegisterWithRegistrar(
-      registry->GetRegistrarForPlugin("LocalAuthPlugin"));
-  PermissionHandlerWindowsPluginRegisterWithRegistrar(
-      registry->GetRegistrarForPlugin("PermissionHandlerWindowsPlugin"));
   PowersyncFlutterLibsPluginRegisterWithRegistrar(
       registry->GetRegistrarForPlugin("PowersyncFlutterLibsPlugin"));
   PrintingPluginRegisterWithRegistrar(
@@ -45,6 +32,4 @@ void RegisterPlugins(flutter::PluginRegistry* registry) {
       registry->GetRegistrarForPlugin("UrlLauncherWindows"));
   WindowManagerPluginRegisterWithRegistrar(
       registry->GetRegistrarForPlugin("WindowManagerPlugin"));
-  WindowsPrinterPluginCApiRegisterWithRegistrar(
-      registry->GetRegistrarForPlugin("WindowsPrinterPluginCApi"));
 }
