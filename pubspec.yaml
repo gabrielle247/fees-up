@@ -34,38 +34,27 @@ dependencies:
   fl_chart: ^0.68.0
   cupertino_icons: ^1.0.8
 
-  # --- 4. Device Services & Storage ---
-  shared_preferences: ^2.3.2
-  path_provider: ^2.1.5
-  permission_handler: ^11.3.1
-  image_picker: ^1.1.2
-  connectivity_plus: ^6.0.5
-  internet_connection_checker: ^1.0.0+1
-  local_auth: ^3.0.0
-
-  # --- 5. Utilities ---
+  # --- 4. Utilities ---
   intl: ^0.20.2
   uuid: ^4.5.2
   path: ^1.9.0
   logging: ^1.2.0
   pdf: ^3.11.3
   google_nav_bar: ^5.0.7
-  local_auth_android: ^2.0.4
-  local_auth_darwin: ^2.0.1
 
-  #Additional Libs
-  dotted_border: ^3.1.0
+  # --- 5. Desktop & Pure Dart Utils ---
   window_manager: ^0.5.1
-  encrypt: ^5.0.3
-  device_info_plus: ^12.3.0
+  cryptography: ^2.9.0
   json2csv_dart: ^1.0.1
   printing: ^5.14.2
-  windows_printer: ^0.2.1
   ticket_widget: ^1.0.2
   elevated_ticket_widget: ^0.0.4
-  electricsql: ^0.7.0
-  flutter_secure_storage: ^10.0.0
-  cryptography: ^2.9.0
+
+  # Additional Libs (Keep only if truly needed, removing unused platform deps)
+  dotted_border: ^3.1.0
+  connectivity_plus: ^6.0.5
+  internet_connection_checker: ^1.0.0+1
+  # Removed: path_provider, flutter_secure_storage, local_auth*, device_info_plus, windows_printer, electricsql
 
 dev_dependencies:
   flutter_test:
