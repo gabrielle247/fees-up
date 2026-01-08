@@ -1,4 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:isar/isar.dart';
+
+import '../models/finance.dart';
+import '../models/people.dart';
+import 'core_providers.dart';
 
 /// Provides total count of enrolled learners
 final learnerCountProvider = FutureProvider<int>((ref) async {
@@ -27,34 +32,84 @@ final totalCashCollectedProvider = FutureProvider<int>((ref) async {
 /// Provides recent activity feed (payments + invoices)
 final recentActivityProvider =
     FutureProvider<List<ActivityFeedItem>>((ref) async {
-  // TODO: Connect to IsarService once DB is initialized
-  final now = DateTime.now();
-  return [
-    ActivityFeedItem(
-      type: 'payment',
-      title: 'Tuition Payment from John Doe',
-      amount: 50000,
-      timestamp: DateTime(now.year, now.month, now.day, 10, 23),
-    ),
-    ActivityFeedItem(
-      type: 'invoice',
-      title: 'Term 1 Invoice for Grade 5A',
-      amount: 50000,
-      timestamp: DateTime(now.year, now.month, now.day - 1, 16, 15),
-    ),
-    ActivityFeedItem(
-      type: 'payment',
-      title: 'Sports Fee from Sarah Smith',
-      amount: 4500,
-      timestamp: DateTime(now.year, now.month, now.day - 1, 14, 30),
-    ),
-    ActivityFeedItem(
-      type: 'invoice',
-      title: 'Bus Levy for Route 4',
-      amount: 12000,
-      timestamp: DateTime(now.year, 3, 12, 9, 0),
-    ),
-  ];
+  final isar = await ref.watch(isarInstanceProvider.future);
+
+  // 1. Fetch recent payments (limit 5)
+  final payments = await isar.payments
+      .where()
+      .sortByReceivedAtDesc()
+      .limit(5)
+      .findAll();
+
+  // 2. Fetch recent invoices (limit 5)
+  final invoices = await isar.invoices
+      .where()
+      .sortByCreatedAtDesc()
+      .limit(5)
+      .findAll();
+
+  // 3. Combine and sort
+  final allItems = <dynamic>[...payments, ...invoices];
+  allItems.sort((a, b) {
+    DateTime dateA;
+    if (a is Payment) {
+      dateA = a.receivedAt;
+    } else {
+      dateA = (a as Invoice).createdAt ?? DateTime(2000);
+    }
+
+    DateTime dateB;
+    if (b is Payment) {
+      dateB = b.receivedAt;
+    } else {
+      dateB = (b as Invoice).createdAt ?? DateTime(2000);
+    }
+
+    return dateB.compareTo(dateA); // Descending
+  });
+
+  // 4. Take top 5
+  final topItems = allItems.take(5).toList();
+
+  final feedItems = <ActivityFeedItem>[];
+
+  for (final item in topItems) {
+    if (item is Payment) {
+      // Lookup Student
+      final student =
+          await isar.students.filter().idEqualTo(item.studentId).findFirst();
+      final studentName = student?.fullName ?? 'Unknown Student';
+
+      feedItems.add(ActivityFeedItem(
+        type: 'payment',
+        title: 'Payment from $studentName',
+        amount: item.amount,
+        timestamp: item.receivedAt,
+      ));
+    } else if (item is Invoice) {
+      // Lookup Student
+      final student =
+          await isar.students.filter().idEqualTo(item.studentId).findFirst();
+      final studentName = student?.fullName ?? 'Unknown Student';
+
+      // Calculate total amount for invoice
+      final invoiceItems = await isar.invoiceItems
+          .filter()
+          .invoiceIdEqualTo(item.id)
+          .findAll();
+      final totalAmount = invoiceItems.fold<int>(
+          0, (sum, invItem) => sum + invItem.amount);
+
+      feedItems.add(ActivityFeedItem(
+        type: 'invoice',
+        title: 'Invoice #${item.invoiceNumber} for $studentName',
+        amount: totalAmount,
+        timestamp: item.createdAt ?? DateTime.now(),
+      ));
+    }
+  }
+
+  return feedItems;
 });
 
 /// Provides pending invoices count
