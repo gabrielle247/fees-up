@@ -1,4 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:isar/isar.dart';
+import '../services/isar_service.dart';
+import '../models/finance.dart';
+import '../models/saas.dart';
+import 'core_providers.dart';
+import 'school_providers.dart';
 
 /// Provides total count of enrolled learners
 final learnerCountProvider = FutureProvider<int>((ref) async {
@@ -14,8 +20,35 @@ final totalOutstandingProvider = FutureProvider<int>((ref) async {
 
 /// Provides total collected cash (payments received today)
 final totalCashTodayProvider = FutureProvider<int>((ref) async {
-  // TODO: Connect to IsarService once DB is initialized
-  return 1542000; // in cents = $15,420
+  // Get the initialized Isar instance
+  final isar = await ref.watch(isarInstanceProvider);
+
+  // Get the current school to ensure we filter by tenant (RLS)
+  final currentSchool = await ref.watch(currentSchoolProvider.future);
+
+  // If no school exists, we cannot calculate revenue. Return 0.
+  // The UI should handle prompting the user to create a school based on currentSchoolProvider.
+  if (currentSchool == null) {
+    return 0;
+  }
+
+  // Calculate start and end of today (Local Time)
+  final now = DateTime.now();
+  final startOfDay = DateTime(now.year, now.month, now.day);
+  final endOfDay = startOfDay.add(const Duration(days: 1));
+
+  // Query payments:
+  // 1. Filter by schoolId (RLS/Tenant)
+  // 2. Filter by receivedAt range (Today)
+  // 3. Sum the 'amount' field
+  final totalCents = await isar.payments
+      .filter()
+      .schoolIdEqualTo(currentSchool.id)
+      .receivedAtBetween(startOfDay, endOfDay)
+      .amountProperty()
+      .sum();
+
+  return totalCents;
 });
 
 /// Provides total collected cash (all time)
