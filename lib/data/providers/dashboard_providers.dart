@@ -1,7 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:isar/isar.dart';
-import '../models/finance.dart';
-import '../models/people.dart';
+import 'package:drift/drift.dart' hide Column;
+import '../database/drift_database.dart';
 import 'core_providers.dart';
 import 'school_providers.dart';
 import 'student_providers.dart';
@@ -11,79 +10,82 @@ final learnerCountProvider = FutureProvider<int>((ref) async {
   final currentSchool = await ref.watch(currentSchoolProvider.future);
   if (currentSchool == null) return 0;
 
-  final repo = await ref.watch(studentRepositoryProvider);
+  final repo = ref.watch(studentRepositoryProvider);
   return repo.countActive(currentSchool.id);
 });
 
 /// Provides total outstanding fees (owes)
 /// Calculated as Sum(Ledger DEBITs) - Sum(Ledger CREDITs)
 final totalOutstandingProvider = FutureProvider<int>((ref) async {
-  final isar = await ref.watch(isarInstanceProvider);
-  final currentSchool = await ref.watch(currentSchoolProvider.future);
-  if (currentSchool == null) return 0;
+  final db = ref.watch(driftDatabaseProvider);
+  final school = await ref.watch(currentSchoolProvider.future);
+  if (school == null) return 0;
 
-  final totalDebits = await isar.ledgerEntrys
-      .filter()
-      .schoolIdEqualTo(currentSchool.id)
-      .typeEqualTo('DEBIT')
-      .amountProperty()
-      .sum();
+  final debits = await (db.selectOnly(db.ledgerEntries)
+        ..addColumns([db.ledgerEntries.amount.sum()])
+        ..where(db.ledgerEntries.schoolId.equals(school.id) &
+            db.ledgerEntries.type.equals('DEBIT')))
+      .getSingle();
 
-  final totalCredits = await isar.ledgerEntrys
-      .filter()
-      .schoolIdEqualTo(currentSchool.id)
-      .typeEqualTo('CREDIT')
-      .amountProperty()
-      .sum();
+  final credits = await (db.selectOnly(db.ledgerEntries)
+        ..addColumns([db.ledgerEntries.amount.sum()])
+        ..where(db.ledgerEntries.schoolId.equals(school.id) &
+            db.ledgerEntries.type.equals('CREDIT')))
+      .getSingle();
+
+  final totalDebits = debits.read(db.ledgerEntries.amount.sum()) ?? 0;
+  final totalCredits = credits.read(db.ledgerEntries.amount.sum()) ?? 0;
 
   return totalDebits - totalCredits;
 });
 
 /// Provides total collected cash (payments received today)
 final totalCashTodayProvider = FutureProvider<int>((ref) async {
-  final isar = await ref.watch(isarInstanceProvider);
-  final currentSchool = await ref.watch(currentSchoolProvider.future);
-  if (currentSchool == null) return 0;
+  final db = ref.watch(driftDatabaseProvider);
+  final school = await ref.watch(currentSchoolProvider.future);
+  if (school == null) return 0;
 
   final now = DateTime.now();
   final startOfDay = DateTime(now.year, now.month, now.day);
   final endOfDay = startOfDay.add(const Duration(days: 1));
 
-  return await isar.payments
-      .filter()
-      .schoolIdEqualTo(currentSchool.id)
-      .receivedAtBetween(startOfDay, endOfDay)
-      .amountProperty()
-      .sum();
+  final result = await (db.selectOnly(db.payments)
+        ..addColumns([db.payments.amount.sum()])
+        ..where(db.payments.schoolId.equals(school.id) &
+            db.payments.receivedAt.isBiggerOrEqualValue(startOfDay) &
+            db.payments.receivedAt.isSmallerThanValue(endOfDay)))
+      .getSingle();
+
+  return result.read(db.payments.amount.sum()) ?? 0;
 });
 
 /// Provides revenue growth percentage (This Month vs Last Month)
 final revenueGrowthProvider = FutureProvider<double>((ref) async {
-  final isar = await ref.watch(isarInstanceProvider);
-  final currentSchool = await ref.watch(currentSchoolProvider.future);
-  if (currentSchool == null) return 0.0;
+  final db = ref.watch(driftDatabaseProvider);
+  final school = await ref.watch(currentSchoolProvider.future);
+  if (school == null) return 0.0;
 
   final now = DateTime.now();
   final startOfThisMonth = DateTime(now.year, now.month, 1);
   final startOfNextMonth = DateTime(now.year, now.month + 1, 1);
-
   final startOfLastMonth = DateTime(now.year, now.month - 1, 1);
-  final endOfLastMonth =
-      startOfThisMonth; // Last month ends when this month starts
 
-  final thisMonthRevenue = await isar.payments
-      .filter()
-      .schoolIdEqualTo(currentSchool.id)
-      .receivedAtBetween(startOfThisMonth, startOfNextMonth)
-      .amountProperty()
-      .sum();
+  final thisMonth = await (db.selectOnly(db.payments)
+        ..addColumns([db.payments.amount.sum()])
+        ..where(db.payments.schoolId.equals(school.id) &
+            db.payments.receivedAt.isBiggerOrEqualValue(startOfThisMonth) &
+            db.payments.receivedAt.isSmallerThanValue(startOfNextMonth)))
+      .getSingle();
 
-  final lastMonthRevenue = await isar.payments
-      .filter()
-      .schoolIdEqualTo(currentSchool.id)
-      .receivedAtBetween(startOfLastMonth, endOfLastMonth)
-      .amountProperty()
-      .sum();
+  final lastMonth = await (db.selectOnly(db.payments)
+        ..addColumns([db.payments.amount.sum()])
+        ..where(db.payments.schoolId.equals(school.id) &
+            db.payments.receivedAt.isBiggerOrEqualValue(startOfLastMonth) &
+            db.payments.receivedAt.isSmallerThanValue(startOfThisMonth)))
+      .getSingle();
+
+  final thisMonthRevenue = thisMonth.read(db.payments.amount.sum()) ?? 0;
+  final lastMonthRevenue = lastMonth.read(db.payments.amount.sum()) ?? 0;
 
   if (lastMonthRevenue == 0) {
     return thisMonthRevenue > 0 ? 100.0 : 0.0;
@@ -94,35 +96,37 @@ final revenueGrowthProvider = FutureProvider<double>((ref) async {
 
 /// Provides total collected cash (all time)
 final totalCashCollectedProvider = FutureProvider<int>((ref) async {
-  final isar = await ref.watch(isarInstanceProvider);
-  final currentSchool = await ref.watch(currentSchoolProvider.future);
-  if (currentSchool == null) return 0;
+  final db = ref.watch(driftDatabaseProvider);
+  final school = await ref.watch(currentSchoolProvider.future);
+  if (school == null) return 0;
 
-  return await isar.payments
-      .filter()
-      .schoolIdEqualTo(currentSchool.id)
-      .amountProperty()
-      .sum();
+  final result = await (db.selectOnly(db.payments)
+        ..addColumns([db.payments.amount.sum()])
+        ..where(db.payments.schoolId.equals(school.id)))
+      .getSingle();
+
+  return result.read(db.payments.amount.sum()) ?? 0;
 });
 
 /// Provides student balance (DEBIT - CREDIT from ledger)
 final studentBalanceProvider =
     FutureProvider.family<int, String>((ref, studentId) async {
-  final isar = await ref.watch(isarInstanceProvider);
+  final db = ref.watch(driftDatabaseProvider);
 
-  final totalDebits = await isar.ledgerEntrys
-      .filter()
-      .studentIdEqualTo(studentId)
-      .typeEqualTo('DEBIT')
-      .amountProperty()
-      .sum();
+  final debits = await (db.selectOnly(db.ledgerEntries)
+        ..addColumns([db.ledgerEntries.amount.sum()])
+        ..where(db.ledgerEntries.studentId.equals(studentId) &
+            db.ledgerEntries.type.equals('DEBIT')))
+      .getSingle();
 
-  final totalCredits = await isar.ledgerEntrys
-      .filter()
-      .studentIdEqualTo(studentId)
-      .typeEqualTo('CREDIT')
-      .amountProperty()
-      .sum();
+  final credits = await (db.selectOnly(db.ledgerEntries)
+        ..addColumns([db.ledgerEntries.amount.sum()])
+        ..where(db.ledgerEntries.studentId.equals(studentId) &
+            db.ledgerEntries.type.equals('CREDIT')))
+      .getSingle();
+
+  final totalDebits = debits.read(db.ledgerEntries.amount.sum()) ?? 0;
+  final totalCredits = credits.read(db.ledgerEntries.amount.sum()) ?? 0;
 
   return totalDebits - totalCredits;
 });
@@ -131,31 +135,31 @@ final studentBalanceProvider =
 final recentActivityProvider =
     FutureProvider<List<ActivityFeedItem>>((ref) async {
   try {
-    final isar = await ref.watch(isarInstanceProvider);
+    final db = ref.watch(driftDatabaseProvider);
     final currentSchool = await ref.watch(currentSchoolProvider.future);
     if (currentSchool == null) return [];
 
     // Fetch recent payments
-    final payments = await isar.payments
-        .filter()
-        .schoolIdEqualTo(currentSchool.id)
-        .sortByReceivedAtDesc()
-        .limit(5)
-        .findAll();
+    final payments = await (db.select(db.payments)
+          ..where((p) => p.schoolId.equals(currentSchool.id))
+          ..orderBy([(p) => OrderingTerm.desc(p.receivedAt)])
+          ..limit(5))
+        .get();
 
     // Fetch recent invoices
-    final invoices = await isar.invoices
-        .filter()
-        .schoolIdEqualTo(currentSchool.id)
-        .sortByCreatedAtDesc()
-        .limit(5)
-        .findAll();
+    final invoices = await (db.select(db.invoices)
+          ..where((i) => i.schoolId.equals(currentSchool.id))
+          ..orderBy([(i) => OrderingTerm.desc(i.createdAt)])
+          ..limit(5))
+        .get();
 
     // Helper to fetch student name safely
     Future<String> getStudentName(String studentId) async {
-      final student =
-          await isar.students.filter().idEqualTo(studentId).findFirst();
-      return student?.fullName ?? 'Unknown Student';
+      final student = await (db.select(db.students)
+            ..where((s) => s.id.equals(studentId)))
+          .getSingleOrNull();
+      if (student == null) return 'Unknown Student';
+      return '${student.firstName} ${student.lastName}'.trim();
     }
 
     // Convert Payments to Items
@@ -169,7 +173,6 @@ final recentActivityProvider =
           timestamp: p.receivedAt,
         );
       } catch (e) {
-        // Skip malformed items
         return null;
       }
     }));
@@ -179,11 +182,13 @@ final recentActivityProvider =
       try {
         final name = await getStudentName(inv.studentId);
 
-        final totalAmount = await isar.invoiceItems
-            .filter()
-            .invoiceIdEqualTo(inv.id)
-            .amountProperty()
-            .sum();
+        final totalAmountResult = await (db.selectOnly(db.invoiceItems)
+              ..addColumns([db.invoiceItems.amount.sum()])
+              ..where(db.invoiceItems.invoiceId.equals(inv.id)))
+            .getSingle();
+
+        final totalAmount =
+            totalAmountResult.read(db.invoiceItems.amount.sum()) ?? 0;
 
         return ActivityFeedItem(
           type: 'invoice',
@@ -205,36 +210,35 @@ final recentActivityProvider =
 
     return allItems.take(10).toList();
   } catch (e) {
-    // Return empty list on global failure instead of crashing
     return [];
   }
 });
 
 /// Provides pending invoices count
 final pendingInvoicesCountProvider = FutureProvider<int>((ref) async {
-  final isar = await ref.watch(isarInstanceProvider);
+  final db = ref.watch(driftDatabaseProvider);
   final currentSchool = await ref.watch(currentSchoolProvider.future);
   if (currentSchool == null) return 0;
 
-  return await isar.invoices
-      .filter()
-      .schoolIdEqualTo(currentSchool.id)
-      .not()
-      .statusEqualTo('PAID')
-      .count();
+  final count = await (db.selectOnly(db.invoices, distinct: true)
+        ..addColumns([db.invoices.id.count()])
+        ..where(db.invoices.schoolId.equals(currentSchool.id) &
+            db.invoices.status.equals('PAID').not()))
+      .getSingle();
+
+  return count.read(db.invoices.id.count()) ?? 0;
 });
 
 /// Provides learners by form/class
 final learnersByFormProvider = FutureProvider<Map<String, int>>((ref) async {
-  final isar = await ref.watch(isarInstanceProvider);
+  final db = ref.watch(driftDatabaseProvider);
   final currentSchool = await ref.watch(currentSchoolProvider.future);
   if (currentSchool == null) return {};
 
-  final enrollments = await isar.enrollments
-      .filter()
-      .schoolIdEqualTo(currentSchool.id)
-      .isActiveEqualTo(true)
-      .findAll();
+  final enrollments = await (db.select(db.enrollments)
+        ..where((e) => e.schoolId.equals(currentSchool.id))
+        ..where((e) => e.isActive.equals(true)))
+      .get();
 
   final Map<String, int> distribution = {};
 

@@ -1,5 +1,6 @@
 import 'package:fees_up/constants/app_colors.dart';
 import 'package:fees_up/data/providers/dashboard_providers.dart';
+import 'package:fees_up/data/providers/core_providers.dart';
 import 'package:fees_up/data/providers/school_providers.dart';
 import 'package:fees_up/mobile/widgets/school_creation_dialog.dart';
 import 'package:flutter/material.dart';
@@ -64,7 +65,8 @@ class _NoSchoolState extends ConsumerWidget {
             ElevatedButton(
               onPressed: () async {
                 // Trigger Seeder
-                await SeederService().seedExampleData();
+                final db = ref.read(driftDatabaseProvider);
+                await SeederService(db).seedExampleData();
                 // Refresh provider
                 ref.invalidate(currentSchoolProvider);
               },

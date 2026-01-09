@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:drift/drift.dart' as drift;
 import 'package:fees_up/constants/app_colors.dart';
-import 'package:fees_up/data/models/saas.dart';
+import 'package:fees_up/data/database/drift_database.dart';
 import 'package:fees_up/data/providers/core_providers.dart';
 import 'package:uuid/uuid.dart';
 
@@ -32,22 +33,22 @@ class _SchoolCreationDialogState extends ConsumerState<SchoolCreationDialog> {
     setState(() => _isCreating = true);
 
     try {
-      final isar = await ref.read(isarInstanceProvider);
-      final school = School()
-        ..id = const Uuid().v4()
-        ..name = _nameController.text.trim()
-        ..subdomain = _subdomainController.text.trim().toLowerCase()
-        ..createdAt = DateTime.now();
+      final db = ref.read(driftDatabaseProvider);
+      final school = SchoolsCompanion(
+        id: drift.Value(const Uuid().v4()),
+        name: drift.Value(_nameController.text.trim()),
+        subdomain: drift.Value(_subdomainController.text.trim().toLowerCase()),
+        createdAt: drift.Value(DateTime.now()),
+      );
 
-      await isar.writeTxn(() async {
-        await isar.schools.put(school);
-      });
+      await db.into(db.schools).insert(school);
 
       if (mounted) {
         Navigator.of(context).pop(true);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('School "${school.name}" created successfully!'),
+            content: Text(
+                'School "${_nameController.text.trim()}" created successfully!'),
             backgroundColor: AppColors.successGreen,
           ),
         );

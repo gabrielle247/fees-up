@@ -84,7 +84,8 @@ class LearnersScreen extends ConsumerWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                student.fullName,
+                                '${student.firstName} ${student.lastName}'
+                                    .trim(),
                                 style: const TextStyle(
                                   color: AppColors.textWhite,
                                   fontWeight: FontWeight.bold,

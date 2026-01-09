@@ -1,56 +1,40 @@
-import 'package:isar/isar.dart';
-import '../models/people.dart';
+import '../database/drift_database.dart';
 
 class StudentRepository {
-  final Isar _isar;
+  final AppDatabase _db;
 
-  StudentRepository(this._isar);
+  StudentRepository(this._db);
 
   /// Get all students for a specific school
   Future<List<Student>> getAll(String schoolId) async {
-    return await _isar.students
-        .filter()
-        .schoolIdEqualTo(schoolId)
-        .findAll();
+    return await (_db.select(_db.students)
+          ..where((s) => s.schoolId.equals(schoolId)))
+        .get();
   }
 
   /// Get a single student by ID
   Future<Student?> getById(String id) async {
-    return await _isar.students
-        .filter()
-        .idEqualTo(id)
-        .findFirst();
+    return await (_db.select(_db.students)..where((s) => s.id.equals(id)))
+        .getSingleOrNull();
   }
 
   /// Add or update a student
   Future<void> save(Student student) async {
-    await _isar.writeTxn(() async {
-      await _isar.students.put(student);
-    });
+    await _db.into(_db.students).insertOnConflictUpdate(student);
   }
 
   /// Delete a student by ID
   Future<void> delete(String id) async {
-    await _isar.writeTxn(() async {
-      // Isar delete requires the integer ID (isarId), not the string UUID.
-      // So we first find the object to get the isarId.
-      final student = await _isar.students
-          .filter()
-          .idEqualTo(id)
-          .findFirst();
-
-      if (student != null) {
-        await _isar.students.delete(student.isarId);
-      }
-    });
+    await (_db.delete(_db.students)..where((s) => s.id.equals(id))).go();
   }
 
   /// Get active students count for dashboard
   Future<int> countActive(String schoolId) async {
-    return await _isar.students
-        .filter()
-        .schoolIdEqualTo(schoolId)
-        .statusEqualTo('ACTIVE')
-        .count();
+    final students = await (_db.select(_db.students)
+          ..where((s) => s.schoolId.equals(schoolId))
+          ..where((s) => s.status.equals('ACTIVE')))
+        .get();
+
+    return students.length;
   }
 }

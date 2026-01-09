@@ -1,9 +1,17 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:isar/isar.dart';
-import '../services/isar_service.dart';
+import 'package:fees_up/data/database/drift_database.dart';
 
-/// Provides the initialized Isar instance.
-/// Throws an error if IsarService hasn't been initialized yet.
-final isarInstanceProvider = Provider<Future<Isar>>((ref) async {
-  return IsarService().db;
+/// Provides the Drift database instance
+final driftDatabaseProvider = Provider<AppDatabase>((ref) {
+  final db = AppDatabase();
+  ref.onDispose(() => db.close());
+  return db;
+});
+
+/// Provides the current school ID from the first school in the database
+final currentSchoolIdProvider = FutureProvider<String>((ref) async {
+  final db = ref.watch(driftDatabaseProvider);
+  final schools = await db.select(db.schools).get();
+  if (schools.isEmpty) throw Exception('No school found');
+  return schools.first.id;
 });
