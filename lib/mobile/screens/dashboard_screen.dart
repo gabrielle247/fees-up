@@ -1,6 +1,7 @@
 import 'package:fees_up/constants/app_colors.dart';
 import 'package:fees_up/data/providers/dashboard_providers.dart';
 import 'package:fees_up/data/providers/school_providers.dart';
+import 'package:fees_up/mobile/widgets/school_creation_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fees_up/data/services/seeder_service.dart';
@@ -42,7 +43,8 @@ class _NoSchoolState extends ConsumerWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.school_outlined, size: 80, color: AppColors.textGrey),
+            const Icon(Icons.school_outlined,
+                size: 80, color: AppColors.textGrey),
             const SizedBox(height: 24),
             const Text(
               "Welcome to Fees Up",
@@ -61,22 +63,28 @@ class _NoSchoolState extends ConsumerWidget {
             const SizedBox(height: 32),
             ElevatedButton(
               onPressed: () async {
-                 // Trigger Seeder
-                 await SeederService().seedExampleData();
-                 // Refresh provider
-                 ref.invalidate(currentSchoolProvider);
+                // Trigger Seeder
+                await SeederService().seedExampleData();
+                // Refresh provider
+                ref.invalidate(currentSchoolProvider);
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primaryBlue,
-                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
               ),
               child: const Text("Load Example Data (Demo)"),
             ),
-             const SizedBox(height: 16),
-             OutlinedButton(
-              onPressed: () {
-                // TODO: Show Create School Dialog
-                // For now, seeding is the primary way to unblock the user as requested
+            const SizedBox(height: 16),
+            OutlinedButton(
+              onPressed: () async {
+                final result = await showDialog<bool>(
+                  context: context,
+                  builder: (context) => const SchoolCreationDialog(),
+                );
+                if (result == true && context.mounted) {
+                  ref.invalidate(currentSchoolProvider);
+                }
               },
               child: const Text("Create New School"),
             ),
@@ -361,8 +369,7 @@ class _DashboardContent extends ConsumerWidget {
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
-                            padding:
-                                const EdgeInsets.symmetric(vertical: 14),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
                           ),
                           child: const Text(
                             'View List',
@@ -392,8 +399,7 @@ class _DashboardContent extends ConsumerWidget {
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
-                            padding:
-                                const EdgeInsets.symmetric(vertical: 14),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
                           ),
                         ),
                       ),
@@ -469,8 +475,7 @@ class _DashboardContent extends ConsumerWidget {
                 physics: const NeverScrollableScrollPhysics(),
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 itemCount: activities.length,
-                separatorBuilder: (context, index) =>
-                    const SizedBox(height: 4),
+                separatorBuilder: (context, index) => const SizedBox(height: 4),
                 itemBuilder: (context, index) => _TransactionItem(
                   activity: activities[index],
                 ),
@@ -800,8 +805,18 @@ class _TransactionItem extends StatelessWidget {
 
   String _formatDate(DateTime dt) {
     final months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec'
     ];
     return '${months[dt.month - 1]} ${dt.day}';
   }

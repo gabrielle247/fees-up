@@ -1,10 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:isar/isar.dart';
-import '../services/isar_service.dart';
 import '../models/finance.dart';
 import '../models/people.dart';
-import '../models/saas.dart';
-import '../repositories/student_repository.dart';
 import 'core_providers.dart';
 import 'school_providers.dart';
 import 'student_providers.dart';
@@ -71,7 +68,8 @@ final revenueGrowthProvider = FutureProvider<double>((ref) async {
   final startOfNextMonth = DateTime(now.year, now.month + 1, 1);
 
   final startOfLastMonth = DateTime(now.year, now.month - 1, 1);
-  final endOfLastMonth = startOfThisMonth; // Last month ends when this month starts
+  final endOfLastMonth =
+      startOfThisMonth; // Last month ends when this month starts
 
   final thisMonthRevenue = await isar.payments
       .filter()
@@ -94,7 +92,6 @@ final revenueGrowthProvider = FutureProvider<double>((ref) async {
   return ((thisMonthRevenue - lastMonthRevenue) / lastMonthRevenue) * 100;
 });
 
-
 /// Provides total collected cash (all time)
 final totalCashCollectedProvider = FutureProvider<int>((ref) async {
   final isar = await ref.watch(isarInstanceProvider);
@@ -108,8 +105,31 @@ final totalCashCollectedProvider = FutureProvider<int>((ref) async {
       .sum();
 });
 
+/// Provides student balance (DEBIT - CREDIT from ledger)
+final studentBalanceProvider =
+    FutureProvider.family<int, String>((ref, studentId) async {
+  final isar = await ref.watch(isarInstanceProvider);
+
+  final totalDebits = await isar.ledgerEntrys
+      .filter()
+      .studentIdEqualTo(studentId)
+      .typeEqualTo('DEBIT')
+      .amountProperty()
+      .sum();
+
+  final totalCredits = await isar.ledgerEntrys
+      .filter()
+      .studentIdEqualTo(studentId)
+      .typeEqualTo('CREDIT')
+      .amountProperty()
+      .sum();
+
+  return totalDebits - totalCredits;
+});
+
 /// Provides recent activity feed (payments + invoices)
-final recentActivityProvider = FutureProvider<List<ActivityFeedItem>>((ref) async {
+final recentActivityProvider =
+    FutureProvider<List<ActivityFeedItem>>((ref) async {
   try {
     final isar = await ref.watch(isarInstanceProvider);
     final currentSchool = await ref.watch(currentSchoolProvider.future);
@@ -133,10 +153,8 @@ final recentActivityProvider = FutureProvider<List<ActivityFeedItem>>((ref) asyn
 
     // Helper to fetch student name safely
     Future<String> getStudentName(String studentId) async {
-      final student = await isar.students
-          .filter()
-          .idEqualTo(studentId)
-          .findFirst();
+      final student =
+          await isar.students.filter().idEqualTo(studentId).findFirst();
       return student?.fullName ?? 'Unknown Student';
     }
 

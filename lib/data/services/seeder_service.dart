@@ -1,18 +1,16 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:isar/isar.dart';
-import 'package:fees_up/data/providers/core_providers.dart';
-import 'package:fees_up/data/providers/school_providers.dart';
+import 'package:fees_up/data/services/isar_service.dart';
 import 'package:fees_up/data/models/people.dart';
 import 'package:fees_up/data/models/saas.dart';
 import 'package:fees_up/data/models/finance.dart';
-import 'package:fees_up/data/models/access.dart';
+import 'package:isar/isar.dart';
 import 'package:uuid/uuid.dart';
 
 class SeederService {
   final _uuid = const Uuid();
 
   Future<void> seedExampleData() async {
-    final isar = await IsarService().db; // Direct access or via provider if strictly needed
+    final isar = await IsarService()
+        .db; // Direct access or via provider if strictly needed
 
     // Check if school already exists (Double check)
     final existingSchool = await isar.schools.where().findFirst();
@@ -53,12 +51,13 @@ class SeederService {
           ..status = "ACTIVE"
           ..createdAt = DateTime.now(),
         Student()
-            ..id = _uuid.v4()
-            ..schoolId = schoolId
-            ..firstName = "John"
-            ..lastName = "Doe"
-            ..status = "ACTIVE"
-            ..createdAt = DateTime.now().subtract(const Duration(days: 400)), // Old student
+          ..id = _uuid.v4()
+          ..schoolId = schoolId
+          ..firstName = "John"
+          ..lastName = "Doe"
+          ..status = "ACTIVE"
+          ..createdAt =
+              DateTime.now().subtract(const Duration(days: 400)), // Old student
       ];
 
       for (var s in students) {
@@ -108,7 +107,6 @@ class SeederService {
         ..occurredAt = now.subtract(const Duration(days: 2));
       await isar.ledgerEntrys.put(ledger1);
 
-
       // Invoice for Emily (Partially Paid)
       final inv2 = Invoice()
         ..id = _uuid.v4()
@@ -120,7 +118,7 @@ class SeederService {
         ..createdAt = now.subtract(const Duration(days: 5));
       await isar.invoices.put(inv2);
 
-       final item2 = InvoiceItem()
+      final item2 = InvoiceItem()
         ..id = _uuid.v4()
         ..invoiceId = inv2.id
         ..description = "Term 1 Tuition"
@@ -169,7 +167,6 @@ class SeederService {
         ..method = "BANK"
         ..receivedAt = now.subtract(const Duration(days: 35));
       await isar.payments.put(pay2);
-
     });
   }
 }
