@@ -7,7 +7,7 @@ import '../models/saas.dart';
 import '../repositories/student_repository.dart';
 import 'core_providers.dart';
 import 'school_providers.dart';
-import 'student_providers.dart'; // Import for studentRepositoryProvider
+import 'student_providers.dart';
 
 /// Provides total count of enrolled learners
 final learnerCountProvider = FutureProvider<int>((ref) async {
@@ -25,7 +25,6 @@ final totalOutstandingProvider = FutureProvider<int>((ref) async {
   final currentSchool = await ref.watch(currentSchoolProvider.future);
   if (currentSchool == null) return 0;
 
-  // We can optimize this by doing two aggregate queries
   final totalDebits = await isar.ledgerEntrys
       .filter()
       .schoolIdEqualTo(currentSchool.id)
@@ -61,6 +60,41 @@ final totalCashTodayProvider = FutureProvider<int>((ref) async {
       .sum();
 });
 
+/// Provides revenue growth percentage (This Month vs Last Month)
+final revenueGrowthProvider = FutureProvider<double>((ref) async {
+  final isar = await ref.watch(isarInstanceProvider);
+  final currentSchool = await ref.watch(currentSchoolProvider.future);
+  if (currentSchool == null) return 0.0;
+
+  final now = DateTime.now();
+  final startOfThisMonth = DateTime(now.year, now.month, 1);
+  final startOfNextMonth = DateTime(now.year, now.month + 1, 1);
+
+  final startOfLastMonth = DateTime(now.year, now.month - 1, 1);
+  final endOfLastMonth = startOfThisMonth; // Last month ends when this month starts
+
+  final thisMonthRevenue = await isar.payments
+      .filter()
+      .schoolIdEqualTo(currentSchool.id)
+      .receivedAtBetween(startOfThisMonth, startOfNextMonth)
+      .amountProperty()
+      .sum();
+
+  final lastMonthRevenue = await isar.payments
+      .filter()
+      .schoolIdEqualTo(currentSchool.id)
+      .receivedAtBetween(startOfLastMonth, endOfLastMonth)
+      .amountProperty()
+      .sum();
+
+  if (lastMonthRevenue == 0) {
+    return thisMonthRevenue > 0 ? 100.0 : 0.0;
+  }
+
+  return ((thisMonthRevenue - lastMonthRevenue) / lastMonthRevenue) * 100;
+});
+
+
 /// Provides total collected cash (all time)
 final totalCashCollectedProvider = FutureProvider<int>((ref) async {
   final isar = await ref.watch(isarInstanceProvider);
@@ -76,73 +110,86 @@ final totalCashCollectedProvider = FutureProvider<int>((ref) async {
 
 /// Provides recent activity feed (payments + invoices)
 final recentActivityProvider = FutureProvider<List<ActivityFeedItem>>((ref) async {
-  final isar = await ref.watch(isarInstanceProvider);
-  final currentSchool = await ref.watch(currentSchoolProvider.future);
-  if (currentSchool == null) return [];
+  try {
+    final isar = await ref.watch(isarInstanceProvider);
+    final currentSchool = await ref.watch(currentSchoolProvider.future);
+    if (currentSchool == null) return [];
 
-  // Fetch recent payments
-  final payments = await isar.payments
-      .filter()
-      .schoolIdEqualTo(currentSchool.id)
-      .sortByReceivedAtDesc()
-      .limit(5)
-      .findAll();
-
-  // Fetch recent invoices
-  final invoices = await isar.invoices
-      .filter()
-      .schoolIdEqualTo(currentSchool.id)
-      .sortByCreatedAtDesc() // Assuming createdAt is close to issue date
-      .limit(5)
-      .findAll();
-
-  // Helper to fetch student name
-  Future<String> getStudentName(String studentId) async {
-    final student = await isar.students
+    // Fetch recent payments
+    final payments = await isar.payments
         .filter()
-        .idEqualTo(studentId)
-        .findFirst();
-    return student?.fullName ?? 'Unknown Student';
+        .schoolIdEqualTo(currentSchool.id)
+        .sortByReceivedAtDesc()
+        .limit(5)
+        .findAll();
+
+    // Fetch recent invoices
+    final invoices = await isar.invoices
+        .filter()
+        .schoolIdEqualTo(currentSchool.id)
+        .sortByCreatedAtDesc()
+        .limit(5)
+        .findAll();
+
+    // Helper to fetch student name safely
+    Future<String> getStudentName(String studentId) async {
+      final student = await isar.students
+          .filter()
+          .idEqualTo(studentId)
+          .findFirst();
+      return student?.fullName ?? 'Unknown Student';
+    }
+
+    // Convert Payments to Items
+    final paymentItems = await Future.wait(payments.map((p) async {
+      try {
+        final name = await getStudentName(p.studentId);
+        return ActivityFeedItem(
+          type: 'payment',
+          title: 'Payment from $name',
+          amount: p.amount,
+          timestamp: p.receivedAt,
+        );
+      } catch (e) {
+        // Skip malformed items
+        return null;
+      }
+    }));
+
+    // Convert Invoices to Items
+    final invoiceItems = await Future.wait(invoices.map((inv) async {
+      try {
+        final name = await getStudentName(inv.studentId);
+
+        final totalAmount = await isar.invoiceItems
+            .filter()
+            .invoiceIdEqualTo(inv.id)
+            .amountProperty()
+            .sum();
+
+        return ActivityFeedItem(
+          type: 'invoice',
+          title: 'Invoice for $name',
+          amount: totalAmount,
+          timestamp: inv.createdAt ?? DateTime.now(),
+        );
+      } catch (e) {
+        return null;
+      }
+    }));
+
+    // Filter nulls, combine, and sort
+    final allItems = [...paymentItems, ...invoiceItems]
+        .whereType<ActivityFeedItem>()
+        .toList();
+
+    allItems.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+
+    return allItems.take(10).toList();
+  } catch (e) {
+    // Return empty list on global failure instead of crashing
+    return [];
   }
-
-  // Convert Payments to Items
-  final paymentItems = await Future.wait(payments.map((p) async {
-    final name = await getStudentName(p.studentId);
-    return ActivityFeedItem(
-      type: 'payment',
-      title: 'Payment from $name',
-      amount: p.amount,
-      timestamp: p.receivedAt,
-    );
-  }));
-
-  // Convert Invoices to Items
-  // Note: Invoice doesn't have total amount stored directly on it in the provided model.
-  // We strictly need to sum InvoiceItems.
-  final invoiceItems = await Future.wait(invoices.map((inv) async {
-    final name = await getStudentName(inv.studentId);
-
-    // Sum items for this invoice
-    // Note: invoiceId in InvoiceItem is string ID
-    final totalAmount = await isar.invoiceItems
-        .filter()
-        .invoiceIdEqualTo(inv.id)
-        .amountProperty()
-        .sum();
-
-    return ActivityFeedItem(
-      type: 'invoice',
-      title: 'Invoice for $name',
-      amount: totalAmount,
-      timestamp: inv.createdAt ?? DateTime.now(),
-    );
-  }));
-
-  // Combine and Sort
-  final allItems = [...paymentItems, ...invoiceItems];
-  allItems.sort((a, b) => b.timestamp.compareTo(a.timestamp));
-
-  return allItems.take(10).toList();
 });
 
 /// Provides pending invoices count
@@ -151,7 +198,6 @@ final pendingInvoicesCountProvider = FutureProvider<int>((ref) async {
   final currentSchool = await ref.watch(currentSchoolProvider.future);
   if (currentSchool == null) return 0;
 
-  // Assuming pending means NOT PAID
   return await isar.invoices
       .filter()
       .schoolIdEqualTo(currentSchool.id)
