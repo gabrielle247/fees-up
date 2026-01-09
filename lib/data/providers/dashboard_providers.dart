@@ -5,7 +5,8 @@ import 'package:fees_up/data/providers/student_providers.dart';
 import 'core_providers.dart';
 
 /// Provides the FinanceRepository instance.
-final financeRepositoryProvider = Provider<Future<FinanceRepository>>((ref) async {
+final financeRepositoryProvider =
+    Provider<Future<FinanceRepository>>((ref) async {
   final isar = await ref.watch(isarInstanceProvider);
   return FinanceRepository(isar);
 });
@@ -45,7 +46,8 @@ final pendingInvoicesCountProvider = FutureProvider<int>((ref) async {
 });
 
 /// Provides recent activity feed (payments + invoices)
-final recentActivityProvider = FutureProvider<List<ActivityFeedItem>>((ref) async {
+final recentActivityProvider =
+    FutureProvider<List<ActivityFeedItem>>((ref) async {
   final schoolId = await ref.watch(currentSchoolIdProvider.future);
   final repo = await ref.watch(financeRepositoryProvider);
   final rawActivities = await repo.getRecentActivity(schoolId);
@@ -54,7 +56,8 @@ final recentActivityProvider = FutureProvider<List<ActivityFeedItem>>((ref) asyn
     if (item is Payment) {
       return ActivityFeedItem(
         type: 'payment',
-        title: 'Payment Received', // Can enhance with Student Name if we fetch it
+        title:
+            'Payment Received', // Can enhance with Student Name if we fetch it
         amount: item.amount,
         timestamp: item.receivedAt,
       );
@@ -62,7 +65,8 @@ final recentActivityProvider = FutureProvider<List<ActivityFeedItem>>((ref) asyn
       return ActivityFeedItem(
         type: 'invoice',
         title: 'Invoice #${item.invoiceNumber}',
-        amount: 0, // Invoices don't have a single amount field easily accessible without items, or we can add it to Invoice model
+        amount:
+            0, // Invoices don't have a single amount field easily accessible without items, or we can add it to Invoice model
         timestamp: item.createdAt ?? DateTime.now(),
       );
     }
@@ -73,7 +77,6 @@ final recentActivityProvider = FutureProvider<List<ActivityFeedItem>>((ref) asyn
     );
   }).toList();
 });
-
 
 /// Activity feed item model
 class ActivityFeedItem {
