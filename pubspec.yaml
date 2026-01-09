@@ -55,6 +55,7 @@ dependencies:
   internet_connection_checker: ^1.0.0+1
   drift: ^2.30.0
   sqlite3_flutter_libs: ^0.5.41
+  sqlite3: ^2.9.4
   path_provider: ^2.1.5
   # Removed: path_provider, flutter_secure_storage, local_auth*, device_info_plus, windows_printer, electricsql
 

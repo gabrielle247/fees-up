@@ -1,6 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:drift/drift.dart' hide Column;
-import '../database/drift_database.dart';
 import 'core_providers.dart';
 import 'school_providers.dart';
 import 'student_providers.dart';

@@ -1,5 +1,7 @@
 import 'package:fees_up/constants/app_colors.dart';
+import 'package:fees_up/data/providers/sync_providers.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class ConfigsScreen extends StatefulWidget {
   const ConfigsScreen({super.key});
@@ -525,29 +527,54 @@ class _ConfigsScreenState extends State<ConfigsScreen> {
                         Row(
                           children: [
                             Expanded(
-                              child: ElevatedButton(
-                                onPressed: () {},
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.primaryBlue,
-                                  padding:
-                                      const EdgeInsets.symmetric(vertical: 12),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                ),
-                                child: const Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(Icons.sync, size: 16),
-                                    SizedBox(width: 8),
-                                    Text(
-                                      'Sync Now',
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w600,
-                                      ),
+                              child: Consumer(
+                                builder: (context, ref, _) => ElevatedButton(
+                                  onPressed: () async {
+                                    final sync = ref.read(syncServiceProvider);
+                                    try {
+                                      await sync.syncAll();
+                                      if (!context.mounted) return;
+                                      setState(() {
+                                        _syncData['lastSync'] =
+                                            'Last synced: just now';
+                                      });
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        const SnackBar(
+                                          content: Text('Sync completed'),
+                                        ),
+                                      );
+                                    } catch (e) {
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        SnackBar(
+                                          content: Text('Sync failed: $e'),
+                                        ),
+                                      );
+                                    }
+                                  },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppColors.primaryBlue,
+                                    padding: const EdgeInsets.symmetric(
+                                        vertical: 12),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
                                     ),
-                                  ],
+                                  ),
+                                  child: const Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(Icons.sync, size: 16),
+                                      SizedBox(width: 8),
+                                      Text(
+                                        'Sync Now',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
                             ),

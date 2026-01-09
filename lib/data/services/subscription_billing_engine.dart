@@ -4,6 +4,7 @@ import '../database/drift_database.dart';
 /// For each student: get enrolled billables → sum prices → create single invoice.
 /// Idempotent: won't create duplicate invoices in the same month.
 class SubscriptionBillingEngine {
+  // ignore: unused_field
   final AppDatabase _db;
 
   SubscriptionBillingEngine(this._db);

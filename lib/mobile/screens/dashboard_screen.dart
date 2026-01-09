@@ -6,6 +6,8 @@ import 'package:fees_up/mobile/widgets/school_creation_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fees_up/data/services/seeder_service.dart';
+import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
@@ -121,30 +123,41 @@ class _DashboardContent extends ConsumerWidget {
                     Container(
                       width: 56,
                       height: 56,
-                      decoration: const BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: AppColors.surfaceHighlight,
-                        image: DecorationImage(
-                          image: AssetImage('assets/images/avatar.png'),
-                          fit: BoxFit.cover,
+                      decoration: BoxDecoration(
+                  const SizedBox(width: 16),
+                  const Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: const [
+                      Text(
+                        'Welcome back, Admin',
+                        style: TextStyle(
+                          color: AppColors.textWhite,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
-                    ),
-                    Positioned(
-                      bottom: 0,
-                      right: 0,
-                      child: Container(
-                        width: 16,
-                        height: 16,
-                        decoration: BoxDecoration(
-                          color: AppColors.successGreen,
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: AppColors.backgroundBlack,
-                            width: 2,
-                          ),
+                      SizedBox(height: 4),
+                      Text(
+                        'Harare High School',
+                        style: TextStyle(
+                          color: AppColors.textGrey,
+                          fontSize: 14,
                         ),
                       ),
+                    ],
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    tooltip: 'Logout',
+                    icon: const Icon(Icons.logout, color: AppColors.textGrey),
+                    onPressed: () async {
+                      final supabase = Supabase.instance.client;
+                      await supabase.auth.signOut();
+                      if (context.mounted) {
+                        context.go('/auth');
+                      }
+                    },
+                  ),
                     ),
                   ],
                 ),

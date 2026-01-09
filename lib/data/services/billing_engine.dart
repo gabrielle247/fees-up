@@ -1,6 +1,7 @@
 import '../database/drift_database.dart';
 
 class BillingEngine {
+  // ignore: unused_field
   final AppDatabase _db;
 
   BillingEngine(this._db);

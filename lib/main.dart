@@ -4,6 +4,7 @@ import 'config/router.dart';
 import 'constants/app_theme.dart';
 import 'core/init/app_initializer.dart';
 import 'data/services/app_logger.dart';
+import 'core/sync/sync_bootstrapper.dart';
 
 void main() async {
   await AppInitializer.init();
@@ -22,7 +23,8 @@ class FeesUpApp extends StatelessWidget {
     return MaterialApp.router(
       title: 'Fees Up',
       theme: AppTheme.darkTheme,
-      routerConfig: appRouter,
+      routerConfig: buildRouter(),
+      builder: (context, child) => SyncBootstrapper(child: child),
       debugShowCheckedModeBanner: false,
     );
   }
