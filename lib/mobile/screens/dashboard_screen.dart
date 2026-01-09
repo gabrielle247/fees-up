@@ -66,11 +66,19 @@ class _NoSchoolState extends ConsumerWidget {
             const SizedBox(height: 32),
             ElevatedButton(
               onPressed: () async {
-                // Trigger Seeder
-                final db = ref.read(driftDatabaseProvider);
-                await SeederService(db).seedExampleData();
-                // Refresh provider
-                ref.invalidate(currentSchoolProvider);
+                try {
+                  // Trigger Seeder
+                  final db = ref.read(driftDatabaseProvider);
+                  await SeederService(db).seedExampleData();
+                  // Refresh provider
+                  ref.invalidate(currentSchoolProvider);
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Failed to load demo data: $e')),
+                    );
+                  }
+                }
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primaryBlue,
@@ -124,10 +132,21 @@ class _DashboardContent extends ConsumerWidget {
                       width: 56,
                       height: 56,
                       decoration: BoxDecoration(
-                  const SizedBox(width: 16),
-                  const Column(
+                        color: AppColors.surfaceGrey,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(
+                        Icons.person,
+                        color: AppColors.textGrey,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(width: 16),
+                const Expanded(
+                  child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
+                    children: [
                       Text(
                         'Welcome back, Admin',
                         style: TextStyle(
@@ -146,45 +165,19 @@ class _DashboardContent extends ConsumerWidget {
                       ),
                     ],
                   ),
-                  const Spacer(),
-                  IconButton(
-                    tooltip: 'Logout',
-                    icon: const Icon(Icons.logout, color: AppColors.textGrey),
-                    onPressed: () async {
-                      final supabase = Supabase.instance.client;
-                      await supabase.auth.signOut();
-                      if (context.mounted) {
-                        context.go('/auth');
-                      }
-                    },
-                  ),
-                    ),
-                  ],
                 ),
-                const SizedBox(width: 12),
-                // Welcome Text
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Welcome back,',
-                        style: TextStyle(
-                          color: AppColors.textGrey,
-                          fontSize: 14,
-                        ),
-                      ),
-                      Text(
-                        'Finance Dashboard',
-                        style: TextStyle(
-                          color: AppColors.textWhite,
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
+                IconButton(
+                  tooltip: 'Logout',
+                  icon: const Icon(Icons.logout, color: AppColors.textGrey),
+                  onPressed: () async {
+                    final supabase = Supabase.instance.client;
+                    await supabase.auth.signOut();
+                    if (context.mounted) {
+                      context.go('/auth');
+                    }
+                  },
                 ),
+                const SizedBox(width: 8),
                 // Notification Bell
                 Stack(
                   children: [
@@ -374,7 +367,9 @@ class _DashboardContent extends ConsumerWidget {
                     children: [
                       Expanded(
                         child: OutlinedButton(
-                          onPressed: () {},
+                          onPressed: () {
+                            context.go('/finance');
+                          },
                           style: OutlinedButton.styleFrom(
                             foregroundColor: AppColors.textWhite,
                             side: const BorderSide(
@@ -398,7 +393,11 @@ class _DashboardContent extends ConsumerWidget {
                       const SizedBox(width: 12),
                       Expanded(
                         child: ElevatedButton.icon(
-                          onPressed: () {},
+                          onPressed: () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Invoice Generation is coming soon!')),
+                            );
+                          },
                           icon: const Icon(Icons.bolt, size: 20),
                           label: const Text(
                             'Generate All',
@@ -442,7 +441,9 @@ class _DashboardContent extends ConsumerWidget {
                   ),
                 ),
                 TextButton(
-                  onPressed: () {},
+                  onPressed: () {
+                    context.go('/finance');
+                  },
                   child: const Text(
                     'View All',
                     style: TextStyle(
@@ -526,7 +527,9 @@ class _DashboardContent extends ConsumerWidget {
             child: SizedBox(
               width: double.infinity,
               child: OutlinedButton(
-                onPressed: () {},
+                onPressed: () {
+                  context.go('/finance'); // Ledger is part of finance screen usually
+                },
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppColors.textWhite,
                   side: const BorderSide(

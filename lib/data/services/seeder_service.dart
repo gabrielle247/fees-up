@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 import '../database/drift_database.dart';
 import 'package:uuid/uuid.dart';
+import 'app_logger.dart';
 
 class SeederService {
   final AppDatabase _db;
@@ -9,13 +10,23 @@ class SeederService {
   SeederService(this._db);
 
   Future<void> seedExampleData() async {
-    // Check if school already exists
-    final existingSchool = await _db.select(_db.schools).getSingleOrNull();
-    if (existingSchool != null) return; // Don't seed if data exists
+    try {
+      // Check if school already exists
+      final existingSchool = await _db.select(_db.schools).getSingleOrNull();
+      if (existingSchool != null) return; // Don't seed if data exists
 
-    await _db.transaction(() async {
-      // 1. Create School
-      final schoolId = _uuid.v4();
+      await _db.transaction(() async {
+        await _performSeed();
+      });
+    } catch (e, stack) {
+      AppLogger.error('SeederService: seedExampleData failed', e, stack);
+      rethrow;
+    }
+  }
+
+  Future<void> _performSeed() async {
+    // 1. Create School
+    final schoolId = _uuid.v4();
       final school = SchoolsCompanion(
         id: Value(schoolId),
         name: const Value("Fees Up Demo School"),
@@ -169,6 +180,5 @@ class SeederService {
         receivedAt: Value(now.subtract(const Duration(days: 35))),
       );
       await _db.into(_db.payments).insert(pay2);
-    });
   }
 }
