@@ -8,16 +8,8 @@ class FinanceRepository {
 
   /// Get total outstanding amount (sum of unpaid invoice balances) for a school
   /// Note: This is a simplified calculation. Real accounting might require summing Ledger entries.
-  /// For now, we sum 'pending' and 'overdue' invoices.
+  /// For now, we calculate from ledger: Total Outstanding = (Total DEBITs) - (Total CREDITs) across all students.
   Future<int> getTotalOutstanding(String schoolId) async {
-    final invoices = await _isar.invoices
-        .filter()
-        .schoolIdEqualTo(schoolId)
-        .statusEqualTo('pending')
-        .or()
-        .statusEqualTo('overdue')
-        .findAll();
-
     // Since Invoice model doesn't store 'balance', we might need to calculate it from ledger or invoice items.
     // However, the Invoice model has 'status'.
     // Let's assume for this simple dashboard, we query the *Ledger* for debit balances,
@@ -32,14 +24,14 @@ class FinanceRepository {
     // LedgerEntry has 'amount' and 'type' (DEBIT/CREDIT).
     // Total Outstanding = (Total DEBITs) - (Total CREDITs) across all students.
 
-    final debitTotal = await _isar.ledgerEntries
+    final debitTotal = await _isar.ledgerEntrys
         .filter()
         .schoolIdEqualTo(schoolId)
         .typeEqualTo('DEBIT')
         .amountProperty()
         .sum();
 
-    final creditTotal = await _isar.ledgerEntries
+    final creditTotal = await _isar.ledgerEntrys
         .filter()
         .schoolIdEqualTo(schoolId)
         .typeEqualTo('CREDIT')
@@ -86,7 +78,8 @@ class FinanceRepository {
   /// Since we need to return specific fields for the UI, let's return a list of dynamic for now
   /// or we can rely on the caller to fetch separate lists.
   /// But 'Recent Activity' usually interleaves them.
-  Future<List<dynamic>> getRecentActivity(String schoolId, {int limit = 10}) async {
+  Future<List<dynamic>> getRecentActivity(String schoolId,
+      {int limit = 10}) async {
     // Fetch recent payments
     final payments = await _isar.payments
         .filter()
@@ -108,14 +101,22 @@ class FinanceRepository {
     final combined = <dynamic>[...payments, ...invoices];
     combined.sort((a, b) {
       DateTime timeA;
-      if (a is Payment) timeA = a.receivedAt;
-      else if (a is Invoice) timeA = a.createdAt ?? DateTime(2000);
-      else timeA = DateTime(2000);
+      if (a is Payment) {
+        timeA = a.receivedAt;
+      } else if (a is Invoice) {
+        timeA = a.createdAt ?? DateTime(2000);
+      } else {
+        timeA = DateTime(2000);
+      }
 
       DateTime timeB;
-      if (b is Payment) timeB = b.receivedAt;
-      else if (b is Invoice) timeB = b.createdAt ?? DateTime(2000);
-      else timeB = DateTime(2000);
+      if (b is Payment) {
+        timeB = b.receivedAt;
+      } else if (b is Invoice) {
+        timeB = b.createdAt ?? DateTime(2000);
+      } else {
+        timeB = DateTime(2000);
+      }
 
       return timeB.compareTo(timeA); // Descending
     });
@@ -126,7 +127,7 @@ class FinanceRepository {
   /// Get full ledger entries for Finance Screen
   /// Returns LedgerEntry objects which are the source of truth for the finance log.
   Future<List<LedgerEntry>> getLedgerEntries(String schoolId) async {
-    return await _isar.ledgerEntries
+    return await _isar.ledgerEntrys
         .filter()
         .schoolIdEqualTo(schoolId)
         .sortByOccurredAtDesc()

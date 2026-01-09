@@ -55,6 +55,8 @@ class Student {
   String? nationalId;
   DateTime? dob;
   String? gender;
+  String? admissionNumber;
+  String? currentGrade;
 
   String status = 'ACTIVE';
   DateTime? enrollmentDate;
@@ -70,6 +72,8 @@ class Student {
         'national_id': nationalId,
         'dob': dob?.toIso8601String(),
         'gender': gender,
+        'admission_number': admissionNumber,
+        'current_grade': currentGrade,
         'status': status,
         'enrollment_date': enrollmentDate?.toIso8601String(),
         'created_at': createdAt?.toIso8601String(),
@@ -83,6 +87,8 @@ class Student {
     ..nationalId = json['national_id'] as String?
     ..dob = json['dob'] != null ? DateTime.parse(json['dob'] as String) : null
     ..gender = json['gender'] as String?
+    ..admissionNumber = json['admission_number'] as String?
+    ..currentGrade = json['current_grade'] as String?
     ..status = json['status'] as String? ?? 'ACTIVE'
     ..enrollmentDate = json['enrollment_date'] != null
         ? DateTime.parse(json['enrollment_date'] as String)

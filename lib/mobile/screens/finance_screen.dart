@@ -15,7 +15,6 @@ class FinanceScreen extends ConsumerStatefulWidget {
 class _FinanceScreenState extends ConsumerState<FinanceScreen> {
   String _selectedPeriod = 'All Time';
   String _selectedFilter = 'All';
-  String _selectedSort = 'Date (Newest)';
   bool _showAdvancedFilters = false;
 
   double _getTotalReceipts(List<LedgerEntry> entries) {
@@ -31,6 +30,7 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
         .fold(0.0, (sum, e) => sum + e.amountInDollars);
   }
 
+  // ignore: unused_element
   double _getTotalPending(List<LedgerEntry> entries) {
     // Ledger entries don't track pending status directly.
     // This would typically come from Invoice status.
@@ -47,7 +47,8 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
     // Date filtering (Simplified)
     final now = DateTime.now();
     if (_selectedPeriod == 'This Month') {
-      if (entry.occurredAt.month != now.month || entry.occurredAt.year != now.year) {
+      if (entry.occurredAt.month != now.month ||
+          entry.occurredAt.year != now.year) {
         return false;
       }
     }
@@ -57,12 +58,14 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
   }
 
   // Group entries by Month Year (e.g. "JANUARY 2026")
-  Map<String, List<LedgerEntry>> _groupEntriesByMonth(List<LedgerEntry> entries) {
+  Map<String, List<LedgerEntry>> _groupEntriesByMonth(
+      List<LedgerEntry> entries) {
     final Map<String, List<LedgerEntry>> grouped = {};
     for (var entry in entries) {
       if (!_matchesFilters(entry)) continue;
 
-      final key = DateFormat('MMMM yyyy').format(entry.occurredAt).toUpperCase();
+      final key =
+          DateFormat('MMMM yyyy').format(entry.occurredAt).toUpperCase();
       if (!grouped.containsKey(key)) {
         grouped[key] = [];
       }
@@ -301,201 +304,252 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
 
                       Expanded(
                         child: grouped.isEmpty
-                        ? const Center(child: Text('No transactions found', style: TextStyle(color: AppColors.textGrey)))
-                        : SingleChildScrollView(
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 16),
-                              child: Column(
-                                children: grouped.entries.map((entry) {
-                                  final month = entry.key;
-                                  final monthEntries = entry.value;
+                            ? const Center(
+                                child: Text('No transactions found',
+                                    style:
+                                        TextStyle(color: AppColors.textGrey)))
+                            : SingleChildScrollView(
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 16),
+                                  child: Column(
+                                    children: grouped.entries.map((entry) {
+                                      final month = entry.key;
+                                      final monthEntries = entry.value;
 
-                                  // Sort by date desc
-                                  monthEntries.sort((a, b) => b.occurredAt.compareTo(a.occurredAt));
+                                      // Sort by date desc
+                                      monthEntries.sort((a, b) =>
+                                          b.occurredAt.compareTo(a.occurredAt));
 
-                                  final monthTotal = monthEntries.fold<double>(
-                                      0, (sum, e) => sum + e.amountInDollars);
+                                      final monthTotal =
+                                          monthEntries.fold<double>(
+                                              0,
+                                              (sum, e) =>
+                                                  sum + e.amountInDollars);
 
-                                  return Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      // Month Header
-                                      Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      return Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
-                                          Text(
-                                            month,
-                                            style: const TextStyle(
-                                              color: AppColors.textWhite,
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 10,
-                                              vertical: 4,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              color: AppColors.surfaceDarkGrey,
-                                              borderRadius: BorderRadius.circular(12),
-                                            ),
-                                            child: Text(
-                                              '${monthEntries.length} entries',
-                                              style: const TextStyle(
-                                                color: AppColors.textGrey,
-                                                fontSize: 11,
+                                          // Month Header
+                                          Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              Text(
+                                                month,
+                                                style: const TextStyle(
+                                                  color: AppColors.textWhite,
+                                                  fontSize: 14,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
                                               ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-
-                                      const SizedBox(height: 12),
-
-                                      // Month Total (Just a sum, meaning might vary based on credit/debit mix)
-                                      // Usually we want Net Cash Flow? Or just total volume?
-                                      // Displaying total volume for now.
-                                      Container(
-                                        padding: const EdgeInsets.all(12),
-                                        decoration: BoxDecoration(
-                                          color: AppColors.surfaceGrey,
-                                          borderRadius: BorderRadius.circular(12),
-                                          border: Border.all(
-                                            color: AppColors.successGreen
-                                                .withValues(alpha: 0.2),
-                                          ),
-                                        ),
-                                        child: Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                          children: [
-                                            const Text(
-                                              'Month Volume',
-                                              style: TextStyle(
-                                                color: AppColors.textGrey,
-                                                fontSize: 12,
-                                              ),
-                                            ),
-                                            Text(
-                                              '\$${monthTotal.toStringAsFixed(2)}',
-                                              style: const TextStyle(
-                                                color: AppColors.textWhite,
-                                                fontSize: 14,
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-
-                                      const SizedBox(height: 12),
-
-                                      // Transactions
-                                      ...monthEntries.map((transaction) {
-                                        return Padding(
-                                          padding: const EdgeInsets.only(bottom: 12),
-                                          child: Container(
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 12,
-                                              vertical: 12,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              color: AppColors.surfaceGrey,
-                                              borderRadius: BorderRadius.circular(12),
-                                            ),
-                                            child: Row(
-                                              children: [
-                                                _getTransactionIcon(transaction.type),
-                                                const SizedBox(width: 12),
-                                                Expanded(
-                                                  child: Column(
-                                                    crossAxisAlignment:
-                                                        CrossAxisAlignment.start,
-                                                    children: [
-                                                      Text(
-                                                        // Use description or category as name substitute
-                                                        transaction.description ?? transaction.category,
-                                                        style: const TextStyle(
-                                                          color: AppColors.textWhite,
-                                                          fontSize: 14,
-                                                          fontWeight: FontWeight.w600,
-                                                        ),
-                                                      ),
-                                                      const SizedBox(height: 4),
-                                                      Row(
-                                                        children: [
-                                                          Expanded(
-                                                            child: Text(
-                                                              '${transaction.referenceCode ?? '-'} • ${transaction.category}',
-                                                              style: const TextStyle(
-                                                                color: AppColors.textGrey,
-                                                                fontSize: 11,
-                                                              ),
-                                                              maxLines: 1,
-                                                              overflow:
-                                                                  TextOverflow.ellipsis,
-                                                            ),
-                                                          ),
-                                                        ],
-                                                      ),
-                                                      const SizedBox(height: 6),
-                                                      Text(
-                                                        DateFormat('MMM dd').format(transaction.occurredAt).toUpperCase(),
-                                                        style: const TextStyle(
-                                                          color: AppColors.textGrey,
-                                                          fontSize: 10,
-                                                        ),
-                                                      ),
-                                                    ],
+                                              Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                  horizontal: 10,
+                                                  vertical: 4,
+                                                ),
+                                                decoration: BoxDecoration(
+                                                  color:
+                                                      AppColors.surfaceDarkGrey,
+                                                  borderRadius:
+                                                      BorderRadius.circular(12),
+                                                ),
+                                                child: Text(
+                                                  '${monthEntries.length} entries',
+                                                  style: const TextStyle(
+                                                    color: AppColors.textGrey,
+                                                    fontSize: 11,
                                                   ),
                                                 ),
-                                                const SizedBox(width: 12),
-                                                Column(
-                                                  crossAxisAlignment:
-                                                      CrossAxisAlignment.end,
-                                                  children: [
-                                                    Text(
-                                                      transaction.type == 'CREDIT'
-                                                          ? '+\$${transaction.amountInDollars.toStringAsFixed(2)}'
-                                                          : '\$${transaction.amountInDollars.toStringAsFixed(2)}',
-                                                      style: TextStyle(
-                                                        color:
-                                                            transaction.type == 'CREDIT'
-                                                                ? AppColors.successGreen
-                                                                : AppColors.textWhite,
-                                                        fontSize: 14,
-                                                        fontWeight: FontWeight.bold,
-                                                      ),
-                                                    ),
-                                                    const SizedBox(height: 4),
-                                                    const Text(
-                                                      'USD',
-                                                      style: TextStyle(
-                                                        color: AppColors.textGrey,
-                                                        fontSize: 10,
-                                                      ),
-                                                    ),
-                                                  ],
+                                              ),
+                                            ],
+                                          ),
+
+                                          const SizedBox(height: 12),
+
+                                          // Month Total (Just a sum, meaning might vary based on credit/debit mix)
+                                          // Usually we want Net Cash Flow? Or just total volume?
+                                          // Displaying total volume for now.
+                                          Container(
+                                            padding: const EdgeInsets.all(12),
+                                            decoration: BoxDecoration(
+                                              color: AppColors.surfaceGrey,
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
+                                              border: Border.all(
+                                                color: AppColors.successGreen
+                                                    .withValues(alpha: 0.2),
+                                              ),
+                                            ),
+                                            child: Row(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment
+                                                      .spaceBetween,
+                                              children: [
+                                                const Text(
+                                                  'Month Volume',
+                                                  style: TextStyle(
+                                                    color: AppColors.textGrey,
+                                                    fontSize: 12,
+                                                  ),
+                                                ),
+                                                Text(
+                                                  '\$${monthTotal.toStringAsFixed(2)}',
+                                                  style: const TextStyle(
+                                                    color: AppColors.textWhite,
+                                                    fontSize: 14,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
                                                 ),
                                               ],
                                             ),
                                           ),
-                                        );
-                                      }),
 
-                                      const SizedBox(height: 20),
-                                    ],
-                                  );
-                                }).toList(),
+                                          const SizedBox(height: 12),
+
+                                          // Transactions
+                                          ...monthEntries.map((transaction) {
+                                            return Padding(
+                                              padding: const EdgeInsets.only(
+                                                  bottom: 12),
+                                              child: Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                  horizontal: 12,
+                                                  vertical: 12,
+                                                ),
+                                                decoration: BoxDecoration(
+                                                  color: AppColors.surfaceGrey,
+                                                  borderRadius:
+                                                      BorderRadius.circular(12),
+                                                ),
+                                                child: Row(
+                                                  children: [
+                                                    _getTransactionIcon(
+                                                        transaction.type),
+                                                    const SizedBox(width: 12),
+                                                    Expanded(
+                                                      child: Column(
+                                                        crossAxisAlignment:
+                                                            CrossAxisAlignment
+                                                                .start,
+                                                        children: [
+                                                          Text(
+                                                            // Use description or category as name substitute
+                                                            transaction
+                                                                    .description ??
+                                                                transaction
+                                                                    .category,
+                                                            style:
+                                                                const TextStyle(
+                                                              color: AppColors
+                                                                  .textWhite,
+                                                              fontSize: 14,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .w600,
+                                                            ),
+                                                          ),
+                                                          const SizedBox(
+                                                              height: 4),
+                                                          Row(
+                                                            children: [
+                                                              Expanded(
+                                                                child: Text(
+                                                                  '${transaction.referenceCode ?? '-'} • ${transaction.category}',
+                                                                  style:
+                                                                      const TextStyle(
+                                                                    color: AppColors
+                                                                        .textGrey,
+                                                                    fontSize:
+                                                                        11,
+                                                                  ),
+                                                                  maxLines: 1,
+                                                                  overflow:
+                                                                      TextOverflow
+                                                                          .ellipsis,
+                                                                ),
+                                                              ),
+                                                            ],
+                                                          ),
+                                                          const SizedBox(
+                                                              height: 6),
+                                                          Text(
+                                                            DateFormat('MMM dd')
+                                                                .format(transaction
+                                                                    .occurredAt)
+                                                                .toUpperCase(),
+                                                            style:
+                                                                const TextStyle(
+                                                              color: AppColors
+                                                                  .textGrey,
+                                                              fontSize: 10,
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                    const SizedBox(width: 12),
+                                                    Column(
+                                                      crossAxisAlignment:
+                                                          CrossAxisAlignment
+                                                              .end,
+                                                      children: [
+                                                        Text(
+                                                          transaction.type ==
+                                                                  'CREDIT'
+                                                              ? '+\$${transaction.amountInDollars.toStringAsFixed(2)}'
+                                                              : '\$${transaction.amountInDollars.toStringAsFixed(2)}',
+                                                          style: TextStyle(
+                                                            color: transaction
+                                                                        .type ==
+                                                                    'CREDIT'
+                                                                ? AppColors
+                                                                    .successGreen
+                                                                : AppColors
+                                                                    .textWhite,
+                                                            fontSize: 14,
+                                                            fontWeight:
+                                                                FontWeight.bold,
+                                                          ),
+                                                        ),
+                                                        const SizedBox(
+                                                            height: 4),
+                                                        const Text(
+                                                          'USD',
+                                                          style: TextStyle(
+                                                            color: AppColors
+                                                                .textGrey,
+                                                            fontSize: 10,
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            );
+                                          }),
+
+                                          const SizedBox(height: 20),
+                                        ],
+                                      );
+                                    }).toList(),
+                                  ),
+                                ),
                               ),
-                            ),
-                          ),
                       ),
                     ],
                   );
                 },
-                loading: () => const Center(child: CircularProgressIndicator(color: AppColors.primaryBlue)),
-                error: (e, s) => Center(child: Text('Error: $e', style: const TextStyle(color: AppColors.errorRed))),
+                loading: () => const Center(
+                    child: CircularProgressIndicator(
+                        color: AppColors.primaryBlue)),
+                error: (e, s) => Center(
+                    child: Text('Error: $e',
+                        style: const TextStyle(color: AppColors.errorRed))),
               ),
             ),
           ],

@@ -40,6 +40,7 @@ class Profile {
   late String schoolId;
 
   late String fullName;
+  String? firstName;
   late String email;
   late String roleId;
 
@@ -50,6 +51,7 @@ class Profile {
         'id': id,
         'school_id': schoolId,
         'full_name': fullName,
+        'first_name': firstName,
         'email': email,
         'role_id': roleId,
         'is_banned': isBanned,
@@ -60,6 +62,7 @@ class Profile {
     ..id = json['id'] as String
     ..schoolId = json['school_id'] as String
     ..fullName = json['full_name'] as String
+    ..firstName = json['first_name'] as String?
     ..email = json['email'] as String
     ..roleId = json['role_id'] as String
     ..isBanned = json['is_banned'] as bool? ?? false

@@ -23,9 +23,11 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
     }
     return students
         .where((student) =>
-            (student.firstName.toLowerCase() + ' ' + student.lastName.toLowerCase())
+            '${student.firstName.toLowerCase()} ${student.lastName.toLowerCase()}'
                 .contains(_searchQuery.toLowerCase()) ||
-            student.admissionNumber.toLowerCase().contains(_searchQuery.toLowerCase()))
+            (student.admissionNumber ?? '')
+                .toLowerCase()
+                .contains(_searchQuery.toLowerCase()))
         .toList();
   }
 
@@ -95,8 +97,11 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
       backgroundColor: AppColors.backgroundBlack,
       body: SafeArea(
         child: schoolIdAsync.when(
-          loading: () => const Center(child: CircularProgressIndicator(color: AppColors.primaryBlue)),
-          error: (e, s) => Center(child: Text('Error loading school: $e', style: const TextStyle(color: AppColors.errorRed))),
+          loading: () => const Center(
+              child: CircularProgressIndicator(color: AppColors.primaryBlue)),
+          error: (e, s) => Center(
+              child: Text('Error loading school: $e',
+                  style: const TextStyle(color: AppColors.errorRed))),
           data: (schoolId) {
             final studentsAsync = ref.watch(studentsProvider(schoolId));
 
@@ -166,8 +171,8 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
                             decoration: const InputDecoration(
                               hintText: 'Search',
                               hintStyle: TextStyle(color: AppColors.textGrey),
-                              prefixIcon: Icon(Icons.search,
-                                  color: AppColors.textGrey),
+                              prefixIcon:
+                                  Icon(Icons.search, color: AppColors.textGrey),
                               border: InputBorder.none,
                               contentPadding:
                                   EdgeInsets.symmetric(vertical: 14),
@@ -198,11 +203,17 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
                 // Expandable Form Sections
                 Expanded(
                   child: studentsAsync.when(
-                    loading: () => const Center(child: CircularProgressIndicator(color: AppColors.primaryBlue)),
-                    error: (e, s) => Center(child: Text('Error loading students: $e', style: const TextStyle(color: AppColors.errorRed))),
+                    loading: () => const Center(
+                        child: CircularProgressIndicator(
+                            color: AppColors.primaryBlue)),
+                    error: (e, s) => Center(
+                        child: Text('Error loading students: $e',
+                            style: const TextStyle(color: AppColors.errorRed))),
                     data: (students) {
                       if (students.isEmpty) {
-                         return const Center(child: Text('No students found', style: TextStyle(color: AppColors.textGrey)));
+                        return const Center(
+                            child: Text('No students found',
+                                style: TextStyle(color: AppColors.textGrey)));
                       }
 
                       final groupedStudents = _groupStudentsByForm(students);
@@ -211,7 +222,8 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
                       for (var key in groupedStudents.keys) {
                         if (!_expandedForms.containsKey(key)) {
                           // Expand first one by default
-                          _expandedForms[key] = groupedStudents.keys.first == key;
+                          _expandedForms[key] =
+                              groupedStudents.keys.first == key;
                         }
                       }
 
@@ -222,10 +234,13 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
                             children: groupedStudents.entries.map((entry) {
                               final form = entry.key;
                               final formStudents = entry.value;
-                              final filteredStudents = _getFilteredStudents(formStudents);
+                              final filteredStudents =
+                                  _getFilteredStudents(formStudents);
                               final isExpanded = _expandedForms[form] ?? false;
 
-                              if (filteredStudents.isEmpty && _searchQuery.isNotEmpty) return const SizedBox.shrink();
+                              if (filteredStudents.isEmpty &&
+                                  _searchQuery.isNotEmpty)
+                                return const SizedBox.shrink();
 
                               return Column(
                                 children: [
@@ -267,7 +282,8 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
                                               ),
                                               const SizedBox(width: 12),
                                               Container(
-                                                padding: const EdgeInsets.symmetric(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
                                                   horizontal: 8,
                                                   vertical: 4,
                                                 ),
@@ -280,7 +296,8 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
                                                 child: Text(
                                                   '${filteredStudents.length}',
                                                   style: const TextStyle(
-                                                    color: AppColors.successGreen,
+                                                    color:
+                                                        AppColors.successGreen,
                                                     fontSize: 12,
                                                     fontWeight: FontWeight.w600,
                                                   ),
@@ -306,22 +323,29 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
                                       children: [
                                         const SizedBox(height: 12),
                                         ...filteredStudents.map((student) {
-                                          // Placeholder for owed amount - assuming logic or field exists
-                                          // Student model doesn't have 'owed' field in current view
-                                          // We might need to fetch this or assume 0 for now
-                                          final isOwing = false;
-                                          final owedAmount = 0;
-                                          final paidAmount = 0;
-                                          final initials = (student.firstName.isNotEmpty ? student.firstName[0] : '') +
-                                                           (student.lastName.isNotEmpty ? student.lastName[0] : '');
-                                          final fullName = '${student.firstName} ${student.lastName}';
+                                          // TODO: Calculate from totalOwing provider when real data is wired
+                                          const isOwing = false; // Placeholder
+                                          const owedAmount = 0.0; // Placeholder
+                                          const paidAmount = 0.0; // Placeholder
+                                          final initials =
+                                              (student.firstName.isNotEmpty
+                                                      ? student.firstName[0]
+                                                      : '') +
+                                                  (student.lastName.isNotEmpty
+                                                      ? student.lastName[0]
+                                                      : '');
+                                          final fullName =
+                                              '${student.firstName} ${student.lastName}';
 
                                           return Padding(
-                                            padding: const EdgeInsets.only(bottom: 12),
+                                            padding: const EdgeInsets.only(
+                                                bottom: 12),
                                             child: GestureDetector(
-                                              onTap: () => _showStudentDetails(student),
+                                              onTap: () =>
+                                                  _showStudentDetails(student),
                                               child: Container(
-                                                padding: const EdgeInsets.symmetric(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
                                                   horizontal: 16,
                                                   vertical: 12,
                                                 ),
@@ -337,17 +361,22 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
                                                       width: 48,
                                                       height: 48,
                                                       decoration: BoxDecoration(
-                                                        color: _getAvatarColor(initials),
+                                                        color: _getAvatarColor(
+                                                            initials),
                                                         borderRadius:
-                                                            BorderRadius.circular(24),
+                                                            BorderRadius
+                                                                .circular(24),
                                                       ),
                                                       child: Center(
                                                         child: Text(
                                                           initials,
-                                                          style: const TextStyle(
-                                                            color: AppColors.textWhite,
+                                                          style:
+                                                              const TextStyle(
+                                                            color: AppColors
+                                                                .textWhite,
                                                             fontSize: 14,
-                                                            fontWeight: FontWeight.w600,
+                                                            fontWeight:
+                                                                FontWeight.w600,
                                                           ),
                                                         ),
                                                       ),
@@ -359,19 +388,23 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
                                                     Expanded(
                                                       child: Column(
                                                         crossAxisAlignment:
-                                                            CrossAxisAlignment.start,
+                                                            CrossAxisAlignment
+                                                                .start,
                                                         children: [
                                                           Text(
                                                             fullName,
-                                                            style: const TextStyle(
-                                                              color:
-                                                                  AppColors.textWhite,
+                                                            style:
+                                                                const TextStyle(
+                                                              color: AppColors
+                                                                  .textWhite,
                                                               fontSize: 14,
                                                               fontWeight:
-                                                                  FontWeight.w600,
+                                                                  FontWeight
+                                                                      .w600,
                                                             ),
                                                           ),
-                                                          const SizedBox(height: 4),
+                                                          const SizedBox(
+                                                              height: 4),
                                                           Row(
                                                             children: [
                                                               Container(
@@ -383,13 +416,16 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
                                                                       .successGreen,
                                                                   borderRadius:
                                                                       BorderRadius
-                                                                          .circular(4),
+                                                                          .circular(
+                                                                              4),
                                                                 ),
                                                               ),
-                                                              const SizedBox(width: 6),
+                                                              const SizedBox(
+                                                                  width: 6),
                                                               Text(
-                                                                student.status ?? 'ACTIVE',
-                                                                style: const TextStyle(
+                                                                student.status,
+                                                                style:
+                                                                    const TextStyle(
                                                                   color: AppColors
                                                                       .textGrey,
                                                                   fontSize: 11,
@@ -492,7 +528,7 @@ class _StudentDetailsSheet extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    student.admissionNumber,
+                    student.admissionNumber ?? 'N/A',
                     style: const TextStyle(
                       color: AppColors.textGrey,
                       fontSize: 12,
@@ -539,7 +575,8 @@ class _StudentDetailsSheet extends StatelessWidget {
 
           const Text(
             'Personal Details',
-            style: TextStyle(color: AppColors.textGrey, fontWeight: FontWeight.bold),
+            style: TextStyle(
+                color: AppColors.textGrey, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
           Text(
