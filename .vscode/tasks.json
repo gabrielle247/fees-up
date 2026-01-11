@@ -1,0 +1,54 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Flutter: Pub Get",
+            "type": "shell",
+            "command": "flutter",
+            "args": [
+                "pub",
+                "get"
+            ],
+            "group": "build"
+        },
+        {
+            "label": "Flutter: Test",
+            "type": "shell",
+            "command": "flutter",
+            "args": [
+                "test"
+            ],
+            "group": "test"
+        },
+        {
+            "label": "Build Android (Release)",
+            "type": "shell",
+            "command": "flutter",
+            "args": [
+                "build",
+                "apk",
+                "--release",
+                "--dart-define=SUPABASE_URL=${env:SUPABASE_URL}",
+                "--dart-define=SUPABASE_ANON_KEY=${env:SUPABASE_ANON_KEY}",
+                "--dart-define=POWERSYNC_ENDPOINT_URL=${env:POWERSYNC_ENDPOINT_URL}",
+                "--dart-define=ENVIRONMENT=production"
+            ],
+            "group": "build"
+        },
+        {
+            "label": "Build Web (Release)",
+            "type": "shell",
+            "command": "flutter",
+            "args": [
+                "build",
+                "web",
+                "--release",
+                "--dart-define=SUPABASE_URL=${env:SUPABASE_URL}",
+                "--dart-define=SUPABASE_ANON_KEY=${env:SUPABASE_ANON_KEY}",
+                "--dart-define=POWERSYNC_ENDPOINT_URL=${env:POWERSYNC_ENDPOINT_URL}",
+                "--dart-define=ENVIRONMENT=production"
+            ],
+            "group": "build"
+        }
+    ]
+}

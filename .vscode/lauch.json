@@ -1,0 +1,69 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "fees_up (development)",
+            "request": "launch",
+            "type": "dart",
+            "program": "lib/main.dart",
+            "toolArgs": [
+                "--dart-define=SUPABASE_URL=${config:feesup.SUPABASE_URL}",
+                "--dart-define=UFT_PASSWORD=${config:feesup.UFT_PASSWORD}",
+                "--dart-define=SUPABASE_ANON_KEY=${config:feesup.SUPABASE_ANON_KEY}",
+                "--dart-define=POWERSYNC_ENDPOINT_URL=${config:feesup.POWERSYNC_ENDPOINT_URL}",
+                "--dart-define=APP_PASSWORD=${config:feesup.APP_PASSWORD}",
+                "--dart-define=ENVIRONMENT=development"
+            ]
+        },
+        {
+            "name": "fees_up (Linux)",
+            "request": "launch",
+            "type": "dart",
+            "program": "lib/main.dart",
+            "args": [
+                "-d",
+                "linux"
+            ],
+            "toolArgs": [
+                "--dart-define=SUPABASE_URL=${config:feesup.SUPABASE_URL}",
+                "--dart-define=UFT_PASSWORD=${config:feesup.UFT_PASSWORD}",
+                "--dart-define=SUPABASE_ANON_KEY=${config:feesup.SUPABASE_ANON_KEY}",
+                "--dart-define=POWERSYNC_ENDPOINT_URL=${config:feesup.POWERSYNC_ENDPOINT_URL}",
+                "--dart-define=APP_PASSWORD=${config:feesup.APP_PASSWORD}",
+                "--dart-define=ENVIRONMENT=development"
+            ]
+        },
+        {
+            "name": "fees_up (Android)",
+            "request": "launch",
+            "type": "dart",
+            "program": "lib/main.dart",
+            "args": [
+                "-d",
+                "android"
+            ],
+            "toolArgs": [
+                "--dart-define=SUPABASE_URL=${config:feesup.SUPABASE_URL}",
+                "--dart-define=SUPABASE_ANON_KEY=${config:feesup.SUPABASE_ANON_KEY}",
+                "--dart-define=POWERSYNC_ENDPOINT_URL=${config:feesup.POWERSYNC_ENDPOINT_URL}",
+                "--dart-define=ENVIRONMENT=development",
+                "--dart-define=UFT_PASSWORD=${config:feesup.UFT_PASSWORD}",
+                "--dart-define=APP_PASSWORD=${config:feesup.APP_PASSWORD}"
+            ]
+        },
+        {
+            "name": "fees_up (production build)",
+            "request": "launch",
+            "type": "dart",
+            "program": "lib/main.dart",
+            "toolArgs": [
+                "--dart-define=SUPABASE_URL=${config:feesup.SUPABASE_URL}",
+                "--dart-define=UFT_PASSWORD=${config:feesup.UFT_PASSWORD}",
+                "--dart-define=SUPABASE_ANON_KEY=${config:feesup.SUPABASE_ANON_KEY}",
+                "--dart-define=POWERSYNC_ENDPOINT_URL=${config:feesup.POWERSYNC_ENDPOINT_URL}",
+                "--dart-define=APP_PASSWORD=${config:feesup.APP_PASSWORD}",
+                "--dart-define=ENVIRONMENT=production"
+            ]
+        }
+    ]
+}

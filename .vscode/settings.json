@@ -1,0 +1,9 @@
+{
+    "cmake.sourceDirectory": "/home/nyashagabriel/Development/Official Fees Up Done/fees_up/linux",
+    "makefile.configureOnOpen": false,
+    "feesup.SUPABASE_URL": "https://hcxvsygvihhdkkyynqzw.supabase.co",
+    "feesup.SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhjeHZzeWd2aWhoZGtreXlucXp3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI5MTA3OTEsImV4cCI6MjA3ODQ4Njc5MX0.Tn1vzaNWHW9bV6FchGU_du-HQ9QDDXphxWJL1cM75qY",
+    "feesup.POWERSYNC_ENDPOINT_URL": "https://6943ea857e2a07e6df7daa4e.powersync.journeyapps.com",
+    "feesup.UFT_PASSWORD": "VlmYZBTMvYgANLIEIrDoYMwKuAbUsiZnITbFLoMjusxjGCnNWS",
+    "feesup.APP_PASSWORD": "epha ujzy wpjd wosi"
+}

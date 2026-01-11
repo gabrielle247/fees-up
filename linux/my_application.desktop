@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Fees Up
+Comment=Student fees management application
+Exec=feesup
+Icon=feesup
+Terminal=false
+Type=Application
+Categories=Education;Finance;
+StartupWMClass=com.greywayco.feesup

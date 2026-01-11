@@ -1,0 +1,234 @@
+# Fees Up PowerSync Sync Rules — Security & Data Isolation
+# Schema Organization: saas (plans, schools) | access (profiles, roles) | people (students, enrollments, academic_years) | finance (invoices, payments, ledger, fee_*)
+# RULE: No school = No sync (except user profile which is always available)
+# All school-scoped buckets depend on user having a school_id
+
+bucket_definitions:
+
+  # ============================================================
+  # BUCKET 1: Private User Profile (Always Available)
+  # ============================================================
+  user_profile_bucket:
+    parameters:
+      - SELECT id as user_id FROM access.profiles WHERE id = request.user_id()
+    data:
+      - SELECT 
+          id,
+          email,
+          full_name,
+          role_id,
+          is_banned,
+          avatar_url,
+          created_at,
+          updated_at
+        FROM access.profiles
+        WHERE id = bucket.user_id
+
+  # ============================================================
+  # BUCKET 2: Access Control (Always Available)
+  # ============================================================
+  roles_bucket:
+    parameters:
+      - SELECT id as user_id FROM access.profiles WHERE id = request.user_id()
+    data:
+      - SELECT 
+          id,
+          description
+        FROM access.roles
+
+  # ============================================================
+  # BUCKET 3: GATED — School-Wide Operational Data
+  # Gate: User must have a school_id (checked via access.get_school_id())
+  # ============================================================
+  school_data_bucket:
+    parameters:
+      # GATE: Only include school_id if user has one
+      - SELECT school_id FROM access.profiles WHERE id = request.user_id() AND school_id IS NOT NULL
+    data:
+      - SELECT 
+          id,
+          name,
+          subdomain,
+          logo_url,
+          current_plan_id,
+          subscription_status,
+          valid_until,
+          address_line1,
+          city,
+          country,
+          phone_number,
+          email_address,
+          tax_id,
+          website,
+          created_at
+        FROM saas.schools
+        WHERE id = bucket.school_id
+
+      # --- People: Academic Years ---
+      - SELECT 
+          id,
+          school_id,
+          name,
+          start_date,
+          end_date,
+          is_active,
+          is_locked,
+          locked_at,
+          locked_by,
+          created_at,
+          updated_at
+        FROM people.academic_years
+        WHERE school_id = bucket.school_id
+
+      # --- People: Students (Active & Archived) ---
+      - SELECT 
+          id,
+          school_id,
+          first_name,
+          last_name,
+          national_id,
+          dob,
+          gender,
+          status,
+          enrollment_date,
+          admission_number,
+          guardian_name,
+          guardian_phone,
+          guardian_email,
+          guardian_relationship,
+          student_type,
+          admission_date,
+          is_archived,
+          created_at,
+          updated_at
+        FROM people.students
+        WHERE school_id = bucket.school_id
+
+      # --- People: Enrollments ---
+      - SELECT 
+          id,
+          school_id,
+          student_id,
+          academic_year_id,
+          grade_level,
+          class_stream,
+          is_active,
+          created_at
+        FROM people.enrollments
+        WHERE school_id = bucket.school_id
+
+      # --- Finance: Fee Configuration ---
+      - SELECT 
+          id,
+          school_id,
+          name,
+          is_taxable,
+          created_at
+        FROM finance.fee_categories
+        WHERE school_id = bucket.school_id
+
+      - SELECT 
+          id,
+          school_id,
+          academic_year_id,
+          category_id,
+          name,
+          amount,
+          currency,
+          target_grade,
+          billing_type,
+          recurrence,
+          billable_months,
+          suspensions,
+          created_at
+        FROM finance.fee_structures
+        WHERE school_id = bucket.school_id
+
+      # --- Finance: Billing ---
+      - SELECT 
+          id,
+          school_id,
+          student_id,
+          invoice_number,
+          term_id,
+          due_date,
+          status,
+          snapshot_grade,
+          created_at
+        FROM finance.invoices
+        WHERE school_id = bucket.school_id
+
+      - SELECT 
+          id,
+          invoice_id,
+          fee_structure_id,
+          description,
+          amount,
+          quantity,
+          created_at
+        FROM finance.invoice_items
+        WHERE invoice_id IN (
+          SELECT id FROM finance.invoices WHERE school_id = bucket.school_id
+        )
+
+      # --- Finance: Payments & Allocations ---
+      - SELECT 
+          id,
+          school_id,
+          student_id,
+          amount,
+          method,
+          reference_code,
+          received_at,
+          created_at
+        FROM finance.payments
+        WHERE school_id = bucket.school_id
+
+      - SELECT 
+          id,
+          payment_id,
+          invoice_item_id,
+          amount_allocated,
+          created_at
+        FROM finance.payment_allocations
+        WHERE payment_id IN (
+          SELECT id FROM finance.payments WHERE school_id = bucket.school_id
+        )
+
+      # --- Finance: Ledger (Audit Trail) ---
+      - SELECT 
+          id,
+          school_id,
+          student_id,
+          type,
+          category,
+          amount,
+          currency,
+          invoice_id,
+          reference_code,
+          description,
+          occurred_at,
+          created_at
+        FROM finance.ledger
+        WHERE school_id = bucket.school_id
+
+  # ============================================================
+  # BUCKET 4: GATED — Roles & Permissions
+  # Gate: User must have a school_id
+  # ============================================================
+  access_bucket:
+    parameters:
+      - SELECT school_id FROM access.profiles WHERE id = request.user_id() AND school_id IS NOT NULL
+    data:
+      # School roster (profiles filtered by school)
+      - SELECT 
+          id,
+          school_id,
+          full_name,
+          email,
+          role_id,
+          is_banned,
+          avatar_url,
+          created_at
+        FROM access.profiles
+        WHERE school_id = bucket.school_id
